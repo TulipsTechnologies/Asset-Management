@@ -15,14 +15,18 @@ export enum AssigneeTypeEnum {
 export enum AssignmentStatusEnum {
   Open = 1,
   Returned = 2,
+  /** Closed because custody moved to another employee via a transfer. */
+  Transferred = 3,
 }
 
 export const ASSIGNMENT_STATUS_LABELS: Record<number, string> = {
   [AssignmentStatusEnum.Open]: 'Open',
   [AssignmentStatusEnum.Returned]: 'Returned',
+  [AssignmentStatusEnum.Transferred]: 'Transferred',
 };
 
 export const ASSIGNMENT_STATUS_BADGE_CLASSES: Record<number, string> = {
   [AssignmentStatusEnum.Open]: 'bg-green-100 text-green-800',
   [AssignmentStatusEnum.Returned]: 'bg-gray-100 text-gray-600',
+  [AssignmentStatusEnum.Transferred]: 'bg-amber-100 text-amber-800',
 };

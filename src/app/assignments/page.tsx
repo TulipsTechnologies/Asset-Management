@@ -375,6 +375,10 @@ const AssignmentsPage = () => {
                     value: String(AssignmentStatusEnum.Returned),
                     label: 'Returned',
                   },
+                  {
+                    value: String(AssignmentStatusEnum.Transferred),
+                    label: 'Transferred',
+                  },
                 ]}
                 value={filters.status != null ? String(filters.status) : ''}
                 onChange={(e) =>

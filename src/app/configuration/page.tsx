@@ -61,8 +61,10 @@ const ConfigurationPage = () => (
       />
       <ConfigCard
         title="Locations"
-        description="Hierarchical location master (site → floor → room) with optional branch anchoring."
+        description="Hierarchical location master (site → floor → room) — transfer and registration targets."
+        href="/locations"
         icon="location"
+        ready
       />
       <ConfigCard
         title="Vendors"

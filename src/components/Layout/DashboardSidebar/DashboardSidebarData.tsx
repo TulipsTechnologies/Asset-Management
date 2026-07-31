@@ -73,8 +73,7 @@ export const ASSET_MENU_ITEMS: IMenuItem[] = [
     iconName: 'move',
     iconSizeClass: 'text-[16px]',
     label: 'Transfers',
-    url: '/coming-soon',
-    phase2: true,
+    url: '/transfers',
   },
   {
     id: 6,
