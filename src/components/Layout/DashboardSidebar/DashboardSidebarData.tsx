@@ -54,11 +54,18 @@ export const ASSET_MENU_ITEMS: IMenuItem[] = [
   {
     id: 4,
     parentId: null,
-    iconName: 'users',
+    iconName: 'checklist',
     iconSizeClass: 'text-[16px]',
     label: 'Assignments',
-    url: '/coming-soon',
-    phase2: true,
+    url: '/assignments',
+  },
+  {
+    id: 13,
+    parentId: null,
+    iconName: 'users',
+    iconSizeClass: 'text-[16px]',
+    label: 'Employees',
+    url: '/employees',
   },
   {
     id: 5,

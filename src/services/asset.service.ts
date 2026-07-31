@@ -54,3 +54,20 @@ export const createAsset = (
     completeData: true,
   });
 };
+
+/**
+ * Activates a Draft (or reactivates a Retired) asset. Requires the asset's
+ * round-tripped rowVersion; a stale value returns the standard 409 conflict.
+ */
+export const activateAsset = (
+  id: string,
+  rowVersion: string
+): Promise<IResponse<string>> => {
+  return requestApi({
+    apiEndpoint: `/Assets/${id}/activate`,
+    method: 'POST',
+    body: JSON.stringify({ rowVersion }),
+    contentType: 'application/json',
+    completeData: true,
+  });
+};

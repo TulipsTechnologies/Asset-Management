@@ -1,20 +1,29 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useToast } from '@/components/Providers/ToastProvider';
+import Button from '@/components/UI/Button';
 import { IAsset } from '@/interface/IAsset';
-import { fetchAssetById } from '@/services/asset.service';
+import { IAssetAssignment } from '@/interface/IAssetAssignment';
+import { activateAsset, fetchAssetById } from '@/services/asset.service';
+import { fetchAssetAssignments } from '@/services/assetAssignment.service';
+import { unwrapPaged } from '@/utils/serviceUtils';
 import {
   CUSTODY_BADGE_CLASSES,
   CUSTODY_LABELS,
   FINANCIAL_LABELS,
   LIFECYCLE_BADGE_CLASSES,
   LIFECYCLE_LABELS,
+  LifecycleStatusEnum,
   OPERATIONAL_LABELS,
   OWNERSHIP_LABELS,
   VERIFICATION_LABELS,
 } from '@/enum/assetEnums';
+import {
+  ASSIGNMENT_STATUS_BADGE_CLASSES,
+  ASSIGNMENT_STATUS_LABELS,
+} from '@/enum/assignmentEnums';
 
 const formatDate = (value?: string | null) =>
   value ? new Date(value).toLocaleDateString() : '—';
@@ -72,8 +81,10 @@ const AssetDetailPage = () => {
 
   const [asset, setAsset] = useState<IAsset | null>(null);
   const [loading, setLoading] = useState(true);
+  const [assignments, setAssignments] = useState<IAssetAssignment[]>([]);
+  const [activating, setActivating] = useState(false);
 
-  useEffect(() => {
+  const loadAsset = useCallback(() => {
     if (!id) return;
     fetchAssetById(id)
       .then((res) => {
@@ -89,8 +100,37 @@ const AssetDetailPage = () => {
         router.replace('/assets');
       })
       .finally(() => setLoading(false));
+
+    fetchAssetAssignments({ assetId: id, pageNumber: 1, pageSize: 50 })
+      .then((res) => {
+        if (res?.success) setAssignments(unwrapPaged(res).items);
+      })
+      .catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  useEffect(() => {
+    loadAsset();
+  }, [loadAsset]);
+
+  const handleActivate = async () => {
+    if (!asset?.rowVersion) return;
+    setActivating(true);
+    try {
+      const res = await activateAsset(asset.id, asset.rowVersion);
+      if (res?.success) {
+        addToast.success(res.message || 'Asset activated');
+        loadAsset();
+      } else {
+        addToast.error(res?.message || 'Failed to activate the asset');
+      }
+    } catch (error) {
+      console.error('Error activating asset:', error);
+      addToast.error('An error occurred while activating the asset');
+    } finally {
+      setActivating(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -119,7 +159,13 @@ const AssetDetailPage = () => {
             </span>
           </h1>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {(asset.lifecycleStatus === LifecycleStatusEnum.Draft ||
+            asset.lifecycleStatus === LifecycleStatusEnum.Retired) && (
+            <Button onClick={handleActivate} disabled={activating}>
+              {activating ? 'Activating…' : 'Activate'}
+            </Button>
+          )}
           <Badge
             label={LIFECYCLE_LABELS[asset.lifecycleStatus]}
             className={LIFECYCLE_BADGE_CLASSES[asset.lifecycleStatus]}
@@ -200,11 +246,61 @@ const AssetDetailPage = () => {
         <Field label="Location" value={asset.assetLocationName || '—'} />
         <Field
           label="Custodian"
-          value={asset.currentCustodianEmployeeId ? 'Assigned' : 'Unassigned'}
+          value={
+            assignments.find((a) => a.status === 1)?.employeeName ??
+            (asset.currentCustodianEmployeeId ? 'Assigned' : 'Unassigned')
+          }
         />
         <Field label="Registered On" value={formatDate(asset.createdOn)} />
         <Field label="Last Modified" value={formatDate(asset.modifiedOn)} />
       </Section>
+
+      {assignments.length > 0 && (
+        <div className="bg-white rounded-xl p-6">
+          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">
+            Assignment history
+          </h2>
+          <div className="space-y-3">
+            {assignments.map((assignment) => (
+              <div
+                key={assignment.id}
+                className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm border-b border-gray-50 pb-3 last:border-0 last:pb-0"
+              >
+                <span
+                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                    ASSIGNMENT_STATUS_BADGE_CLASSES[assignment.status] ??
+                    'bg-gray-100 text-gray-700'
+                  }`}
+                >
+                  {ASSIGNMENT_STATUS_LABELS[assignment.status]}
+                </span>
+                <span className="font-medium text-secondaryColor">
+                  {assignment.employeeName}
+                </span>
+                <span className="text-gray-400">
+                  {formatDate(assignment.assignmentDate)}
+                  {assignment.returnedDate
+                    ? ` → ${formatDate(assignment.returnedDate)}`
+                    : assignment.expectedReturnDate
+                      ? ` (due ${formatDate(assignment.expectedReturnDate)})`
+                      : ''}
+                </span>
+                <span className="text-gray-400">
+                  {assignment.conditionAtIssueName}
+                  {assignment.conditionAtReturnName
+                    ? ` → ${assignment.conditionAtReturnName}`
+                    : ''}
+                </span>
+                {assignment.returnNotes && (
+                  <span className="text-xs text-gray-400 w-full">
+                    {assignment.returnNotes}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {(asset.description || asset.notes) && (
         <div className="bg-white rounded-xl p-6">

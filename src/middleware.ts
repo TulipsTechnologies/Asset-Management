@@ -43,6 +43,8 @@ export const config = {
     '/dashboard',
     '/assets/:path*',
     '/asset-categories/:path*',
+    '/assignments/:path*',
+    '/employees/:path*',
     '/configuration/:path*',
     '/coming-soon',
   ],
