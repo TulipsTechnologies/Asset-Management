@@ -1,0 +1,296 @@
+@use "./vendor";
+@use "./common";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+// :root {
+//   --background: #ffffff;
+//   --foreground: #171717;
+// }
+
+@media (prefers-color-scheme: dark) {
+  // :root {
+  //   --background: #0a0a0a;
+  //   --foreground: #ededed;
+  // }
+  // html {
+  //   color-scheme: light;
+  // }
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  font-family: var(--Inter);
+}
+
+body {
+  // color: var(--foreground);
+  // background: var(--background);
+  font-family: var(--Inter);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Custom Table */
+.customTable-container {
+  @apply overflow-auto h-[calc(100vh-216px)] w-full relative;
+}
+
+.customTable {
+  @apply text-sm;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid #e5e7eb;
+}
+.customTable td:first-child,
+.customTable th:first-child {
+  border-left: none;
+}
+
+.customTable tr:first-child th,
+.customTable tr:first-child td {
+  border-top: none;
+}
+
+.customTable tr:last-child td {
+  border-bottom: none;
+}
+
+.customTable td:last-child,
+.customTable th:last-child {
+  border-right: none;
+}
+.customTable th {
+  @apply font-medium;
+}
+.customTable th,
+.customTable td {
+  @apply border-r border-b;
+  text-align: left;
+  padding: 8px;
+  position: relative;
+}
+.resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 5px;
+  cursor: ew-resize;
+  background-color: #ddd;
+}
+.scrollable-wrapper:not(:hover)::-webkit-scrollbar,
+.customTable-container:not(:hover)::-webkit-scrollbar {
+  display: none;
+}
+
+/* For WebKit browsers (Chrome, Safari, Edge) */
+.custom-scroller::-webkit-scrollbar {
+  width: 10px; /* Width of the scrollbar */
+  height: 10px; /* Height of the scrollbar (for horizontal scrollbars) */
+  appearance: none;
+  display: none;
+}
+
+.custom-scroller::-webkit-scrollbar-track {
+  background: white; /* Track color */
+  border-radius: 10px; /* Optional: Round corners */
+}
+
+.custom-scroller::-webkit-scrollbar-thumb {
+  @apply bg-primarycolor/10 transition-all duration-300 ease-in-out;
+  border-radius: 10px; /* Optional: Round corners */
+  border: none; /* Creates a gap effect */
+}
+
+.custom-scroller::-webkit-scrollbar-thumb:hover {
+  @apply bg-primarycolor cursor-grab; /* Darker blue on hover */
+}
+.custom-scroller:hover::-webkit-scrollbar {
+  display: block;
+}
+
+/* Table Colums drag */
+.sortable-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+}
+
+.sortable-item {
+  @apply cursor-grab flex justify-between items-center p-2 border-b last:border-none !left-0 !w-full;
+}
+
+.sortable-item.locked {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.sortable-item.dragging {
+  background: #e0e0e0;
+}
+
+.lock-button {
+  background: none;
+  border: none;
+  color: blue;
+  cursor: pointer;
+}
+
+// Toast
+
+.top-right {
+  top: 20px;
+  right: 20px;
+}
+.top-left {
+  top: 20px;
+  left: 20px;
+}
+.top-center {
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.bottom-right {
+  bottom: 20px;
+  right: 20px;
+}
+.bottom-left {
+  bottom: 20px;
+  left: 20px;
+}
+
+// Toast
+/* For WebKit browsers (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 10px; /* Width of the scrollbar */
+  height: 10px; /* Height of the scrollbar (for horizontal scrollbars) */
+  appearance: none;
+}
+
+::-webkit-scrollbar-track {
+  background: white; /* Track color */
+  border-radius: 10px; /* Optional: Round corners */
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-primarycolor/10 transition-all duration-300 ease-in-out;
+  border-radius: 10px; /* Optional: Round corners */
+  border: none; /* Creates a gap effect */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-primarycolor cursor-grab; /* Darker blue on hover */
+}
+:hover::-webkit-scrollbar {
+  display: block;
+}
+input[type="date"] {
+  width: 100%;
+  padding: 8px;
+  cursor: pointer;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.parent {
+  .child {
+    @apply opacity-0 pointer-events-none transition-all duration-300 ease-in-out;
+  }
+  &:hover {
+    .child {
+      @apply opacity-100 pointer-events-auto;
+    }
+  }
+}
+/* components/editor.css */
+.toolbar button {
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  background: white;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.toolbar button:hover {
+  background: #f0f0f0;
+}
+
+.toolbar button.active {
+  background: #333;
+  color: white;
+  border-color: #333;
+}
+
+.tiptap-editor {
+  min-height: 150px;
+  width: 100%;
+  padding: 0.75rem;
+  outline: none;
+}
+
+.toolbar button {
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: white;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.ql-editor {
+  min-height: 250px !important;
+}
+.ad-date-picker * {
+  cursor: pointer;
+}
+
+.bs-date-picker * {
+  cursor: pointer;
+}
+input[type="time"] {
+  text-align: left;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid #d1d5db;
+  padding: 0.75rem;
+  width: 100%;
+  font-size: 1rem;
+}
+
+input[type="time"]::-webkit-calendar-picker-indicator {
+  // background: none;
+  cursor: pointer;
+}

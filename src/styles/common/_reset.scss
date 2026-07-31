@@ -1,0 +1,66 @@
+* {
+  line-height: normal;
+}
+
+main {
+  min-height: 100vh;
+}
+@media print {
+  main {
+    min-height: auto;
+  }
+}
+html,
+body {
+  display: inline-block;
+  line-height: normal;
+}
+body,
+html {
+//   overflow-x: hidden;
+  width: 100%;
+  vertical-align: middle;
+}
+
+.wrapper {
+  width: 100%;
+  overflow-x: hidden;
+}
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 0;
+  line-height: normal;
+}
+ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+a {
+  cursor: pointer;
+  text-decoration: none;
+
+  &:active {
+    color: initial;
+  }
+}
+
+button {
+  appearance: none;
+}
+input,
+button {
+  &:focus {
+    outline: none;
+  }
+}
+@media (min-width: 759px) {
+  main {
+    height: 100%;
+  }
+}

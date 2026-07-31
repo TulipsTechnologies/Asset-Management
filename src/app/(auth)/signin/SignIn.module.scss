@@ -1,0 +1,100 @@
+@use '@/styles/abstracts' as *;
+
+.btn {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  border: none;
+  height: rem(60);
+  border-radius: 50px;
+  font-size: rem(16);
+  font-weight: 400;
+  cursor: pointer;
+  transition: all 0.3s ease-in-out;
+
+  &.green {
+    background-color: $grad2;
+    color: $white;
+
+    &:hover {
+      background-color: $hover;
+    }
+  }
+  &.gray {
+    background-color: $lightBg;
+
+    &:hover {
+      background-color: $lightbgHover;
+    }
+  }
+  &.sm {
+    height: 45px;
+    font-size: 14px;
+    color: $primary;
+    width: auto;
+    padding-inline: 10px;
+  }
+  &.borderless {
+    color: $grad2;
+    background-color: transparent;
+    border-radius: 0px;
+    padding: 0;
+    height: auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+}
+.google {
+  width: 26px;
+  height: 26px;
+  margin-right: 10px;
+}
+.options {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: rem(30);
+}
+.divider {
+  display: inline-block;
+  width: 100%;
+  text-align: center;
+  position: relative;
+  color: $primary;
+  span {
+    background-color: $white;
+    position: relative;
+    display: inline-block;
+    padding-inline: rem(20);
+  }
+  &::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translateX(-50%) translateY(-50%);
+    height: 1px;
+    width: 100%;
+    background-color: $border;
+  }
+}
+.customContent {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+}
+.contentLeft {
+  flex: 0 0 100%;
+}
+.borderBtm {
+  border-bottom: 1px solid $border;
+  text-align: right;
+  flex: 0 0 135px;
+  max-width: 135px;
+}
+.spaced {
+  margin-bottom: rem(30);
+  margin-top: rem(30);
+}

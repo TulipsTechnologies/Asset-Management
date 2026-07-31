@@ -1,0 +1,14 @@
+@use '@/styles/abstracts' as *;
+
+h2 {
+  font-size: rem(20);
+  font-weight: 700;
+  color: $heading;
+  line-height: 150%;
+}
+p {
+  font-size: rem(16);
+  font-weight: 400;
+  color: $primary;
+  line-height: 150%;
+}
