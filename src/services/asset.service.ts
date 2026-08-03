@@ -6,6 +6,7 @@ import {
   IAssetFilter,
   IAssetListItem,
   ICreateAsset,
+  IUpdateAsset,
 } from '@/interface/IAsset';
 
 export const fetchAssets = (
@@ -50,6 +51,44 @@ export const createAsset = (
     apiEndpoint: '/Assets',
     method: 'POST',
     body: JSON.stringify(data),
+    contentType: 'application/json',
+    completeData: true,
+  });
+};
+
+/**
+ * Updates an asset's registry fields. The AssetCode is immutable and condition
+ * / statuses are workflow-owned, so none of them are part of the payload.
+ * Requires the round-tripped rowVersion; 409 = stale rowVersion or duplicate
+ * tag/serial (the message says which).
+ */
+export const updateAsset = (
+  id: string,
+  data: IUpdateAsset
+): Promise<IResponse<string>> => {
+  return requestApi({
+    apiEndpoint: `/Assets/${id}`,
+    method: 'PUT',
+    body: JSON.stringify(data),
+    contentType: 'application/json',
+    completeData: true,
+  });
+};
+
+/**
+ * Retires an Active asset. 409 when the asset is in custody or has an active
+ * transfer (the message explains) — surface it verbatim. Retired assets can be
+ * re-activated with activateAsset.
+ */
+export const retireAsset = (
+  id: string,
+  rowVersion: string,
+  reason?: string
+): Promise<IResponse<string>> => {
+  return requestApi({
+    apiEndpoint: `/Assets/${id}/retire`,
+    method: 'POST',
+    body: JSON.stringify({ reason: reason || undefined, rowVersion }),
     contentType: 'application/json',
     completeData: true,
   });

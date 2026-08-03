@@ -77,6 +77,7 @@ export interface ICreateAsset {
   purchaseDate?: string;
   purchaseCost?: number;
   currencyId?: string;
+  supplierId?: string;
   invoiceNumber?: string;
   purchaseOrderReference?: string;
   receiptDate?: string;
@@ -86,6 +87,46 @@ export interface ICreateAsset {
   warrantyEndDate?: string;
   insurancePolicyNumber?: string;
   insuranceExpiryDate?: string;
+}
+
+/**
+ * PUT /Assets/{id} body. AssetCode is immutable (never sent); condition and
+ * the four statuses are owned by workflows and are NOT editable here.
+ * Unrendered ids (class/type/branch/department/location/parent) are
+ * round-tripped unchanged from the GET so a save never clears them.
+ */
+export interface IUpdateAsset {
+  assetName: string;
+  assetCategoryId: string;
+  assetTag?: string;
+  manufacturer?: string;
+  brand?: string;
+  model?: string;
+  serialNumber?: string;
+  description?: string;
+  notes?: string;
+  ownershipType?: OwnershipTypeEnum;
+  purchaseDate?: string;
+  purchaseCost?: number;
+  currencyId?: string;
+  assetClassId?: string;
+  assetTypeId?: string;
+  supplierId?: string;
+  invoiceNumber?: string;
+  purchaseOrderReference?: string;
+  receiptDate?: string;
+  commissioningDate?: string;
+  placedInServiceDate?: string;
+  branchId?: string;
+  departmentId?: string;
+  assetLocationId?: string;
+  parentAssetId?: string;
+  warrantyStartDate?: string;
+  warrantyEndDate?: string;
+  insurancePolicyNumber?: string;
+  insuranceExpiryDate?: string;
+  /** Base64 rowversion from the GET — round-trip unchanged (concurrency contract). */
+  rowVersion: string;
 }
 
 export interface IAssetFilter {

@@ -69,7 +69,9 @@ const ConfigurationPage = () => (
       <ConfigCard
         title="Vendors"
         description="Supplier master referenced by asset purchases, warranties and service contracts."
+        href="/vendors"
         icon="users"
+        ready
       />
       <ConfigCard
         title="Capitalization Policy"

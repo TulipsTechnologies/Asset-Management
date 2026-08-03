@@ -4,9 +4,16 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useToast } from '@/components/Providers/ToastProvider';
 import Button from '@/components/UI/Button';
+import Modal from '@/components/UI/Modal';
+import TextArea from '@/components/UI/TextArea';
+import AssetDocumentsSection from './_components/AssetDocumentsSection';
 import { IAsset } from '@/interface/IAsset';
 import { IAssetAssignment } from '@/interface/IAssetAssignment';
-import { activateAsset, fetchAssetById } from '@/services/asset.service';
+import {
+  activateAsset,
+  fetchAssetById,
+  retireAsset,
+} from '@/services/asset.service';
 import { fetchAssetAssignments } from '@/services/assetAssignment.service';
 import { unwrapPaged } from '@/utils/serviceUtils';
 import {
@@ -83,6 +90,9 @@ const AssetDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [assignments, setAssignments] = useState<IAssetAssignment[]>([]);
   const [activating, setActivating] = useState(false);
+  const [retireOpen, setRetireOpen] = useState(false);
+  const [retireReason, setRetireReason] = useState('');
+  const [retiring, setRetiring] = useState(false);
 
   const loadAsset = useCallback(() => {
     if (!id) return;
@@ -132,6 +142,34 @@ const AssetDetailPage = () => {
     }
   };
 
+  const handleRetire = async () => {
+    if (!asset?.rowVersion || retiring) return;
+    setRetiring(true);
+    try {
+      const res = await retireAsset(
+        asset.id,
+        asset.rowVersion,
+        retireReason.trim() || undefined
+      );
+      if (res?.success) {
+        addToast.success(res.message || 'Asset retired');
+      } else {
+        // 409 carries the custody/active-transfer guard message — show verbatim.
+        addToast.error(res?.message || 'Failed to retire the asset');
+      }
+      // Close and reload either way so a retry starts from a fresh RowVersion
+      // instead of looping on the stale one (assignments-phase lesson).
+      setRetireOpen(false);
+      setRetireReason('');
+      loadAsset();
+    } catch (error) {
+      console.error('Error retiring asset:', error);
+      addToast.error('An error occurred while retiring the asset');
+    } finally {
+      setRetiring(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="px-4 mt-10 text-center text-gray-400 text-sm">
@@ -160,10 +198,30 @@ const AssetDetailPage = () => {
           </h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {asset.lifecycleStatus !== LifecycleStatusEnum.Disposed && (
+            <Button
+              variant="outline"
+              onClick={() => router.push(`/assets/${asset.id}/edit`)}
+            >
+              <i className="icon icon-edit text-xs" />
+              <span>Edit</span>
+            </Button>
+          )}
           {(asset.lifecycleStatus === LifecycleStatusEnum.Draft ||
             asset.lifecycleStatus === LifecycleStatusEnum.Retired) && (
             <Button onClick={handleActivate} disabled={activating}>
               {activating ? 'Activating…' : 'Activate'}
+            </Button>
+          )}
+          {asset.lifecycleStatus === LifecycleStatusEnum.Active && (
+            <Button
+              variant="danger"
+              onClick={() => {
+                setRetireReason('');
+                setRetireOpen(true);
+              }}
+            >
+              Retire
             </Button>
           )}
           <Badge
@@ -302,6 +360,11 @@ const AssetDetailPage = () => {
         </div>
       )}
 
+      <AssetDocumentsSection
+        assetId={asset.id}
+        readOnly={asset.lifecycleStatus === LifecycleStatusEnum.Disposed}
+      />
+
       {(asset.description || asset.notes) && (
         <div className="bg-white rounded-xl p-6">
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
@@ -319,6 +382,36 @@ const AssetDetailPage = () => {
           )}
         </div>
       )}
+
+      {/* Retire confirmation modal */}
+      <Modal isOpen={retireOpen} onClose={() => setRetireOpen(false)} size="md">
+        <div className="p-6">
+          <h2 className="text-lg font-semibold text-secondaryColor mb-1">
+            Retire Asset
+          </h2>
+          <p className="text-sm text-gray-500 mb-4">
+            {asset.assetCode} — {asset.assetName}. Retired assets leave active
+            service but keep their history and can be re-activated later.
+            Assets in custody or with an active transfer cannot be retired.
+          </p>
+          <TextArea
+            label="Reason"
+            value={retireReason}
+            onChange={(e) => setRetireReason(e.target.value)}
+            rows={2}
+            maxLength={500}
+            placeholder="Optional — end of life, replaced, obsolete…"
+          />
+          <div className="flex justify-end gap-3 mt-6">
+            <Button variant="secondary" onClick={() => setRetireOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="danger" onClick={handleRetire} disabled={retiring}>
+              {retiring ? 'Retiring…' : 'Retire Asset'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
