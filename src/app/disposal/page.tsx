@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useCallback, useEffect, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { useToast } from '@/components/Providers/ToastProvider';
 import Button from '@/components/UI/Button';
 import ConfirmationModal from '@/components/UI/ConfirmationModel';
@@ -32,6 +32,7 @@ import {
   cancelRequest,
   createRequest,
   downloadDocument,
+  downloadWipeCertificate,
   executeRequest,
   getDocuments,
   getRequests,
@@ -631,15 +632,24 @@ const DisposalPage = () => {
 
   // ---- Details modal: certificates and documents ----
 
+  // Last-write-wins guard: open request A, close, open request B — a slower A can
+  // otherwise land after B and fill B's modal with A's paperwork, at which point the
+  // Download buttons fetch the wrong request's files.
+  const paperworkRequestRef = useRef<string | null>(null);
+
   const loadPaperwork = useCallback((requestId: string) => {
+    paperworkRequestRef.current = requestId;
     setPaperworkLoading(true);
     Promise.all([getWipeCertificates(requestId), getDocuments(requestId)])
       .then(([certificateRes, documentRes]) => {
+        if (paperworkRequestRef.current !== requestId) return;
         setCertificates(certificateRes?.success ? (certificateRes.data ?? []) : []);
         setDocuments(documentRes?.success ? (documentRes.data ?? []) : []);
       })
       .catch(() => undefined)
-      .finally(() => setPaperworkLoading(false));
+      .finally(() => {
+        if (paperworkRequestRef.current === requestId) setPaperworkLoading(false);
+      });
   }, []);
 
   const openDetails = (request: IDisposalRequest) => {
@@ -724,6 +734,21 @@ const DisposalPage = () => {
     } catch (error) {
       console.error('Error downloading disposal document:', error);
       addToast.error('Failed to download the document');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  // The scanned certificate is the evidence that gates execution, so it has to be
+  // retrievable — it was upload-only until the phase review caught it.
+  const handleDownloadCertificate = async (certificate: IDataWipeCertificate) => {
+    setDownloadingId(certificate.id);
+    try {
+      const res = await downloadWipeCertificate(certificate.id);
+      await saveBlobResponse(res, certificate.fileName ?? 'wipe-certificate');
+    } catch (error) {
+      console.error('Error downloading data-wipe certificate:', error);
+      addToast.error('Failed to download the certificate');
     } finally {
       setDownloadingId(null);
     }
@@ -1515,10 +1540,17 @@ const DisposalPage = () => {
                           {certificate.wipedByEmployeeName}
                         </span>
                       )}
-                      {certificate.fileName && (
-                        <span className="text-xs text-gray-400">
-                          {certificate.fileName}
-                        </span>
+                      {certificate.hasFile && (
+                        <button
+                          type="button"
+                          className="text-xs text-primarycolor hover:underline disabled:opacity-50"
+                          onClick={() => handleDownloadCertificate(certificate)}
+                          disabled={downloadingId === certificate.id}
+                        >
+                          {downloadingId === certificate.id
+                            ? 'Downloading…'
+                            : (certificate.fileName ?? 'Download')}
+                        </button>
                       )}
                     </div>
                   ))}
@@ -1590,6 +1622,21 @@ const DisposalPage = () => {
                         setCertificateFile(e.target.files?.[0] ?? null)
                       }
                       className="w-full py-2 text-sm text-gray-600 border-b border-gray-300"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <TextArea
+                      label="Notes"
+                      rows={2}
+                      value={certificateForm.notes}
+                      onChange={(e) =>
+                        setCertificateForm((prev) => ({
+                          ...prev,
+                          notes: e.target.value,
+                        }))
+                      }
+                      maxLength={2000}
+                      placeholder="Anything worth recording about the wipe…"
                     />
                   </div>
                   <div className="flex items-end">

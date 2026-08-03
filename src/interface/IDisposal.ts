@@ -124,6 +124,8 @@ export interface IDataWipeCertificate {
   fileName?: string | null;
   notes?: string | null;
   createdOn: string;
+  /** True when a scanned certificate is attached and can be downloaded. */
+  hasFile: boolean;
 }
 
 /**

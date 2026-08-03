@@ -197,3 +197,15 @@ export const downloadDocument = (id: string): Promise<Response> => {
     returnBlob: true,
   });
 };
+
+/**
+ * Downloads a scanned data-wipe certificate — the evidence that gates execution,
+ * so it has to be retrievable and not just uploadable.
+ */
+export const downloadWipeCertificate = (id: string): Promise<Response> => {
+  return requestApi({
+    apiEndpoint: `/DisposalRequests/wipe-certificates/${id}/download`,
+    method: 'GET',
+    returnBlob: true,
+  });
+};
