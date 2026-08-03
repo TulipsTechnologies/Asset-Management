@@ -81,8 +81,7 @@ export const ASSET_MENU_ITEMS: IMenuItem[] = [
     iconName: 'refresh',
     iconSizeClass: 'text-[16px]',
     label: 'Returns',
-    url: '/coming-soon',
-    phase2: true,
+    url: '/returns',
   },
   {
     id: 7,

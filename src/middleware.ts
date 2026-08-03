@@ -45,6 +45,7 @@ export const config = {
     '/asset-categories/:path*',
     '/assignments/:path*',
     '/transfers/:path*',
+    '/returns/:path*',
     '/employees/:path*',
     '/locations/:path*',
     '/vendors/:path*',
