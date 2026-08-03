@@ -5,6 +5,7 @@ import {
   IAssetCategory,
   IAssetCategoryFilter,
   IAssetCategoryTree,
+  IUpdateAssetCategory,
   IUpsertAssetCategory,
 } from '@/interface/IAssetCategory';
 
@@ -54,6 +55,31 @@ export const createAssetCategory = (
     method: 'POST',
     body: JSON.stringify(data),
     contentType: 'application/json',
+    completeData: true,
+  });
+};
+
+export const updateAssetCategory = (
+  id: string,
+  data: IUpdateAssetCategory
+): Promise<IResponse<string>> => {
+  return requestApi({
+    apiEndpoint: `/AssetCategories/${id}`,
+    method: 'PUT',
+    body: JSON.stringify(data),
+    contentType: 'application/json',
+    completeData: true,
+  });
+};
+
+/**
+ * Soft delete. The API refuses with a 409 while the category still has child
+ * categories or classified assets — surface its message verbatim.
+ */
+export const deleteAssetCategory = (id: string): Promise<IResponse<string>> => {
+  return requestApi({
+    apiEndpoint: `/AssetCategories/${id}`,
+    method: 'DELETE',
     completeData: true,
   });
 };

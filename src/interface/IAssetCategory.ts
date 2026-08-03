@@ -12,6 +12,10 @@ export interface IAssetCategory {
   displayOrder: number;
   isActive: boolean;
   hasChildren: boolean;
+  /** Assets classified here — a category in use cannot be deleted. */
+  assetCount: number;
+  /** Base64 rowversion — REQUIRED on update (concurrency contract). */
+  rowVersion: string;
 }
 
 export interface IAssetCategoryTree {
@@ -33,6 +37,11 @@ export interface IUpsertAssetCategory {
   defaultResidualRate?: number;
   displayOrder?: number;
   isActive: boolean;
+}
+
+/** Edit payload — the rowVersion round-trip is required (400 missing / 409 stale). */
+export interface IUpdateAssetCategory extends IUpsertAssetCategory {
+  rowVersion: string;
 }
 
 export interface IAssetCategoryFilter {

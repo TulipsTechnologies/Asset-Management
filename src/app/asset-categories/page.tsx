@@ -20,10 +20,15 @@ import {
   IAssetCategoryFilter,
   IAssetCategoryTree,
 } from '@/interface/IAssetCategory';
+import Dropdown from '@/components/UI/Dropdown';
+import CustomMenuItem from '@/components/UI/CustomMenuItem';
+import ConfirmationModal from '@/components/UI/ConfirmationModel';
 import {
   createAssetCategory,
+  deleteAssetCategory,
   fetchAssetCategories,
   fetchAssetCategoryTree,
+  updateAssetCategory,
 } from '@/services/assetCategory.service';
 import { unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
@@ -44,6 +49,19 @@ const emptyForm: TFormState = {
   parentAssetCategoryId: '',
   isActive: true,
 };
+
+const DetailField = ({
+  label,
+  value,
+}: {
+  label: string;
+  value?: string | null;
+}) => (
+  <div>
+    <div className="text-xs uppercase tracking-wide text-gray-400">{label}</div>
+    <div className="text-sm text-secondaryColor mt-0.5">{value || '—'}</div>
+  </div>
+);
 
 const TreeNode = ({
   node,
@@ -97,6 +115,12 @@ const AssetCategoriesPage = () => {
   const [formError, setFormError] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Edit reuses the create modal; null means "creating".
+  const [editing, setEditing] = useState<IAssetCategory | null>(null);
+  const [viewing, setViewing] = useState<IAssetCategory | null>(null);
+  const [deleting, setDeleting] = useState<IAssetCategory | null>(null);
+  const [deleteSaving, setDeleteSaving] = useState(false);
+
   const [treeOpen, setTreeOpen] = useState(false);
   const [tree, setTree] = useState<IAssetCategoryTree[]>([]);
   const [treeLoading, setTreeLoading] = useState(false);
@@ -106,7 +130,15 @@ const AssetCategoriesPage = () => {
     { key: 'name', label: 'Name', width: 220, type: 'string', name: 'name' },
     { key: 'parentAssetCategoryName', label: 'Parent', width: 180, type: 'string', name: 'parentAssetCategoryName' },
     { key: 'defaultDepreciationMethodName', label: 'Depreciation Default', width: 170, type: 'string', name: 'defaultDepreciationMethodName' },
+    { key: 'assetCount', label: 'Assets', width: 80, name: 'assetCount' },
     { key: 'isActive', label: 'Active', width: 90, name: 'isActive' },
+    {
+      key: 'actions',
+      label: <i className="icon icon-actions text-[10px]" />,
+      width: 45,
+      canToggle: false,
+      name: 'actions',
+    },
   ];
 
   const loadCategories = useCallback(async () => {
@@ -151,6 +183,7 @@ const AssetCategoriesPage = () => {
   };
 
   const openCreate = () => {
+    setEditing(null);
     setForm(emptyForm);
     setFormError('');
     loadParentOptions();
@@ -169,32 +202,117 @@ const AssetCategoriesPage = () => {
       .finally(() => setTreeLoading(false));
   };
 
+  // When editing, a category may not be its own parent — nor its own descendant's
+  // child, which would close a loop. Both are refused by the API; excluding them here
+  // means the operator is never offered a choice that cannot work.
+  const parentOptions = (() => {
+    const excluded = new Set<string>();
+    if (editing) {
+      excluded.add(editing.id);
+      let frontier = [editing.id];
+      while (frontier.length > 0) {
+        const children = allCategories
+          .filter(
+            (c) =>
+              c.parentAssetCategoryId &&
+              frontier.includes(c.parentAssetCategoryId) &&
+              !excluded.has(c.id)
+          )
+          .map((c) => c.id);
+        children.forEach((id) => excluded.add(id));
+        frontier = children;
+      }
+    }
+    return allCategories
+      .filter((c) => !excluded.has(c.id))
+      .map((c) => ({ value: c.id, label: `${c.categoryCode} — ${c.name}` }));
+  })();
+
+  const openEdit = (category: IAssetCategory) => {
+    setEditing(category);
+    setForm({
+      categoryCode: category.categoryCode,
+      name: category.name,
+      description: category.description ?? '',
+      parentAssetCategoryId: category.parentAssetCategoryId ?? '',
+      isActive: category.isActive,
+    });
+    setFormError('');
+    loadParentOptions();
+    setFormOpen(true);
+  };
+
   const handleSave = async () => {
     if (!form.categoryCode.trim() || !form.name.trim()) {
       setFormError('Code and name are required');
       return;
     }
     setSaving(true);
+    const payload = {
+      categoryCode: form.categoryCode.trim().toUpperCase(),
+      name: form.name.trim(),
+      description: form.description.trim() || undefined,
+      parentAssetCategoryId: form.parentAssetCategoryId || undefined,
+      isActive: form.isActive,
+    };
     try {
-      const res = await createAssetCategory({
-        categoryCode: form.categoryCode.trim().toUpperCase(),
-        name: form.name.trim(),
-        description: form.description.trim() || undefined,
-        parentAssetCategoryId: form.parentAssetCategoryId || undefined,
-        isActive: form.isActive,
-      });
+      const res = editing
+        ? await updateAssetCategory(editing.id, {
+            ...payload,
+            rowVersion: editing.rowVersion,
+          })
+        : await createAssetCategory(payload);
+
       if (res?.success) {
-        addToast.success('Category created successfully');
+        addToast.success(
+          res.message || (editing ? 'Category updated' : 'Category created')
+        );
         setFormOpen(false);
+        setEditing(null);
+        loadCategories();
+      } else if (editing) {
+        // House rule: a failed rowVersion-carrying save closes and reloads, so a
+        // stale token is never retried. The server message carries the real reason
+        // (duplicate code, cycle, depth limit).
+        addToast.error(res?.message || 'Failed to update the category');
+        setFormOpen(false);
+        setEditing(null);
         loadCategories();
       } else {
-        addToast.error(res?.message || 'Failed to create the category');
+        // Creates carry no rowVersion, so the form can stay open to be corrected.
+        setFormError(res?.message || 'Failed to create the category');
       }
     } catch (error) {
-      console.error('Error creating category:', error);
-      addToast.error('An error occurred while creating the category');
+      console.error('Error saving category:', error);
+      addToast.error('An error occurred while saving the category');
+      if (editing) {
+        setFormOpen(false);
+        setEditing(null);
+        loadCategories();
+      }
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleting) return;
+    setDeleteSaving(true);
+    try {
+      const res = await deleteAssetCategory(deleting.id);
+      if (res?.success) {
+        addToast.success(res.message || 'Category deleted');
+      } else {
+        // The 409 explains exactly what still uses the category.
+        addToast.error(res?.message || 'Failed to delete the category');
+      }
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      addToast.error('An error occurred while deleting the category');
+    } finally {
+      setDeleteSaving(false);
+      setDeleting(null);
+      loadCategories();
     }
   };
 
@@ -222,6 +340,7 @@ const AssetCategoriesPage = () => {
     parentAssetCategoryName: category.parentAssetCategoryName || '—',
     defaultDepreciationMethodName:
       category.defaultDepreciationMethodName || '—',
+    assetCount: category.assetCount || '—',
     isActive: category.isActive ? (
       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
         Active
@@ -230,6 +349,44 @@ const AssetCategoriesPage = () => {
       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
         Inactive
       </span>
+    ),
+    actions: (
+      <div className="flex gap-x-2 relative bg-white px-4 py-2 -m-2">
+        <Dropdown
+          buttonChildren={
+            <div className="bg-white/80 px-1.5 py-2 rounded-sm hover:bg-primarycolor hover:text-white">
+              <i className="icon icon-elipsis-v text-sm"></i>
+            </div>
+          }
+        >
+          {[
+            {
+              label: 'View Details',
+              icon: <i className="icon icon-eye text-xs" />,
+              action: () => setViewing(category),
+            },
+            {
+              label: 'Edit',
+              icon: <i className="icon icon-edit text-xs" />,
+              action: () => openEdit(category),
+            },
+            {
+              label: 'Delete',
+              icon: <i className="icon icon-delete text-xs" />,
+              action: () => setDeleting(category),
+            },
+          ].map((option, index, arr) => (
+            <CustomMenuItem
+              key={index}
+              label={option.label}
+              onClick={option.action}
+              border={index !== arr.length - 1}
+              icon={option.icon}
+              className="!py-2"
+            />
+          ))}
+        </Dropdown>
+      </div>
     ),
   }));
 
@@ -273,11 +430,25 @@ const AssetCategoriesPage = () => {
         />
       </div>
 
-      <Modal isOpen={formOpen} onClose={() => setFormOpen(false)} size="lg">
+      <Modal
+        isOpen={formOpen}
+        onClose={() => {
+          setFormOpen(false);
+          setEditing(null);
+        }}
+        size="lg"
+      >
         <div className="p-6">
-          <h2 className="text-lg font-semibold text-secondaryColor mb-4">
-            Add Category
+          <h2 className="text-lg font-semibold text-secondaryColor mb-1">
+            {editing ? `Edit ${editing.name}` : 'Add Category'}
           </h2>
+          {editing && editing.assetCount > 0 && (
+            <p className="text-xs text-gray-400 mb-4">
+              {editing.assetCount} asset{editing.assetCount === 1 ? '' : 's'} use
+              this category. Changing the code only affects asset codes generated
+              from now on; existing codes never change.
+            </p>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
             <Input
               label="Category Code"
@@ -306,10 +477,7 @@ const AssetCategoriesPage = () => {
             <Select
               label="Parent Category"
               placeholder="None (top level)"
-              options={allCategories.map((c) => ({
-                value: c.id,
-                label: `${c.categoryCode} — ${c.name}`,
-              }))}
+              options={parentOptions}
               value={form.parentAssetCategoryId}
               onChange={(e) =>
                 setForm((prev) => ({
@@ -342,15 +510,110 @@ const AssetCategoriesPage = () => {
             Hierarchy is limited to 3 levels; codes are unique per company.
           </p>
           <div className="flex justify-end gap-3 mt-6">
-            <Button variant="secondary" onClick={() => setFormOpen(false)}>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setFormOpen(false);
+                setEditing(null);
+              }}
+            >
               Cancel
             </Button>
             <Button onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving…' : 'Save'}
+              {saving ? 'Saving…' : editing ? 'Save Changes' : 'Save'}
             </Button>
           </div>
         </div>
       </Modal>
+
+      {/* View details — read-only, reachable for every row */}
+      <Modal isOpen={viewing !== null} onClose={() => setViewing(null)} size="lg">
+        <div className="p-6">
+          <h2 className="text-lg font-semibold text-secondaryColor mb-1">
+            {viewing?.name}
+          </h2>
+          <p className="text-xs text-gray-400 mb-4 font-mono">
+            {viewing?.categoryCode}
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+            <DetailField label="Parent" value={viewing?.parentAssetCategoryName} />
+            <DetailField
+              label="Status"
+              value={viewing?.isActive ? 'Active' : 'Inactive'}
+            />
+            <DetailField
+              label="Depreciation Default"
+              value={viewing?.defaultDepreciationMethodName}
+            />
+            <DetailField
+              label="Useful Life"
+              value={
+                viewing?.defaultUsefulLifeMonths
+                  ? `${viewing.defaultUsefulLifeMonths} months`
+                  : null
+              }
+            />
+            <DetailField
+              label="Residual Rate"
+              value={
+                viewing?.defaultResidualRate != null
+                  ? `${viewing.defaultResidualRate}%`
+                  : null
+              }
+            />
+            <DetailField
+              label="Display Order"
+              value={String(viewing?.displayOrder ?? '')}
+            />
+            <DetailField
+              label="Assets Classified Here"
+              value={String(viewing?.assetCount ?? 0)}
+            />
+            <DetailField
+              label="Child Categories"
+              value={viewing?.hasChildren ? 'Yes' : 'None'}
+            />
+            <div className="md:col-span-2">
+              <DetailField label="Description" value={viewing?.description} />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 mt-6">
+            <Button variant="secondary" onClick={() => setViewing(null)}>
+              Close
+            </Button>
+            <Button
+              onClick={() => {
+                const target = viewing;
+                setViewing(null);
+                if (target) openEdit(target);
+              }}
+            >
+              Edit
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete — the API refuses while children or assets remain, and says which */}
+      <ConfirmationModal
+        isOpen={deleting !== null}
+        loading={deleteSaving}
+        message={
+          deleting
+            ? deleting.hasChildren || deleting.assetCount > 0
+              ? `"${deleting.name}" still has ${
+                  deleting.hasChildren ? 'child categories' : ''
+                }${deleting.hasChildren && deleting.assetCount > 0 ? ' and ' : ''}${
+                  deleting.assetCount > 0
+                    ? `${deleting.assetCount} asset${deleting.assetCount === 1 ? '' : 's'}`
+                    : ''
+                }, so it cannot be deleted. Deactivate it instead to stop new registrations. Try anyway?`
+              : `Delete "${deleting.name}"? Its code becomes available for reuse.`
+            : ''
+        }
+        onConfirm={handleDelete}
+        onClose={() => setDeleting(null)}
+      />
 
       <Modal isOpen={treeOpen} onClose={() => setTreeOpen(false)} size="lg">
         <div className="p-6">
