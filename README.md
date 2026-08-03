@@ -51,8 +51,9 @@ in production.
 | Returns — initiate/inspect/cancel, recovery cases | ✅ `/api/AssetReturns` (+`/api/AssetRecoveryCases`) |
 | Physical Verification — campaigns, scan/record, discrepancy reconciliation, evidence | ✅ `/api/AssetAuditCampaigns` (+results/discrepancies/evidence) |
 | Maintenance — requests (raise/convert/reject/withdraw), work orders (start/complete/cancel), asset release/recommission | ✅ `/api/MaintenanceRequests`, `/api/WorkOrders` (+`/api/Assets/{id}/release`\|`/recommission`) |
+| Disposal — request/approve/reject/cancel, pre-flighted execute, wipe certificates, paperwork | ✅ `/api/DisposalRequests` (+`/wipe-certificates`, `/documents`) |
 | Configuration hub | ✅ (cards; management screens arrive with their APIs) |
-| Depreciation / Disposal / Reports | sidebar stubs → `/coming-soon` (later phases) |
+| Depreciation / Reports | sidebar stubs → `/coming-soon` (later phases) |
 
 Conventions:
 

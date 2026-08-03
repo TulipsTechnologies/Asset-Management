@@ -109,8 +109,7 @@ export const ASSET_MENU_ITEMS: IMenuItem[] = [
     iconName: 'trash',
     iconSizeClass: 'text-[16px]',
     label: 'Disposal',
-    url: '/coming-soon',
-    phase2: true,
+    url: '/disposal',
   },
   {
     id: 11,

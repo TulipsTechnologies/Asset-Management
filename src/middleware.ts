@@ -48,6 +48,7 @@ export const config = {
     '/returns/:path*',
     '/physical-verification/:path*',
     '/maintenance/:path*',
+    '/disposal/:path*',
     '/employees/:path*',
     '/locations/:path*',
     '/vendors/:path*',
