@@ -43,14 +43,9 @@ export const ASSET_MENU_ITEMS: IMenuItem[] = [
     label: 'Assets',
     url: '/assets',
   },
-  {
-    id: 3,
-    parentId: null,
-    iconName: 'category',
-    iconSizeClass: 'text-[16px]',
-    label: 'Asset Categories',
-    url: '/asset-categories',
-  },
+  // Asset Categories intentionally has no sidebar entry — like Locations and
+  // Vendors it is reachable through the Configuration hub only (id 3 retired,
+  // ids are stable — do not reuse).
   {
     id: 4,
     parentId: null,
@@ -89,8 +84,7 @@ export const ASSET_MENU_ITEMS: IMenuItem[] = [
     iconName: 'checklist',
     iconSizeClass: 'text-[16px]',
     label: 'Physical Verification',
-    url: '/coming-soon',
-    phase2: true,
+    url: '/physical-verification',
   },
   {
     id: 8,

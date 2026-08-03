@@ -99,6 +99,12 @@ export const VERIFICATION_LABELS: Record<number, string> = {
   [VerificationStatusEnum.Discrepancy]: 'Discrepancy',
 };
 
+export const VERIFICATION_BADGE_CLASSES: Record<number, string> = {
+  [VerificationStatusEnum.NotVerified]: 'bg-gray-100 text-gray-700',
+  [VerificationStatusEnum.Verified]: 'bg-green-100 text-green-800',
+  [VerificationStatusEnum.Discrepancy]: 'bg-red-100 text-red-700',
+};
+
 export const OWNERSHIP_LABELS: Record<number, string> = {
   [OwnershipTypeEnum.Owned]: 'Owned',
   [OwnershipTypeEnum.Leased]: 'Leased',

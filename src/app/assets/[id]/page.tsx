@@ -25,6 +25,7 @@ import {
   LifecycleStatusEnum,
   OPERATIONAL_LABELS,
   OWNERSHIP_LABELS,
+  VERIFICATION_BADGE_CLASSES,
   VERIFICATION_LABELS,
 } from '@/enum/assetEnums';
 import {
@@ -234,7 +235,10 @@ const AssetDetailPage = () => {
           />
           <Badge label={OPERATIONAL_LABELS[asset.operationalStatus]} />
           <Badge label={FINANCIAL_LABELS[asset.financialStatus]} />
-          <Badge label={VERIFICATION_LABELS[asset.verificationStatus]} />
+          <Badge
+            label={VERIFICATION_LABELS[asset.verificationStatus]}
+            className={VERIFICATION_BADGE_CLASSES[asset.verificationStatus]}
+          />
           <Badge
             label={asset.conditionName}
             className="bg-blue-50 text-blue-700"

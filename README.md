@@ -46,8 +46,12 @@ in production.
 | Assets — register (code generated server-side, immutable) | ✅ `POST /api/Assets` |
 | Assets — detail (six status dimensions, purchase/warranty/custody) | ✅ `GET /api/Assets/{id}` |
 | Asset Categories — list, create (3-level tree rule), tree view | ✅ `/api/AssetCategories` (+`/tree`) |
+| Assignments — assign/return flows, employees registry | ✅ `/api/AssetAssignments` |
+| Transfers — request/approve/dispatch/receive/cancel, locations registry | ✅ `/api/AssetTransfers` |
+| Returns — initiate/inspect/cancel, recovery cases | ✅ `/api/AssetReturns` (+`/api/AssetRecoveryCases`) |
+| Physical Verification — campaigns, scan/record, discrepancy reconciliation, evidence | ✅ `/api/AssetAuditCampaigns` (+results/discrepancies/evidence) |
 | Configuration hub | ✅ (cards; management screens arrive with their APIs) |
-| Assignments / Transfers / Returns / Verification / Maintenance / Depreciation / Disposal / Reports | sidebar stubs → `/coming-soon` (later phases) |
+| Maintenance / Depreciation / Disposal / Reports | sidebar stubs → `/coming-soon` (later phases) |
 
 Conventions:
 
