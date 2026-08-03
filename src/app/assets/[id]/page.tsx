@@ -15,6 +15,10 @@ import {
   retireAsset,
 } from '@/services/asset.service';
 import { fetchAssetAssignments } from '@/services/assetAssignment.service';
+import {
+  recommissionAsset,
+  releaseAsset,
+} from '@/services/maintenance.service';
 import { unwrapPaged } from '@/utils/serviceUtils';
 import {
   CUSTODY_BADGE_CLASSES,
@@ -24,6 +28,7 @@ import {
   LIFECYCLE_LABELS,
   LifecycleStatusEnum,
   OPERATIONAL_LABELS,
+  OperationalStatusEnum,
   OWNERSHIP_LABELS,
   VERIFICATION_BADGE_CLASSES,
   VERIFICATION_LABELS,
@@ -35,6 +40,27 @@ import {
 
 const formatDate = (value?: string | null) =>
   value ? new Date(value).toLocaleDateString() : '—';
+
+/** Release lifts a Quarantined hold; recommission brings back an OutOfService asset. */
+type THoldAction = 'release' | 'recommission';
+
+const HOLD_COPY: Record<
+  THoldAction,
+  { title: string; blurb: string; confirm: string }
+> = {
+  release: {
+    title: 'Release Asset',
+    blurb:
+      'Lifts the Quarantined hold and puts the asset back to Operational. Custody is untouched — a released asset stays Unassigned until the assignment workflow issues it.',
+    confirm: 'Release',
+  },
+  recommission: {
+    title: 'Recommission Asset',
+    blurb:
+      'Returns an Out of Service asset to Operational. Together with release this is the only audited exit from a hold, so a reason is required.',
+    confirm: 'Recommission',
+  },
+};
 
 const Field = ({
   label,
@@ -94,6 +120,10 @@ const AssetDetailPage = () => {
   const [retireOpen, setRetireOpen] = useState(false);
   const [retireReason, setRetireReason] = useState('');
   const [retiring, setRetiring] = useState(false);
+  // Release / recommission modal (the only audited exits from a hold)
+  const [holdAction, setHoldAction] = useState<THoldAction | null>(null);
+  const [holdReason, setHoldReason] = useState('');
+  const [holdSaving, setHoldSaving] = useState(false);
 
   const loadAsset = useCallback(() => {
     if (!id) return;
@@ -171,6 +201,43 @@ const AssetDetailPage = () => {
     }
   };
 
+  const handleHold = async () => {
+    if (!asset?.rowVersion || !holdAction || !holdReason.trim() || holdSaving)
+      return;
+    setHoldSaving(true);
+    try {
+      const payload = {
+        reason: holdReason.trim(),
+        rowVersion: asset.rowVersion,
+      };
+      const res =
+        holdAction === 'release'
+          ? await releaseAsset(asset.id, payload)
+          : await recommissionAsset(asset.id, payload);
+      if (res?.success) {
+        addToast.success(
+          res.message ||
+            (holdAction === 'release'
+              ? 'Asset released'
+              : 'Asset recommissioned')
+        );
+      } else {
+        // 400 on the wrong verb for the current hold, 409 on a stale
+        // rowVersion — both messages say which; show them verbatim.
+        addToast.error(res?.message || 'Failed to lift the hold');
+      }
+    } catch (error) {
+      console.error('Error lifting the asset hold:', error);
+      addToast.error('An error occurred while lifting the hold');
+    } finally {
+      // Close and reload either way so a retry starts from a fresh RowVersion.
+      setHoldSaving(false);
+      setHoldAction(null);
+      setHoldReason('');
+      loadAsset();
+    }
+  };
+
   if (loading) {
     return (
       <div className="px-4 mt-10 text-center text-gray-400 text-sm">
@@ -212,6 +279,28 @@ const AssetDetailPage = () => {
             asset.lifecycleStatus === LifecycleStatusEnum.Retired) && (
             <Button onClick={handleActivate} disabled={activating}>
               {activating ? 'Activating…' : 'Activate'}
+            </Button>
+          )}
+          {asset.operationalStatus === OperationalStatusEnum.Quarantined && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                setHoldReason('');
+                setHoldAction('release');
+              }}
+            >
+              Release
+            </Button>
+          )}
+          {asset.operationalStatus === OperationalStatusEnum.OutOfService && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                setHoldReason('');
+                setHoldAction('recommission');
+              }}
+            >
+              Recommission
             </Button>
           )}
           {asset.lifecycleStatus === LifecycleStatusEnum.Active && (
@@ -412,6 +501,47 @@ const AssetDetailPage = () => {
             </Button>
             <Button variant="danger" onClick={handleRetire} disabled={retiring}>
               {retiring ? 'Retiring…' : 'Retire Asset'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Release / recommission modal — reason is mandatory (design §4) */}
+      <Modal
+        isOpen={holdAction !== null}
+        onClose={() => setHoldAction(null)}
+        size="md"
+      >
+        <div className="p-6">
+          <h2 className="text-lg font-semibold text-secondaryColor mb-1">
+            {holdAction ? HOLD_COPY[holdAction].title : ''}
+          </h2>
+          <p className="text-sm text-gray-500 mb-4">
+            {asset.assetCode} — {asset.assetName}.{' '}
+            {holdAction ? HOLD_COPY[holdAction].blurb : ''}
+          </p>
+          <TextArea
+            label="Reason"
+            required
+            value={holdReason}
+            onChange={(e) => setHoldReason(e.target.value)}
+            rows={2}
+            maxLength={1000}
+            placeholder="Why is the hold being lifted?"
+          />
+          <div className="flex justify-end gap-3 mt-6">
+            <Button variant="secondary" onClick={() => setHoldAction(null)}>
+              Back
+            </Button>
+            <Button
+              onClick={handleHold}
+              disabled={!holdReason.trim() || holdSaving}
+            >
+              {holdSaving
+                ? 'Working…'
+                : holdAction
+                  ? HOLD_COPY[holdAction].confirm
+                  : ''}
             </Button>
           </div>
         </div>

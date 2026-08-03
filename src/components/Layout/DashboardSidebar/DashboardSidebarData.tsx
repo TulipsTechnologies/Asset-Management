@@ -92,8 +92,7 @@ export const ASSET_MENU_ITEMS: IMenuItem[] = [
     iconName: 'tools',
     iconSizeClass: 'text-[16px]',
     label: 'Maintenance',
-    url: '/coming-soon',
-    phase2: true,
+    url: '/maintenance',
   },
   {
     id: 9,

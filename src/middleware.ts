@@ -47,6 +47,7 @@ export const config = {
     '/transfers/:path*',
     '/returns/:path*',
     '/physical-verification/:path*',
+    '/maintenance/:path*',
     '/employees/:path*',
     '/locations/:path*',
     '/vendors/:path*',

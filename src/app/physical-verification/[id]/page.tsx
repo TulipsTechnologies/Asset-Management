@@ -1258,7 +1258,10 @@ const CampaignDetailPage = () => {
             </div>
           )}
 
+          {/* Distinct key per tab: CustomTable seeds its column state from props
+              once, so a reused instance would render the other tab's columns. */}
           <CustomTable
+            key="verification-results-table"
             columns={resultColumns}
             rows={resultRows}
             tableName="Verification Results"
@@ -1358,6 +1361,7 @@ const CampaignDetailPage = () => {
       ) : (
         <>
           <CustomTable
+            key="verification-discrepancies-table"
             columns={discColumns}
             rows={discRows}
             tableName="Verification Discrepancies"
