@@ -9,6 +9,7 @@ import ToggleSwitch from '@/components/UI/ToggleSwitch';
 import {
   IAssetCodeConfiguration,
   SequenceScopeEnum,
+  YearTokenStyleEnum,
 } from '@/interface/IAssetCodeConfiguration';
 import {
   fetchAssetCodeConfiguration,
@@ -18,7 +19,9 @@ import {
 type TFormState = {
   prefix: string;
   includeCategoryToken: boolean;
-  includeYearToken: boolean;
+  categoryTokenLength: string;
+  yearTokenStyle: YearTokenStyleEnum;
+  includeCategoryInitialsToken: boolean;
   sequencePadding: string;
   sequenceScope: SequenceScopeEnum;
   separator: string;
@@ -33,11 +36,27 @@ const SEPARATORS = [
 ];
 
 /** Client-side twin of the server composer — cosmetic live preview only. */
-const composeExample = (form: TFormState, sampleCategory: string): string => {
+const composeExample = (
+  form: TFormState,
+  sampleCategory: string,
+  sampleInitials: string
+): string => {
   const padding = Math.min(10, Math.max(1, Number(form.sequencePadding) || 1));
   const parts = [form.prefix || 'AST'];
-  if (form.includeCategoryToken) parts.push(sampleCategory);
-  if (form.includeYearToken) parts.push(String(new Date().getFullYear()));
+  if (form.includeCategoryToken) {
+    const truncate = Number(form.categoryTokenLength);
+    parts.push(
+      Number.isInteger(truncate) && truncate > 0
+        ? sampleCategory.slice(0, truncate)
+        : sampleCategory
+    );
+  }
+  if (form.yearTokenStyle === YearTokenStyleEnum.CalendarYear)
+    parts.push(String(new Date().getFullYear()));
+  if (form.yearTokenStyle === YearTokenStyleEnum.FiscalYear)
+    parts.push('FY83/84');
+  if (form.includeCategoryInitialsToken && sampleInitials)
+    parts.push(sampleInitials);
   parts.push('1'.padStart(padding, '0'));
   return parts.join(form.separator);
 };
@@ -60,7 +79,12 @@ const AssetCodeFormatPage = () => {
         setForm({
           prefix: res.data.prefix,
           includeCategoryToken: res.data.includeCategoryToken,
-          includeYearToken: res.data.includeYearToken,
+          categoryTokenLength:
+            res.data.categoryTokenLength != null
+              ? String(res.data.categoryTokenLength)
+              : '',
+          yearTokenStyle: res.data.yearTokenStyle,
+          includeCategoryInitialsToken: res.data.includeCategoryInitialsToken,
           sequencePadding: String(res.data.sequencePadding),
           sequenceScope: res.data.sequenceScope,
           separator: res.data.separator,
@@ -109,10 +133,15 @@ const AssetCodeFormatPage = () => {
     }
     setSaving(true);
     try {
+      const truncate = form.categoryTokenLength.trim()
+        ? Number(form.categoryTokenLength)
+        : undefined;
       const res = await saveAssetCodeConfiguration({
         prefix,
         includeCategoryToken: form.includeCategoryToken,
-        includeYearToken: form.includeYearToken,
+        categoryTokenLength: truncate,
+        yearTokenStyle: form.yearTokenStyle,
+        includeCategoryInitialsToken: form.includeCategoryInitialsToken,
         sequencePadding: padding,
         sequenceScope: form.sequenceScope,
         separator: form.separator,
@@ -135,7 +164,10 @@ const AssetCodeFormatPage = () => {
   };
 
   const sampleCategory = config?.longestCategoryCode || 'IT';
-  const preview = form ? composeExample(form, sampleCategory) : '';
+  const sampleInitials = config?.longestCategoryInitials || 'AB';
+  const preview = form
+    ? composeExample(form, sampleCategory, sampleInitials)
+    : '';
   const previewTooLong = !!config && preview.length > config.maxCodeLength;
 
   return (
@@ -229,12 +261,48 @@ const AssetCodeFormatPage = () => {
                 update({ includeCategoryToken: e.target.checked })
               }
             />
+            <Input
+              label="Category token length"
+              type="number"
+              value={form.categoryTokenLength}
+              onChange={(e) =>
+                update({ categoryTokenLength: e.target.value })
+              }
+              placeholder="Full code"
+              helperText="First N characters of the category code (blank = full code)."
+            />
+            <Select
+              label="Year in the code"
+              options={[
+                { value: String(YearTokenStyleEnum.None), label: 'No year' },
+                {
+                  value: String(YearTokenStyleEnum.CalendarYear),
+                  label: `Calendar year (${new Date().getFullYear()})`,
+                },
+                {
+                  value: String(YearTokenStyleEnum.FiscalYear),
+                  label: 'Fiscal year (FY83/84)',
+                },
+              ]}
+              value={String(form.yearTokenStyle)}
+              onChange={(e) =>
+                update({ yearTokenStyle: Number(e.target.value) })
+              }
+            />
             <ToggleSwitch
-              label="Include year"
-              checked={form.includeYearToken}
-              onChange={(e) => update({ includeYearToken: e.target.checked })}
+              label="Include category name initials"
+              checked={form.includeCategoryInitialsToken}
+              onChange={(e) =>
+                update({ includeCategoryInitialsToken: e.target.checked })
+              }
             />
           </div>
+
+          {config?.fiscalYearWarning && (
+            <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-4 py-3 mt-4">
+              {config.fiscalYearWarning}
+            </p>
+          )}
 
           {form.sequenceScope === SequenceScopeEnum.PerCompanyAndCategory && (
             <p className="text-xs text-gray-400 mt-3">

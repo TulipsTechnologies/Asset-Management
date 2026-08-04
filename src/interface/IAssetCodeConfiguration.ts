@@ -4,10 +4,20 @@ export enum SequenceScopeEnum {
   PerCompanyAndCategory = 2,
 }
 
+// Mirrors backend YearTokenStyleEnum — integer values must match.
+export enum YearTokenStyleEnum {
+  None = 0,
+  CalendarYear = 1,
+  /** Rendered like FY83/84 from the fiscal calendar. */
+  FiscalYear = 2,
+}
+
 export interface IAssetCodeConfiguration {
   prefix: string;
   includeCategoryToken: boolean;
-  includeYearToken: boolean;
+  categoryTokenLength?: number | null;
+  yearTokenStyle: YearTokenStyleEnum;
+  includeCategoryInitialsToken: boolean;
   sequencePadding: number;
   sequenceScope: SequenceScopeEnum;
   separator: string;
@@ -18,12 +28,17 @@ export interface IAssetCodeConfiguration {
   exampleCode: string;
   maxCodeLength: number;
   longestCategoryCode?: string | null;
+  longestCategoryInitials?: string | null;
+  /** Set when the fiscal token is on and the calendar is missing or about to lapse. */
+  fiscalYearWarning?: string | null;
 }
 
 export interface ISaveAssetCodeConfiguration {
   prefix: string;
   includeCategoryToken: boolean;
-  includeYearToken: boolean;
+  categoryTokenLength?: number | null;
+  yearTokenStyle: YearTokenStyleEnum;
+  includeCategoryInitialsToken: boolean;
   sequencePadding: number;
   sequenceScope: SequenceScopeEnum;
   separator: string;
