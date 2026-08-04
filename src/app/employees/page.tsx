@@ -5,6 +5,7 @@ import { useToast } from '@/components/Providers/ToastProvider';
 import Button from '@/components/UI/Button';
 import CustomTable from '@/components/CustomTable/CustomTable';
 import ImportExportOptions from '@/components/ImportExport/ImportExportOptions';
+import { syncEmployeesFromHrm } from '@/services/employeeSync.service';
 import {
   ITableFilters,
   TTableColumn,
@@ -66,6 +67,7 @@ const EmployeesPage = () => {
   const [editing, setEditing] = useState<IEmployee | null>(null);
   const [deleting, setDeleting] = useState<IEmployee | null>(null);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   const columns: TTableColumn[] = [
     { key: 'employeeCode', label: 'Code', width: 100, type: 'string', name: 'employeeCode' },
@@ -182,6 +184,33 @@ const EmployeesPage = () => {
     }
   };
 
+  /**
+   * TulipsHRM owns the register for linked companies; this pulls it. Nobody is
+   * deleted — people who left HRM come back deactivated — so the outcome is
+   * reported as counts rather than a bare success.
+   */
+  const handleSyncFromHrm = async () => {
+    setSyncing(true);
+    try {
+      const res = await syncEmployeesFromHrm();
+      if (res?.success) {
+        addToast.success(res.message || 'Employees synced from TulipsHRM');
+        // Data problems in HRM the sync worked around (duplicate codes, …).
+        (res.data?.warnings ?? []).forEach((warning) =>
+          addToast.info(warning, 12000)
+        );
+        loadEmployees();
+      } else {
+        addToast.error(res?.message || 'Could not sync employees from TulipsHRM');
+      }
+    } catch (error) {
+      console.error('Error syncing employees:', error);
+      addToast.error('An error occurred while syncing employees');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!deleting) return;
     setSaving(true);
@@ -276,6 +305,18 @@ const EmployeesPage = () => {
         }
         tableHeaderRight={
           <>
+            <button
+              type="button"
+              onClick={handleSyncFromHrm}
+              disabled={syncing}
+              className="text-sm flex items-center gap-x-2 font-medium whitespace-nowrap disabled:opacity-50"
+              title="Pull the employee register from TulipsHRM"
+            >
+              <i
+                className={`icon icon-redo text-base ${syncing ? 'animate-spin text-gray-400' : 'text-gray-500'}`}
+              />
+              <span>{syncing ? 'Syncing…' : 'Sync from HRM'}</span>
+            </button>
             <ImportExportOptions
               entity="employees"
               entityLabel="Employees"
