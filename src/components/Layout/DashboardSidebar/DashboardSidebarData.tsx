@@ -116,8 +116,7 @@ export const ASSET_MENU_ITEMS: IMenuItem[] = [
     iconName: 'report',
     iconSizeClass: 'text-[16px]',
     label: 'Reports',
-    url: '/coming-soon',
-    phase2: true,
+    url: '/reports',
   },
   {
     id: 12,

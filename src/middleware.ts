@@ -50,6 +50,7 @@ export const config = {
     '/maintenance/:path*',
     '/disposal/:path*',
     '/depreciation/:path*',
+    '/reports/:path*',
     '/employees/:path*',
     '/locations/:path*',
     '/vendors/:path*',
