@@ -1,6 +1,7 @@
 'use client';
 
 import { ReactNode, useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/Providers/ToastProvider';
 import Button from '@/components/UI/Button';
 import ConfirmationModal from '@/components/UI/ConfirmationModel';
@@ -254,6 +255,7 @@ const DetailField = ({
 
 const MaintenancePage = () => {
   const { addToast } = useToast();
+  const router = useRouter();
 
   const [activeTab, setActiveTab] = useState<'requests' | 'workOrders'>(
     'requests'
@@ -815,16 +817,26 @@ const MaintenancePage = () => {
     setCancelReason('');
   };
 
-  const assetCell = (assetCode: string, assetName: string) => (
+  const assetCell = (assetCode: string, assetName: string, assetId?: string) => (
     <div>
-      <div className="font-medium text-primarycolor">{assetCode}</div>
+      {assetId ? (
+        <button
+          type="button"
+          className="font-medium text-primarycolor hover:underline"
+          onClick={() => router.push(`/assets/${assetId}`)}
+        >
+          {assetCode}
+        </button>
+      ) : (
+        <div className="font-medium text-primarycolor">{assetCode}</div>
+      )}
       <div className="text-xs text-gray-400">{assetName}</div>
     </div>
   );
 
   const requestRowData = requests.map((request) => ({
     id: request.id,
-    asset: assetCell(request.assetCode, request.assetName),
+    asset: assetCell(request.assetCode, request.assetName, request.assetId),
     requestType: typeBadge(request.requestType),
     priority: priorityBadge(request.priority),
     status: requestStatusBadge(request.status),
@@ -887,7 +899,7 @@ const MaintenancePage = () => {
 
   const workOrderRowData = workOrders.map((workOrder) => ({
     id: workOrder.id,
-    asset: assetCell(workOrder.assetCode, workOrder.assetName),
+    asset: assetCell(workOrder.assetCode, workOrder.assetName, workOrder.assetId),
     title: workOrder.title,
     classification: (
       <div className="flex flex-wrap items-center gap-1">

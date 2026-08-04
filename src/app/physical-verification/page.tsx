@@ -398,7 +398,13 @@ const PhysicalVerificationPage = () => {
   const rowData = campaigns.map((campaign) => ({
     id: campaign.id,
     name: (
-      <span className="font-medium text-primarycolor">{campaign.name}</span>
+      <button
+        type="button"
+        className="font-medium text-primarycolor hover:underline"
+        onClick={() => router.push(`/physical-verification/${campaign.id}`)}
+      >
+        {campaign.name}
+      </button>
     ),
     status: statusBadge(campaign.status),
     progress: progressOf(campaign),

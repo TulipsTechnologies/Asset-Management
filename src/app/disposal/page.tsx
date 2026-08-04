@@ -1,6 +1,7 @@
 'use client';
 
 import { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/Providers/ToastProvider';
 import Button from '@/components/UI/Button';
 import ConfirmationModal from '@/components/UI/ConfirmationModel';
@@ -260,6 +261,7 @@ const executePreflight = (request: IDisposalRequest): TExecuteBlock | null => {
 
 const DisposalPage = () => {
   const { addToast } = useToast();
+  const router = useRouter();
 
   const [requests, setRequests] = useState<IDisposalRequest[]>([]);
   const [loading, setLoading] = useState(false);
@@ -754,9 +756,19 @@ const DisposalPage = () => {
     }
   };
 
-  const assetCell = (assetCode: string, assetName: string) => (
+  const assetCell = (assetCode: string, assetName: string, assetId?: string) => (
     <div>
-      <div className="font-medium text-primarycolor">{assetCode}</div>
+      {assetId ? (
+        <button
+          type="button"
+          className="font-medium text-primarycolor hover:underline"
+          onClick={() => router.push(`/assets/${assetId}`)}
+        >
+          {assetCode}
+        </button>
+      ) : (
+        <div className="font-medium text-primarycolor">{assetCode}</div>
+      )}
       <div className="text-xs text-gray-400">{assetName}</div>
     </div>
   );
@@ -802,7 +814,7 @@ const DisposalPage = () => {
 
     return {
       id: request.id,
-      asset: assetCell(request.assetCode, request.assetName),
+      asset: assetCell(request.assetCode, request.assetName, request.assetId),
       method: methodBadge(request.disposalMethod),
       proceeds: proceedsCell(request),
       status: statusCell(request, block),

@@ -1,6 +1,7 @@
 'use client';
 
 import { ReactNode, useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/Providers/ToastProvider';
 import Button from '@/components/UI/Button';
 import CustomTable from '@/components/CustomTable/CustomTable';
@@ -125,6 +126,7 @@ const DetailField = ({
 
 const ReturnsPage = () => {
   const { addToast } = useToast();
+  const router = useRouter();
 
   const [activeTab, setActiveTab] = useState<'returns' | 'recovery'>('returns');
 
@@ -417,9 +419,13 @@ const ReturnsPage = () => {
   const rowData = returns.map((assetReturn) => ({
     id: assetReturn.id,
     assetCode: (
-      <span className="font-medium text-primarycolor">
+      <button
+        type="button"
+        className="font-medium text-primarycolor hover:underline"
+        onClick={() => router.push(`/assets/${assetReturn.assetId}`)}
+      >
         {assetReturn.assetCode}
-      </span>
+      </button>
     ),
     assetName: assetReturn.assetName,
     returnedBy: (

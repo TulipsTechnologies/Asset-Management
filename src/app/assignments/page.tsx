@@ -265,9 +265,13 @@ const AssignmentsPage = () => {
   const rowData = assignments.map((assignment) => ({
     id: assignment.id,
     assetCode: (
-      <span className="font-medium text-primarycolor">
+      <button
+        type="button"
+        className="font-medium text-primarycolor hover:underline"
+        onClick={() => router.push(`/assets/${assignment.assetId}`)}
+      >
         {assignment.assetCode}
-      </span>
+      </button>
     ),
     assetName: assignment.assetName,
     employeeName: (
@@ -307,11 +311,6 @@ const AssignmentsPage = () => {
               label: 'View Details',
               icon: <i className="icon icon-eye text-sm" />,
               action: () => setViewing(assignment),
-            },
-            {
-              label: 'View Asset',
-              icon: <i className="icon icon-eye text-sm" />,
-              action: () => router.push(`/assets/${assignment.assetId}`),
             },
             ...(assignment.status === AssignmentStatusEnum.Open
               ? [

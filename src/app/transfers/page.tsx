@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/Providers/ToastProvider';
 import Button from '@/components/UI/Button';
 import CustomTable from '@/components/CustomTable/CustomTable';
@@ -54,6 +55,7 @@ type TConditionAction = 'dispatch' | 'receive';
 
 const TransfersPage = () => {
   const { addToast } = useToast();
+  const router = useRouter();
 
   const [transfers, setTransfers] = useState<IAssetTransfer[]>([]);
   const [loading, setLoading] = useState(false);
@@ -282,7 +284,13 @@ const TransfersPage = () => {
   const rowData = transfers.map((transfer) => ({
     id: transfer.id,
     assetCode: (
-      <span className="font-medium text-primarycolor">{transfer.assetCode}</span>
+      <button
+        type="button"
+        className="font-medium text-primarycolor hover:underline"
+        onClick={() => router.push(`/assets/${transfer.assetId}`)}
+      >
+        {transfer.assetCode}
+      </button>
     ),
     assetName: transfer.assetName,
     destination: (
