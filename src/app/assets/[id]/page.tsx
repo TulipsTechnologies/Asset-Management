@@ -7,6 +7,8 @@ import Button from '@/components/UI/Button';
 import Modal from '@/components/UI/Modal';
 import TextArea from '@/components/UI/TextArea';
 import AssetDocumentsSection from './_components/AssetDocumentsSection';
+import ProfileHeader from '@/components/UI/ProfileHeader';
+import InfoCard, { InfoCardGrid, InfoField } from '@/components/UI/InfoCard';
 import { IAsset } from '@/interface/IAsset';
 import { IAssetAssignment } from '@/interface/IAssetAssignment';
 import {
@@ -62,19 +64,6 @@ const HOLD_COPY: Record<
   },
 };
 
-const Field = ({
-  label,
-  value,
-}: {
-  label: string;
-  value?: React.ReactNode;
-}) => (
-  <div>
-    <div className="text-xs text-gray-400 uppercase tracking-wide">{label}</div>
-    <div className="text-sm text-secondaryColor mt-0.5">{value ?? '—'}</div>
-  </div>
-);
-
 const Badge = ({
   label,
   className,
@@ -91,23 +80,6 @@ const Badge = ({
   </span>
 );
 
-const Section = ({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) => (
-  <div className="bg-white rounded-xl p-6">
-    <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">
-      {title}
-    </h2>
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4">
-      {children}
-    </div>
-  </div>
-);
-
 const AssetDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -121,6 +93,7 @@ const AssetDetailPage = () => {
   const [retireReason, setRetireReason] = useState('');
   const [retiring, setRetiring] = useState(false);
   // Release / recommission modal (the only audited exits from a hold)
+  const [activeTab, setActiveTab] = useState<'overview' | 'assignments' | 'documents'>('overview');
   const [holdAction, setHoldAction] = useState<THoldAction | null>(null);
   const [holdReason, setHoldReason] = useState('');
   const [holdSaving, setHoldSaving] = useState(false);
@@ -249,230 +222,337 @@ const AssetDetailPage = () => {
   if (!asset) return null;
 
   return (
-    <div className="px-4 mt-2 space-y-4 max-w-5xl">
-      <div className="flex items-center justify-between">
-        <div>
-          <button
-            onClick={() => router.push('/assets')}
-            className="text-sm text-gray-500 hover:text-primarycolor"
-          >
-            <i className="icon icon-left text-xs mr-1" /> Assets
-          </button>
-          <h1 className="text-lg font-semibold text-secondaryColor mt-1">
-            {asset.assetName}
-            <span className="ml-3 text-sm font-normal text-gray-400">
-              {asset.assetCode}
-            </span>
-          </h1>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {asset.lifecycleStatus !== LifecycleStatusEnum.Disposed && (
-            <Button
-              variant="outline"
-              onClick={() => router.push(`/assets/${asset.id}/edit`)}
-            >
-              <i className="icon icon-edit text-xs" />
-              <span>Edit</span>
-            </Button>
-          )}
-          {(asset.lifecycleStatus === LifecycleStatusEnum.Draft ||
-            asset.lifecycleStatus === LifecycleStatusEnum.Retired) && (
-            <Button onClick={handleActivate} disabled={activating}>
-              {activating ? 'Activating…' : 'Activate'}
-            </Button>
-          )}
-          {asset.operationalStatus === OperationalStatusEnum.Quarantined && (
-            <Button
-              variant="outline"
-              onClick={() => {
-                setHoldReason('');
-                setHoldAction('release');
-              }}
-            >
-              Release
-            </Button>
-          )}
-          {asset.operationalStatus === OperationalStatusEnum.OutOfService && (
-            <Button
-              variant="outline"
-              onClick={() => {
-                setHoldReason('');
-                setHoldAction('recommission');
-              }}
-            >
-              Recommission
-            </Button>
-          )}
-          {asset.lifecycleStatus === LifecycleStatusEnum.Active && (
-            <Button
-              variant="danger"
-              onClick={() => {
-                setRetireReason('');
-                setRetireOpen(true);
-              }}
-            >
-              Retire
-            </Button>
-          )}
+    <div className="px-4 sm:px-6 py-5">
+      <ProfileHeader
+        fallback={<i className="icon icon-briefcase text-2xl"></i>}
+        title={asset.assetCode}
+        titleBadges={
           <Badge
             label={LIFECYCLE_LABELS[asset.lifecycleStatus]}
             className={LIFECYCLE_BADGE_CLASSES[asset.lifecycleStatus]}
           />
-          <Badge
-            label={CUSTODY_LABELS[asset.custodyStatus]}
-            className={CUSTODY_BADGE_CLASSES[asset.custodyStatus]}
-          />
-          <Badge label={OPERATIONAL_LABELS[asset.operationalStatus]} />
-          <Badge label={FINANCIAL_LABELS[asset.financialStatus]} />
-          <Badge
-            label={VERIFICATION_LABELS[asset.verificationStatus]}
-            className={VERIFICATION_BADGE_CLASSES[asset.verificationStatus]}
-          />
-          <Badge
-            label={asset.conditionName}
-            className="bg-blue-50 text-blue-700"
-          />
-        </div>
-      </div>
-
-      <Section title="Identification">
-        <Field label="Asset Code" value={asset.assetCode} />
-        <Field label="Asset Tag" value={asset.assetTag || '—'} />
-        <Field label="Category" value={asset.assetCategoryName} />
-        <Field label="Serial Number" value={asset.serialNumber || '—'} />
-        <Field label="Manufacturer" value={asset.manufacturer || '—'} />
-        <Field label="Brand" value={asset.brand || '—'} />
-        <Field label="Model" value={asset.model || '—'} />
-        <Field
-          label="Ownership"
-          value={OWNERSHIP_LABELS[asset.ownershipType]}
-        />
-        <Field label="Parent Asset" value={asset.parentAssetCode || '—'} />
-      </Section>
-
-      <Section title="Purchase">
-        <Field label="Purchase Date" value={formatDate(asset.purchaseDate)} />
-        <Field
-          label="Purchase Cost"
-          value={
-            asset.purchaseCost != null
-              ? `${asset.currencyId ? `${asset.currencyId} ` : ''}${asset.purchaseCost.toLocaleString()}`
-              : '—'
-          }
-        />
-        <Field label="Supplier" value={asset.supplierName || '—'} />
-        <Field label="Invoice No." value={asset.invoiceNumber || '—'} />
-        <Field
-          label="PO Reference"
-          value={asset.purchaseOrderReference || '—'}
-        />
-        <Field label="Receipt Date" value={formatDate(asset.receiptDate)} />
-        <Field
-          label="Commissioned"
-          value={formatDate(asset.commissioningDate)}
-        />
-        <Field
-          label="Placed In Service"
-          value={formatDate(asset.placedInServiceDate)}
-        />
-      </Section>
-
-      <Section title="Warranty & insurance">
-        <Field
-          label="Warranty Start"
-          value={formatDate(asset.warrantyStartDate)}
-        />
-        <Field label="Warranty End" value={formatDate(asset.warrantyEndDate)} />
-        <Field
-          label="Insurance Policy"
-          value={asset.insurancePolicyNumber || '—'}
-        />
-        <Field
-          label="Insurance Expiry"
-          value={formatDate(asset.insuranceExpiryDate)}
-        />
-      </Section>
-
-      <Section title="Location & custody">
-        <Field label="Location" value={asset.assetLocationName || '—'} />
-        <Field
-          label="Custodian"
-          value={
-            assignments.find((a) => a.status === 1)?.employeeName ??
-            (asset.currentCustodianEmployeeId ? 'Assigned' : 'Unassigned')
-          }
-        />
-        <Field label="Registered On" value={formatDate(asset.createdOn)} />
-        <Field label="Last Modified" value={formatDate(asset.modifiedOn)} />
-      </Section>
-
-      {assignments.length > 0 && (
-        <div className="bg-white rounded-xl p-6">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">
-            Assignment history
-          </h2>
-          <div className="space-y-3">
-            {assignments.map((assignment) => (
-              <div
-                key={assignment.id}
-                className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm border-b border-gray-50 pb-3 last:border-0 last:pb-0"
-              >
-                <span
-                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                    ASSIGNMENT_STATUS_BADGE_CLASSES[assignment.status] ??
-                    'bg-gray-100 text-gray-700'
-                  }`}
-                >
-                  {ASSIGNMENT_STATUS_LABELS[assignment.status]}
-                </span>
-                <span className="font-medium text-secondaryColor">
-                  {assignment.employeeName}
-                </span>
-                <span className="text-gray-400">
-                  {formatDate(assignment.assignmentDate)}
-                  {assignment.returnedDate
-                    ? ` → ${formatDate(assignment.returnedDate)}`
-                    : assignment.expectedReturnDate
-                      ? ` (due ${formatDate(assignment.expectedReturnDate)})`
-                      : ''}
-                </span>
-                <span className="text-gray-400">
-                  {assignment.conditionAtIssueName}
-                  {assignment.conditionAtReturnName
-                    ? ` → ${assignment.conditionAtReturnName}`
-                    : ''}
-                </span>
-                {assignment.returnNotes && (
-                  <span className="text-xs text-gray-400 w-full">
-                    {assignment.returnNotes}
-                  </span>
-                )}
-              </div>
-            ))}
+        }
+        subtitle={[asset.assetCategoryName, asset.assetName]
+          .filter(Boolean)
+          .join(' • ')}
+        chips={
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Badge
+              label={CUSTODY_LABELS[asset.custodyStatus]}
+              className={CUSTODY_BADGE_CLASSES[asset.custodyStatus]}
+            />
+            <Badge label={OPERATIONAL_LABELS[asset.operationalStatus]} />
+            <Badge label={FINANCIAL_LABELS[asset.financialStatus]} />
+            <Badge
+              label={VERIFICATION_LABELS[asset.verificationStatus]}
+              className={VERIFICATION_BADGE_CLASSES[asset.verificationStatus]}
+            />
+            <Badge
+              label={asset.conditionName}
+              className="bg-blue-50 text-blue-700"
+            />
           </div>
-        </div>
-      )}
-
-      <AssetDocumentsSection
-        assetId={asset.id}
-        readOnly={asset.lifecycleStatus === LifecycleStatusEnum.Disposed}
+        }
+        rightSlot={
+          <div>
+            <p className="text-xs text-gray-400">Purchase Cost</p>
+            {asset.purchaseCost != null ? (
+              <p className="text-sm font-semibold text-secondaryColor">
+                {asset.currencyId ? `${asset.currencyId} ` : ''}
+                {asset.purchaseCost.toLocaleString()}
+              </p>
+            ) : (
+              <p className="text-sm italic text-gray-400">Not recorded</p>
+            )}
+          </div>
+        }
+        actions={
+          <>
+            {asset.lifecycleStatus !== LifecycleStatusEnum.Disposed && (
+              <Button
+                variant="outline"
+                onClick={() => router.push(`/assets/${asset.id}/edit`)}
+              >
+                <i className="icon icon-edit text-xs"></i>
+                <span>Edit</span>
+              </Button>
+            )}
+            {(asset.lifecycleStatus === LifecycleStatusEnum.Draft ||
+              asset.lifecycleStatus === LifecycleStatusEnum.Retired) && (
+              <Button onClick={handleActivate} disabled={activating}>
+                {activating ? 'Activating…' : 'Activate'}
+              </Button>
+            )}
+            {asset.operationalStatus === OperationalStatusEnum.Quarantined && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setHoldReason('');
+                  setHoldAction('release');
+                }}
+              >
+                Release
+              </Button>
+            )}
+            {asset.operationalStatus === OperationalStatusEnum.OutOfService && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setHoldReason('');
+                  setHoldAction('recommission');
+                }}
+              >
+                Recommission
+              </Button>
+            )}
+            {asset.lifecycleStatus === LifecycleStatusEnum.Active && (
+              <Button
+                variant="danger"
+                onClick={() => {
+                  setRetireReason('');
+                  setRetireOpen(true);
+                }}
+              >
+                Retire
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => router.push('/assets')}>
+              <i className="icon icon-left text-xs"></i>
+              <span>Back</span>
+            </Button>
+          </>
+        }
       />
 
-      {(asset.description || asset.notes) && (
-        <div className="bg-white rounded-xl p-6">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
-            Details
-          </h2>
-          {asset.description && (
-            <p className="text-sm text-secondaryColor whitespace-pre-wrap mb-3">
-              {asset.description}
+      <div className="flex gap-1 border-b border-gray-200 mb-5 overflow-x-auto">
+        {(
+          [
+            { key: 'overview', label: 'Overview' },
+            { key: 'assignments', label: 'Assignments' },
+            { key: 'documents', label: 'Documents' },
+          ] as const
+        ).map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setActiveTab(tab.key)}
+            className={`px-4 py-2.5 text-sm whitespace-nowrap border-b-2 -mb-px transition-colors ${
+              activeTab === tab.key
+                ? 'border-primarycolor text-primarycolor font-medium'
+                : 'border-transparent text-gray-500 hover:text-secondaryColor'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'overview' && (
+        <InfoCardGrid className="max-w-5xl">
+          <InfoCard title="Basic" icon="info">
+            <InfoField label="Asset Code" icon="card" value={asset.assetCode} />
+            <InfoField label="Asset Tag" icon="id" value={asset.assetTag} />
+            <InfoField
+              label="Category"
+              icon="modules"
+              value={asset.assetCategoryName}
+            />
+            <InfoField
+              label="Serial Number"
+              icon="clipboard"
+              value={asset.serialNumber}
+            />
+            <InfoField
+              label="Make / Model"
+              icon="setting"
+              value={[asset.manufacturer, asset.brand, asset.model]
+                .filter(Boolean)
+                .join(' ')}
+            />
+            <InfoField
+              label="Parent Asset"
+              icon="expand"
+              value={asset.parentAssetCode}
+            />
+            <InfoField
+              label="Condition"
+              icon="check-circle"
+              value={asset.conditionName}
+            />
+          </InfoCard>
+
+          <InfoCard title="Purchase & Ownership" icon="briefcase">
+            <InfoField
+              label="Ownership"
+              icon="company"
+              value={OWNERSHIP_LABELS[asset.ownershipType]}
+            />
+            <InfoField
+              label="Purchase Date"
+              icon="calendar"
+              value={formatDate(asset.purchaseDate)}
+            />
+            <InfoField
+              label="Purchase Cost"
+              icon="cash"
+              value={
+                asset.purchaseCost != null
+                  ? `${asset.currencyId ? `${asset.currencyId} ` : ''}${asset.purchaseCost.toLocaleString()}`
+                  : null
+              }
+            />
+            <InfoField
+              label="Supplier"
+              icon="handshake"
+              value={asset.supplierName}
+            />
+            <InfoField
+              label="Invoice / PO"
+              icon="documents"
+              value={[asset.invoiceNumber, asset.purchaseOrderReference]
+                .filter(Boolean)
+                .join(' / ')}
+            />
+            <InfoField
+              label="Placed In Service"
+              icon="clock-check"
+              value={formatDate(asset.placedInServiceDate)}
+            />
+          </InfoCard>
+
+          <InfoCard title="Warranty & Insurance" icon="umbrella">
+            <InfoField
+              label="Warranty"
+              icon="certificate"
+              value={
+                asset.warrantyStartDate || asset.warrantyEndDate
+                  ? `${formatDate(asset.warrantyStartDate) ?? '…'} → ${formatDate(asset.warrantyEndDate) ?? '…'}`
+                  : null
+              }
+            />
+            <InfoField
+              label="Insurance Policy"
+              icon="lock"
+              value={asset.insurancePolicyNumber}
+            />
+            <InfoField
+              label="Insurance Expiry"
+              icon="calendar"
+              value={formatDate(asset.insuranceExpiryDate)}
+            />
+          </InfoCard>
+
+          <InfoCard title="Location & Custody" icon="marker">
+            <InfoField
+              label="Location"
+              icon="marker"
+              value={asset.assetLocationName}
+            />
+            <InfoField
+              label="Custodian"
+              icon="user-check"
+              value={
+                assignments.find((a) => a.status === 1)?.employeeName ??
+                (asset.currentCustodianEmployeeId ? 'Assigned' : null)
+              }
+              emptyText="Unassigned"
+            />
+            <InfoField
+              label="Registered On"
+              icon="calendar"
+              value={formatDate(asset.createdOn)}
+            />
+            <InfoField
+              label="Last Modified"
+              icon="clock"
+              value={formatDate(asset.modifiedOn)}
+            />
+          </InfoCard>
+
+          <InfoCard title="Notes" icon="comment">
+            <div className="py-3">
+              {asset.description || asset.notes ? (
+                <>
+                  {asset.description && (
+                    <p className="text-sm text-secondaryColor whitespace-pre-wrap mb-2">
+                      {asset.description}
+                    </p>
+                  )}
+                  {asset.notes && (
+                    <p className="text-sm text-gray-500 whitespace-pre-wrap">
+                      {asset.notes}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm italic text-gray-400">Not provided</p>
+              )}
+            </div>
+          </InfoCard>
+        </InfoCardGrid>
+      )}
+
+      {activeTab === 'assignments' && (
+        <InfoCard
+          title="Assignment History"
+          icon="users"
+          className="max-w-5xl"
+          bodyClassName="py-3"
+        >
+          {assignments.length === 0 ? (
+            <p className="text-sm italic text-gray-400 py-3">
+              Never assigned.
             </p>
+          ) : (
+            <div className="space-y-3">
+              {assignments.map((assignment) => (
+                <div
+                  key={assignment.id}
+                  className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm border-b border-gray-50 pb-3 last:border-0 last:pb-0"
+                >
+                  <span
+                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                      ASSIGNMENT_STATUS_BADGE_CLASSES[assignment.status] ??
+                      'bg-gray-100 text-gray-700'
+                    }`}
+                  >
+                    {ASSIGNMENT_STATUS_LABELS[assignment.status]}
+                  </span>
+                  <span className="font-medium text-secondaryColor">
+                    {assignment.employeeName}
+                  </span>
+                  <span className="text-gray-400">
+                    {formatDate(assignment.assignmentDate)}
+                    {assignment.returnedDate
+                      ? ` → ${formatDate(assignment.returnedDate)}`
+                      : assignment.expectedReturnDate
+                        ? ` (due ${formatDate(assignment.expectedReturnDate)})`
+                        : ''}
+                  </span>
+                  <span className="text-gray-400">
+                    {assignment.conditionAtIssueName}
+                    {assignment.conditionAtReturnName
+                      ? ` → ${assignment.conditionAtReturnName}`
+                      : ''}
+                  </span>
+                  {assignment.returnNotes && (
+                    <span className="text-xs text-gray-400 w-full">
+                      {assignment.returnNotes}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
-          {asset.notes && (
-            <p className="text-sm text-gray-500 whitespace-pre-wrap">
-              {asset.notes}
-            </p>
-          )}
+        </InfoCard>
+      )}
+
+      {activeTab === 'documents' && (
+        <div className="max-w-5xl">
+          <AssetDocumentsSection
+            assetId={asset.id}
+            readOnly={asset.lifecycleStatus === LifecycleStatusEnum.Disposed}
+          />
         </div>
       )}
 

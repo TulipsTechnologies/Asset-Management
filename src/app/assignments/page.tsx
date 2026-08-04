@@ -11,6 +11,7 @@ import {
 } from '@/components/CustomTable/CustomTableInterface';
 import CustomMenuItem from '@/components/UI/CustomMenuItem';
 import Dropdown from '@/components/UI/Dropdown';
+import InfoCard, { InfoCardGrid, InfoField } from '@/components/UI/InfoCard';
 import Modal from '@/components/UI/Modal';
 import Input from '@/components/UI/Input';
 import Select from '@/components/UI/Select';
@@ -89,6 +90,7 @@ const AssignmentsPage = () => {
 
   // Assign modal
   const [assignOpen, setAssignOpen] = useState(false);
+  const [viewing, setViewing] = useState<IAssetAssignment | null>(null);
   const [assignableAssets, setAssignableAssets] = useState<IAssetListItem[]>([]);
   const [assignForm, setAssignForm] = useState<TAssignForm>(emptyAssignForm);
   const [assignError, setAssignError] = useState('');
@@ -301,6 +303,11 @@ const AssignmentsPage = () => {
           }
         >
           {[
+            {
+              label: 'View Details',
+              icon: <i className="icon icon-eye text-sm" />,
+              action: () => setViewing(assignment),
+            },
             {
               label: 'View Asset',
               icon: <i className="icon icon-eye text-sm" />,
@@ -595,6 +602,86 @@ const AssignmentsPage = () => {
               {returnSaving ? 'Returning…' : 'Confirm Return'}
             </Button>
           </div>
+        </div>
+      </Modal>
+      {/* Assignment details — Vehicle-detail InfoCard language */}
+      <Modal isOpen={!!viewing} onClose={() => setViewing(null)} size="3xl">
+        <div className="p-5">
+          <div className="mb-4 flex items-center gap-3">
+            <span className="flex items-center justify-center size-10 rounded-full bg-primarycolor text-white">
+              <i className="icon icon-users text-base"></i>
+            </span>
+            <div>
+              <h2 className="text-lg font-semibold text-secondaryColor leading-tight">
+                {viewing?.assetCode} → {viewing?.employeeName}
+              </h2>
+              <p className="text-xs text-gray-500">{viewing?.assetName}</p>
+            </div>
+            <span
+              className={`ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                viewing
+                  ? (ASSIGNMENT_STATUS_BADGE_CLASSES[viewing.status] ??
+                    'bg-gray-100 text-gray-700')
+                  : ''
+              }`}
+            >
+              {viewing ? ASSIGNMENT_STATUS_LABELS[viewing.status] : ''}
+            </span>
+          </div>
+
+          <InfoCardGrid>
+            <InfoCard title="Assignment" icon="user-check">
+              <InfoField
+                label="Custodian"
+                icon="users"
+                value={viewing?.employeeName}
+              />
+              <InfoField
+                label="Assigned On"
+                icon="calendar"
+                value={formatDate(viewing?.assignmentDate)}
+              />
+              <InfoField
+                label="Expected Return"
+                icon="clock"
+                value={formatDate(viewing?.expectedReturnDate)}
+              />
+              <InfoField
+                label="Condition at Issue"
+                icon="check-circle"
+                value={viewing?.conditionAtIssueName}
+              />
+              <InfoField
+                label="Accessories"
+                icon="clipboard"
+                value={viewing?.accessories}
+              />
+              <InfoField
+                label="Handover Notes"
+                icon="comment"
+                value={viewing?.handoverNotes}
+              />
+            </InfoCard>
+
+            <InfoCard title="Return" icon="redo">
+              <InfoField
+                label="Returned On"
+                icon="calendar"
+                value={formatDate(viewing?.returnedDate)}
+                emptyText="Not returned yet"
+              />
+              <InfoField
+                label="Condition at Return"
+                icon="check-circle"
+                value={viewing?.conditionAtReturnName}
+              />
+              <InfoField
+                label="Return Notes"
+                icon="comment"
+                value={viewing?.returnNotes}
+              />
+            </InfoCard>
+          </InfoCardGrid>
         </div>
       </Modal>
     </div>
