@@ -100,8 +100,7 @@ export const ASSET_MENU_ITEMS: IMenuItem[] = [
     iconName: 'graph',
     iconSizeClass: 'text-[16px]',
     label: 'Depreciation',
-    url: '/coming-soon',
-    phase2: true,
+    url: '/depreciation',
   },
   {
     id: 10,

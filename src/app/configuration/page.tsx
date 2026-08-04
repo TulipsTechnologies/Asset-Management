@@ -74,9 +74,11 @@ const ConfigurationPage = () => (
         ready
       />
       <ConfigCard
-        title="Capitalization Policy"
-        description="Per-company threshold that defaults assets to capital; below-threshold assets stay non-capital tracked items."
+        title="Depreciation Settings"
+        description="Fiscal calendar (Bikram Sambat, seeded per year), capitalization policy and GL account mappings for depreciation and disposal journals."
+        href="/configuration/depreciation"
         icon="graph"
+        ready
       />
       <ConfigCard
         title="Classes & Types"
