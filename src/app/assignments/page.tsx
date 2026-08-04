@@ -23,22 +23,15 @@ import {
   IAssetAssignment,
   IAssetAssignmentFilter,
 } from '@/interface/IAssetAssignment';
-import { IAssetListItem } from '@/interface/IAsset';
 import { IEmployee } from '@/interface/IEmployee';
 import {
-  assignAsset,
   fetchAssetAssignments,
   returnAsset,
 } from '@/services/assetAssignment.service';
-import { fetchAssets } from '@/services/asset.service';
 import { fetchEmployees } from '@/services/employee.service';
 import { unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
-import {
-  ASSET_CONDITIONS,
-  CustodyStatusEnum,
-  LifecycleStatusEnum,
-} from '@/enum/assetEnums';
+import { ASSET_CONDITIONS } from '@/enum/assetEnums';
 import {
   ASSIGNMENT_STATUS_BADGE_CLASSES,
   ASSIGNMENT_STATUS_LABELS,
@@ -52,26 +45,6 @@ import AssignmentAnalyticsView from '@/components/Assignments/AssignmentAnalytic
 
 const formatDate = (value?: string | null) =>
   value ? new Date(value).toLocaleDateString() : '—';
-
-type TAssignForm = {
-  assetId: string;
-  employeeId: string;
-  assignmentDate: string;
-  expectedReturnDate: string;
-  conditionAtIssueId: string;
-  accessories: string;
-  handoverNotes: string;
-};
-
-const emptyAssignForm: TAssignForm = {
-  assetId: '',
-  employeeId: '',
-  assignmentDate: '',
-  expectedReturnDate: '',
-  conditionAtIssueId: '',
-  accessories: '',
-  handoverNotes: '',
-};
 
 /* --------------------------------------------------------------------- */
 /* View modes                                                             */
@@ -111,13 +84,8 @@ const AssignmentsPage = () => {
   const [view, setView] = useState<TAssignmentView>('table');
   /* Bumped after any mutation so the board reloads alongside the list it does not share. */
   const [refreshToken, setRefreshToken] = useState(0);
-  const [assignOpen, setAssignOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [viewing, setViewing] = useState<IAssetAssignment | null>(null);
-  const [assignableAssets, setAssignableAssets] = useState<IAssetListItem[]>([]);
-  const [assignForm, setAssignForm] = useState<TAssignForm>(emptyAssignForm);
-  const [assignError, setAssignError] = useState('');
-  const [saving, setSaving] = useState(false);
 
   // Return modal
   const [returning, setReturning] = useState<IAssetAssignment | null>(null);
@@ -210,55 +178,6 @@ const AssignmentsPage = () => {
         pageNumber: 1,
       }),
     }));
-  };
-
-  const openAssign = async () => {
-    setAssignForm(emptyAssignForm);
-    setAssignError('');
-    setAssignOpen(true);
-    try {
-      // Only Active + Unassigned assets can be issued.
-      const res = await fetchAssets({
-        pageNumber: 1,
-        pageSize: 500,
-        lifecycleStatus: LifecycleStatusEnum.Active,
-        custodyStatus: CustodyStatusEnum.Unassigned,
-      });
-      if (res?.success) setAssignableAssets(unwrapPaged(res).items);
-    } catch {
-      addToast.error('Failed to load assignable assets');
-    }
-  };
-
-  const handleAssign = async () => {
-    if (!assignForm.assetId || !assignForm.employeeId || !assignForm.conditionAtIssueId) {
-      setAssignError('Asset, employee and condition are required');
-      return;
-    }
-    setSaving(true);
-    try {
-      const res = await assignAsset({
-        assetId: assignForm.assetId,
-        employeeId: assignForm.employeeId,
-        assignmentDate: assignForm.assignmentDate || undefined,
-        expectedReturnDate: assignForm.expectedReturnDate || undefined,
-        conditionAtIssueId: assignForm.conditionAtIssueId,
-        accessories: assignForm.accessories.trim() || undefined,
-        handoverNotes: assignForm.handoverNotes.trim() || undefined,
-      });
-      if (res?.success) {
-        addToast.success(res.message || 'Asset assigned');
-        setAssignOpen(false);
-        refreshAll();
-      } else {
-        addToast.error(res?.message || 'Failed to assign the asset');
-      }
-    } catch (error) {
-      console.error('Error assigning asset:', error);
-      addToast.error('An error occurred while assigning the asset');
-    } finally {
-      setSaving(false);
-    }
   };
 
   const openReturn = (assignment: IAssetAssignment) => {
@@ -406,11 +325,6 @@ const AssignmentsPage = () => {
         <i className="icon icon-plus text-xs"></i>
         <span>Assign Assets</span>
       </Button>
-      {/* The single-asset form stays for the one-off handover, where picking a
-          person and one asset in a small form beats working a list. */}
-      <Button variant="outline" onClick={openAssign}>
-        <span>Single asset</span>
-      </Button>
       <ViewSwitcher
         options={VIEW_OPTIONS}
         value={view}
@@ -550,123 +464,6 @@ const AssignmentsPage = () => {
         employees={employees}
         onAssigned={loadAssignments}
       />
-
-      <Modal isOpen={assignOpen} onClose={() => setAssignOpen(false)} size="lg">
-        <div className="p-6">
-          <h2 className="text-lg font-semibold text-secondaryColor mb-4">
-            Assign Asset
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
-            <Select
-              label="Asset"
-              required
-              placeholder="Select an Active, unassigned asset"
-              options={assignableAssets.map((a) => ({
-                value: a.id,
-                label: `${a.assetCode} — ${a.assetName}`,
-              }))}
-              value={assignForm.assetId}
-              onChange={(e) => {
-                setAssignForm((prev) => ({ ...prev, assetId: e.target.value }));
-                setAssignError('');
-              }}
-            />
-            <Select
-              label="Employee"
-              required
-              placeholder="Select custodian"
-              options={employees.map((e) => ({
-                value: e.id,
-                label: e.employeeCode
-                  ? `${e.fullName} (${e.employeeCode})`
-                  : e.fullName,
-              }))}
-              value={assignForm.employeeId}
-              onChange={(e) => {
-                setAssignForm((prev) => ({
-                  ...prev,
-                  employeeId: e.target.value,
-                }));
-                setAssignError('');
-              }}
-            />
-            <Select
-              label="Condition at Issue"
-              required
-              placeholder="Select condition"
-              options={ASSET_CONDITIONS.map((c) => ({
-                value: c.id,
-                label: c.name,
-              }))}
-              value={assignForm.conditionAtIssueId}
-              onChange={(e) => {
-                setAssignForm((prev) => ({
-                  ...prev,
-                  conditionAtIssueId: e.target.value,
-                }));
-                setAssignError('');
-              }}
-            />
-            <Input
-              label="Assignment Date"
-              type="date"
-              value={assignForm.assignmentDate}
-              onChange={(e) =>
-                setAssignForm((prev) => ({
-                  ...prev,
-                  assignmentDate: e.target.value,
-                }))
-              }
-            />
-            <Input
-              label="Expected Return"
-              type="date"
-              value={assignForm.expectedReturnDate}
-              onChange={(e) =>
-                setAssignForm((prev) => ({
-                  ...prev,
-                  expectedReturnDate: e.target.value,
-                }))
-              }
-            />
-            <Input
-              label="Accessories"
-              value={assignForm.accessories}
-              onChange={(e) =>
-                setAssignForm((prev) => ({
-                  ...prev,
-                  accessories: e.target.value,
-                }))
-              }
-              placeholder="Charger, bag, dock…"
-            />
-            <div className="md:col-span-2">
-              <TextArea
-                label="Handover Notes"
-                value={assignForm.handoverNotes}
-                onChange={(e) =>
-                  setAssignForm((prev) => ({
-                    ...prev,
-                    handoverNotes: e.target.value,
-                  }))
-                }
-                rows={2}
-              />
-            </div>
-          </div>
-          {assignError && (
-            <p className="text-sm text-red-600 mt-3">{assignError}</p>
-          )}
-          <div className="flex justify-end gap-3 mt-6">
-            <Button variant="secondary" onClick={() => setAssignOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAssign} disabled={saving}>
-              {saving ? 'Assigning…' : 'Assign'}
-            </Button>
-          </div>
-        </div>
-      </Modal>
 
       {/* Return modal */}
       <Modal

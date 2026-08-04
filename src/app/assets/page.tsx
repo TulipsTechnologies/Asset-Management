@@ -19,6 +19,7 @@ import ViewSwitcher, { IViewOption, readStoredView } from '@/components/UI/ViewS
 import AssetCardView from '@/components/Assets/AssetCardView';
 import AssetCalendarView from '@/components/Assets/AssetCalendarView';
 import AssetAnalyticsView from '@/components/Assets/AssetAnalyticsView';
+import SingleAssignModal, { IAssignTarget } from '@/components/Assignments/SingleAssignModal';
 import {
   AssetActionsMenu,
   IAssetAction,
@@ -28,8 +29,10 @@ import {
 } from '@/components/Assets/AssetViewShared';
 import { IAssetFilter, IAssetListItem } from '@/interface/IAsset';
 import { IAssetCategory } from '@/interface/IAssetCategory';
+import { IEmployee } from '@/interface/IEmployee';
 import { deleteAsset, fetchAssets } from '@/services/asset.service';
 import { fetchAssetCategories } from '@/services/assetCategory.service';
+import { fetchEmployees } from '@/services/employee.service';
 import { unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import {
@@ -78,6 +81,8 @@ const AssetsPage = () => {
   const [deleting, setDeleting] = useState<IAssetListItem | null>(null);
   const [deletingBusy, setDeletingBusy] = useState(false);
   const [categories, setCategories] = useState<IAssetCategory[]>([]);
+  const [employees, setEmployees] = useState<IEmployee[]>([]);
+  const [assigning, setAssigning] = useState<IAssignTarget | null>(null);
   const [loading, setLoading] = useState(false);
   const [rowCount, setRowCount] = useState(0);
   const [pageCount, setPageCount] = useState(0);
@@ -158,6 +163,13 @@ const AssetsPage = () => {
         if (res?.success) setCategories(unwrapPaged(res).items);
       })
       .catch(() => undefined);
+
+    // Custodians for the assign modal — only active employees can receive an asset.
+    fetchEmployees({ pageNumber: 1, pageSize: 500, isActive: true })
+      .then((res) => {
+        if (res?.success) setEmployees(unwrapPaged(res).items);
+      })
+      .catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -236,6 +248,23 @@ const AssetsPage = () => {
         label: 'View',
         iconName: 'eye',
         onClick: (asset) => router.push(`/assets/${asset.id}`),
+      },
+      {
+        // Issue it straight from the row it is on. The gate here is only what the list
+        // knows — the assign endpoint still has the last word on operational holds,
+        // active transfers, pending returns and approved disposals.
+        label: 'Assign',
+        iconName: 'user-check',
+        onClick: (asset) =>
+          setAssigning({
+            id: asset.id,
+            assetCode: asset.assetCode,
+            assetName: asset.assetName,
+          }),
+        isAvailable: (asset) =>
+          asset.lifecycleStatus === LifecycleStatusEnum.Active &&
+          (asset.custodyStatus === CustodyStatusEnum.Unassigned ||
+            asset.custodyStatus === CustodyStatusEnum.Reserved),
       },
       {
         label: 'Edit',
@@ -486,6 +515,14 @@ const AssetsPage = () => {
           />
         </div>
       )}
+
+      <SingleAssignModal
+        isOpen={!!assigning}
+        onClose={() => setAssigning(null)}
+        asset={assigning}
+        employees={employees}
+        onAssigned={loadAssets}
+      />
 
       <ConfirmationModal
         isOpen={!!deleting}
