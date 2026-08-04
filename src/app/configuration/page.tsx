@@ -36,8 +36,7 @@ const SECTIONS: ISettingsSection[] = [
         label: 'Asset Code Format',
         description: 'Prefix, category/year tokens and sequence padding per company',
         iconName: 'id',
-        url: '/coming-soon',
-        phase2: true,
+        url: '/asset-code-format',
       },
       {
         label: 'Classes & Types',
