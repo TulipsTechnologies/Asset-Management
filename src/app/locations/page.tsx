@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useToast } from '@/components/Providers/ToastProvider';
 import Button from '@/components/UI/Button';
 import CustomTable from '@/components/CustomTable/CustomTable';
+import ImportExportOptions from '@/components/ImportExport/ImportExportOptions';
 import {
   ITableFilters,
   TTableColumn,
@@ -268,7 +269,14 @@ const LocationsPage = () => {
           </Button>
         }
         tableHeaderRight={
-          <SearchBox onSearch={setSearchQuery} searchVal={searchQuery} />
+          <>
+            <ImportExportOptions
+              entity="locations"
+              entityLabel="Locations"
+              onImported={loadLocations}
+            />
+            <SearchBox onSearch={setSearchQuery} searchVal={searchQuery} />
+          </>
         }
         updateFilters={updateFilters}
       />

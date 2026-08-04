@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/components/Providers/ToastProvider';
 import Button from '@/components/UI/Button';
 import CustomTable from '@/components/CustomTable/CustomTable';
+import ImportExportOptions from '@/components/ImportExport/ImportExportOptions';
 import {
   ITableFilters,
   TTableColumn,
@@ -393,6 +394,11 @@ const AssetsPage = () => {
                 }
               />
             </FilterPanel>
+            <ImportExportOptions
+              entity="assets"
+              entityLabel="Assets"
+              onImported={loadAssets}
+            />
             <SearchBox onSearch={setSearchQuery} searchVal={searchQuery} />
           </>
         }
