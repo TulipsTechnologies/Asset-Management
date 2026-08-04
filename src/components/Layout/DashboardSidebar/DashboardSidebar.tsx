@@ -12,7 +12,7 @@ import { IMenuItem, ASSET_MENU_ITEMS } from './DashboardSidebarData';
 import { useDashbordCtx } from '../DashboardLayout/Contexts/DashboardContext';
 
 const DashboardSidebar = () => {
-  const { isMenuExtended, isMobileMenuOpen } = useDashbordCtx();
+  const { isMenuExtended, isMobileMenuOpen, setIsMenuExtended } = useDashbordCtx();
   // Inside the mobile off-canvas drawer the sidebar is always fully extended.
   const extended = isMenuExtended || isMobileMenuOpen;
   const pathname = usePathname();
@@ -42,6 +42,13 @@ const DashboardSidebar = () => {
   // -1 = user explicitly collapsed everything; null = default (active group auto-expands)
   const handleItemClick = (item: IMenuItem, isOpen: boolean) => {
     if (item.subMenu && item.subMenu.length > 0) {
+      // Submenus only render in the extended rail, so clicking a group while the
+      // sidebar is collapsed to icons would otherwise put its pages out of reach.
+      if (!extended) {
+        setIsMenuExtended(true);
+        setOpenMenuId(item.id);
+        return;
+      }
       setOpenMenuId(isOpen ? -1 : item.id);
     } else if (item.url) {
       router.push(item.url);

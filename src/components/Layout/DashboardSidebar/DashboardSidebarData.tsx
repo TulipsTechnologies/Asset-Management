@@ -21,10 +21,18 @@ export interface IMenuData {
   menuBottom: IMenuItem[];
 }
 
+/** Children carry a right chevron, matching the platform's parent-menu pattern. */
+const CHILD_ICON = 'right';
+
 /**
- * Static sidebar menu for the Asset Management module (navigation per the
- * technical architecture §3.3). Items flagged phase2 are deferred workflow
- * areas — they render a badge and route to /coming-soon until implemented.
+ * Static sidebar menu for the Asset Management module, grouped the way the module
+ * appears once it is mounted inside the main TulipsHRM shell: a handful of parent
+ * menus that expand into their pages, rather than one flat list. Ids are stable —
+ * retired ones (3) are never reused.
+ *
+ * Groups follow the lifecycle of an asset: it is REGISTERED, then OPERATED
+ * (issued, moved, returned, counted), then carried through its LIFECYCLE
+ * (serviced, depreciated, disposed).
  */
 export const ASSET_MENU_ITEMS: IMenuItem[] = [
   {
@@ -36,86 +44,118 @@ export const ASSET_MENU_ITEMS: IMenuItem[] = [
     url: '/dashboard',
   },
   {
-    id: 2,
+    id: 20,
     parentId: null,
     iconName: 'briefcase',
     iconSizeClass: 'text-[16px]',
-    label: 'Assets',
-    url: '/assets',
-  },
-  // Asset Categories intentionally has no sidebar entry — like Locations and
-  // Vendors it is reachable through the Configuration hub only (id 3 retired,
-  // ids are stable — do not reuse).
-  {
-    id: 4,
-    parentId: null,
-    iconName: 'clipboard',
-    iconSizeClass: 'text-[16px]',
-    label: 'Assignments',
-    url: '/assignments',
-  },
-  {
-    id: 13,
-    parentId: null,
-    iconName: 'users',
-    iconSizeClass: 'text-[16px]',
-    label: 'Employees',
-    url: '/employees',
-  },
-  {
-    id: 5,
-    parentId: null,
-    iconName: 'move',
-    iconSizeClass: 'text-[16px]',
-    label: 'Transfers',
-    url: '/transfers',
+    label: 'Asset Register',
+    subMenu: [
+      {
+        id: 2,
+        parentId: 20,
+        iconName: CHILD_ICON,
+        iconSizeClass: 'text-[11px]',
+        label: 'Assets',
+        url: '/assets',
+      },
+      {
+        id: 3,
+        parentId: 20,
+        iconName: CHILD_ICON,
+        iconSizeClass: 'text-[11px]',
+        label: 'Categories',
+        url: '/asset-categories',
+      },
+      {
+        id: 13,
+        parentId: 20,
+        iconName: CHILD_ICON,
+        iconSizeClass: 'text-[11px]',
+        label: 'Employees',
+        url: '/employees',
+      },
+    ],
   },
   {
-    id: 6,
+    id: 21,
     parentId: null,
-    iconName: 'redo',
+    iconName: 'stream',
     iconSizeClass: 'text-[16px]',
-    label: 'Returns',
-    url: '/returns',
+    label: 'Asset Operations',
+    subMenu: [
+      {
+        id: 4,
+        parentId: 21,
+        iconName: CHILD_ICON,
+        iconSizeClass: 'text-[11px]',
+        label: 'Assignments',
+        url: '/assignments',
+      },
+      {
+        id: 5,
+        parentId: 21,
+        iconName: CHILD_ICON,
+        iconSizeClass: 'text-[11px]',
+        label: 'Transfers',
+        url: '/transfers',
+      },
+      {
+        id: 6,
+        parentId: 21,
+        iconName: CHILD_ICON,
+        iconSizeClass: 'text-[11px]',
+        label: 'Returns',
+        url: '/returns',
+      },
+      {
+        id: 7,
+        parentId: 21,
+        iconName: CHILD_ICON,
+        iconSizeClass: 'text-[11px]',
+        label: 'Physical Verification',
+        url: '/physical-verification',
+      },
+    ],
   },
   {
-    id: 7,
+    id: 22,
     parentId: null,
-    iconName: 'clipboard',
+    iconName: 'hourglass',
     iconSizeClass: 'text-[16px]',
-    label: 'Physical Verification',
-    url: '/physical-verification',
-  },
-  {
-    id: 8,
-    parentId: null,
-    iconName: 'setting',
-    iconSizeClass: 'text-[16px]',
-    label: 'Maintenance',
-    url: '/maintenance',
-  },
-  {
-    id: 9,
-    parentId: null,
-    iconName: 'trend',
-    iconSizeClass: 'text-[16px]',
-    label: 'Depreciation',
-    url: '/depreciation',
-  },
-  {
-    id: 10,
-    parentId: null,
-    iconName: 'trash',
-    iconSizeClass: 'text-[16px]',
-    label: 'Disposal',
-    url: '/disposal',
+    label: 'Asset Lifecycle',
+    subMenu: [
+      {
+        id: 8,
+        parentId: 22,
+        iconName: CHILD_ICON,
+        iconSizeClass: 'text-[11px]',
+        label: 'Maintenance',
+        url: '/maintenance',
+      },
+      {
+        id: 9,
+        parentId: 22,
+        iconName: CHILD_ICON,
+        iconSizeClass: 'text-[11px]',
+        label: 'Depreciation',
+        url: '/depreciation',
+      },
+      {
+        id: 10,
+        parentId: 22,
+        iconName: CHILD_ICON,
+        iconSizeClass: 'text-[11px]',
+        label: 'Disposal',
+        url: '/disposal',
+      },
+    ],
   },
   {
     id: 11,
     parentId: null,
     iconName: 'bar-chart',
     iconSizeClass: 'text-[16px]',
-    label: 'Reports',
+    label: 'Reports & Analytics',
     url: '/reports',
   },
   {
