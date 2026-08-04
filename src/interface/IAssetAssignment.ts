@@ -49,6 +49,8 @@ export interface IAssetAssignmentFilter {
   assetId?: string;
   employeeId?: string;
   status?: AssignmentStatusEnum;
+  /** Open and past its expected return date. Open-ended assignments are never overdue. */
+  isOverdue?: boolean;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -130,4 +132,40 @@ export interface IBulkAssignResult {
   alreadyAssigned: number;
   failed: number;
   outcomes: IBulkAssignOutcome[];
+}
+
+/* ------------------------------------------------------------------------- */
+/* Analytics view                                                            */
+/* ------------------------------------------------------------------------- */
+
+export interface IAssignmentBucket {
+  label: string;
+  count: number;
+}
+
+export interface IAssignmentMonthPoint {
+  year: number;
+  month: number;
+  issued: number;
+  returned: number;
+}
+
+/**
+ * Counts are of assignment RECORDS, not assets: an asset issued, returned and issued again
+ * is three rows here and one asset in the register.
+ */
+export interface IAssignmentAnalytics {
+  totalAssignments: number;
+  openCount: number;
+  overdueCount: number;
+  returnedCount: number;
+  /** Assets currently issuable — the board's Available column. */
+  availableAssetCount: number;
+  /** Mean days held over closed assignments only; null when none have closed. */
+  averageDaysHeld?: number | null;
+  longestOpenDays?: number | null;
+  byCustodian: IAssignmentBucket[];
+  byCategory: IAssignmentBucket[];
+  byConditionAtIssue: IAssignmentBucket[];
+  byMonth: IAssignmentMonthPoint[];
 }

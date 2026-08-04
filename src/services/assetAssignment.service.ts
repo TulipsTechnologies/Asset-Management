@@ -5,12 +5,26 @@ import {
   IAssetAssignment,
   IAssetAssignmentFilter,
   IAssignableAsset,
+  IAssignmentAnalytics,
   IAssignableAssetFilter,
   IBulkAssignAssets,
   IBulkAssignResult,
   ICreateAssetAssignment,
   IReturnAssetAssignment,
 } from '@/interface/IAssetAssignment';
+
+/**
+ * The filter params every assignment feed accepts. The list, the board's columns and the
+ * analytics all send this, so switching view cannot change which assignments are described.
+ * Paging is excluded — only the list pages.
+ */
+const assignmentFilterQuery = (filter: IAssetAssignmentFilter) => ({
+  Search: filter.search,
+  AssetId: filter.assetId,
+  EmployeeId: filter.employeeId,
+  Status: filter.status,
+  IsOverdue: filter.isOverdue,
+});
 
 export const fetchAssetAssignments = (
   filter: IAssetAssignmentFilter = {}
@@ -21,11 +35,19 @@ export const fetchAssetAssignments = (
       buildQuery({
         PageNumber: filter.pageNumber,
         PageSize: filter.pageSize,
-        Search: filter.search,
-        AssetId: filter.assetId,
-        EmployeeId: filter.employeeId,
-        Status: filter.status,
+        ...assignmentFilterQuery(filter),
       }),
+    method: 'GET',
+    completeData: true,
+  });
+};
+
+/** Aggregates over the same filtered assignments — status mix, custodians, trend. */
+export const fetchAssignmentAnalytics = (
+  filter: IAssetAssignmentFilter = {}
+): Promise<IResponse<IAssignmentAnalytics>> => {
+  return requestApi({
+    apiEndpoint: '/AssetAssignments/analytics' + buildQuery({ ...assignmentFilterQuery(filter) }),
     method: 'GET',
     completeData: true,
   });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/Providers/ToastProvider';
 import Button from '@/components/UI/Button';
@@ -46,6 +46,9 @@ import {
 } from '@/enum/assignmentEnums';
 import useDebounce from '@/hooks/useDebounce';
 import BulkAssignModal from '@/components/Assignments/BulkAssignModal';
+import ViewSwitcher, { IViewOption, readStoredView } from '@/components/UI/ViewSwitcher';
+import AssignmentKanbanView from '@/components/Assignments/AssignmentKanbanView';
+import AssignmentAnalyticsView from '@/components/Assignments/AssignmentAnalyticsView';
 
 const formatDate = (value?: string | null) =>
   value ? new Date(value).toLocaleDateString() : '—';
@@ -70,6 +73,21 @@ const emptyAssignForm: TAssignForm = {
   handoverNotes: '',
 };
 
+/* --------------------------------------------------------------------- */
+/* View modes                                                             */
+/* --------------------------------------------------------------------- */
+
+type TAssignmentView = 'table' | 'kanban' | 'analytics';
+
+const VIEW_VALUES = ['table', 'kanban', 'analytics'] as const;
+const VIEW_STORAGE_KEY = 'assignments.viewMode';
+
+const VIEW_OPTIONS: IViewOption<TAssignmentView>[] = [
+  { value: 'table', label: 'Table', iconName: 'menu', title: 'Every assignment, row by row' },
+  { value: 'kanban', label: 'Board', iconName: 'rearrange', title: 'Custody as a pipeline' },
+  { value: 'analytics', label: 'Analytics', iconName: 'bar-chart', title: 'How custody is behaving' },
+];
+
 const AssignmentsPage = () => {
   const { addToast } = useToast();
   const router = useRouter();
@@ -90,6 +108,9 @@ const AssignmentsPage = () => {
   const [employees, setEmployees] = useState<IEmployee[]>([]);
 
   // Assign modal
+  const [view, setView] = useState<TAssignmentView>('table');
+  /* Bumped after any mutation so the board reloads alongside the list it does not share. */
+  const [refreshToken, setRefreshToken] = useState(0);
   const [assignOpen, setAssignOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [viewing, setViewing] = useState<IAssetAssignment | null>(null);
@@ -143,8 +164,23 @@ const AssignmentsPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
+  // Only the table needs the paged list. The board queries a column at a time and the
+  // analytics aggregate server-side, both from the same filters.
   useEffect(() => {
+    if (view === 'table') loadAssignments();
+  }, [loadAssignments, view]);
+
+  // Restored after mount, never during render: the server has no localStorage, and painting
+  // the remembered view on the first client pass would hydrate mismatched.
+  useEffect(() => {
+    const stored = readStoredView<TAssignmentView>(VIEW_STORAGE_KEY, VIEW_VALUES);
+    if (stored) setView(stored);
+  }, []);
+
+  /** Reloads whichever view is showing — the list and the board do not share a fetch. */
+  const refreshAll = useCallback(() => {
     loadAssignments();
+    setRefreshToken((token) => token + 1);
   }, [loadAssignments]);
 
   useEffect(() => {
@@ -213,7 +249,7 @@ const AssignmentsPage = () => {
       if (res?.success) {
         addToast.success(res.message || 'Asset assigned');
         setAssignOpen(false);
-        loadAssignments();
+        refreshAll();
       } else {
         addToast.error(res?.message || 'Failed to assign the asset');
       }
@@ -246,19 +282,19 @@ const AssignmentsPage = () => {
       if (res?.success) {
         addToast.success(res.message || 'Asset returned');
         setReturning(null);
-        loadAssignments();
+        refreshAll();
       } else {
         // Stale row (already returned / modified elsewhere): close the modal and
         // refresh so a retry never loops on the same stale payload.
         addToast.error(res?.message || 'Failed to return the asset');
         setReturning(null);
-        loadAssignments();
+        refreshAll();
       }
     } catch (error) {
       console.error('Error returning asset:', error);
       addToast.error('An error occurred while returning the asset');
       setReturning(null);
-      loadAssignments();
+      refreshAll();
     } finally {
       setReturnSaving(false);
     }
@@ -338,33 +374,54 @@ const AssignmentsPage = () => {
     ),
   }));
 
-  return (
-    <div className="px-4 mt-2">
-      <CustomTable
-        columns={columns}
-        rows={rowData}
-        tableName="Assignments"
-        serialOffset={
-          ((filters.pageNumber ?? 1) - 1) *
-          (filters.pageSize ?? DEFAULT_PAGE_SIZE)
-        }
-        isLoading={loading}
-        entityLabel="assignment"
-        tableHeaderLeft={
-          <div className="flex gap-2">
-            <Button onClick={() => setBulkOpen(true)}>
-              <i className="icon icon-plus text-xs"></i>
-              <span>Assign Assets</span>
-            </Button>
-            {/* The single-asset form stays for the one-off handover, where picking a
-                person and one asset in a small form beats working a list. */}
-            <Button variant="outline" onClick={openAssign}>
-              <span>Single asset</span>
-            </Button>
-          </div>
-        }
-        tableHeaderRight={
-          <>
+  /**
+   * The filter identity the board and the analytics depend on — without the page number,
+   * so turning a page in the table does not refetch feeds that would come back identical.
+   * Memoized on the primitives; a fresh object each render would defeat that.
+   */
+  const viewFilters = useMemo<IAssetAssignmentFilter>(
+    () => ({
+      search: filters.search,
+      employeeId: filters.employeeId,
+      status: filters.status,
+    }),
+    [filters.search, filters.employeeId, filters.status]
+  );
+
+  /** Plain-language echo of the active narrowing, so Analytics can say what it describes. */
+  const filterSummary = useMemo(() => {
+    const parts: string[] = [];
+    if (filters.status != null) parts.push(ASSIGNMENT_STATUS_LABELS[filters.status]);
+    if (filters.employeeId) {
+      const employee = employees.find((e) => e.id === filters.employeeId);
+      if (employee) parts.push(`held by ${employee.fullName}`);
+    }
+    if (filters.search) parts.push(`matching \u201C${filters.search}\u201D`);
+    return parts.length ? parts.join(' \u00B7 ') : 'every assignment on record';
+  }, [filters, employees]);
+
+  const toolbarLeft = (
+    <div className="flex flex-wrap items-center gap-2">
+      <Button onClick={() => setBulkOpen(true)}>
+        <i className="icon icon-plus text-xs"></i>
+        <span>Assign Assets</span>
+      </Button>
+      {/* The single-asset form stays for the one-off handover, where picking a
+          person and one asset in a small form beats working a list. */}
+      <Button variant="outline" onClick={openAssign}>
+        <span>Single asset</span>
+      </Button>
+      <ViewSwitcher
+        options={VIEW_OPTIONS}
+        value={view}
+        onChange={setView}
+        storageKey={VIEW_STORAGE_KEY}
+      />
+    </div>
+  );
+
+  const filterControls = (
+    <>
             <FilterPanel
               open={showFilters}
               onOpenChange={setShowFilters}
@@ -424,20 +481,67 @@ const AssignmentsPage = () => {
               />
             </FilterPanel>
             <SearchBox onSearch={setSearchQuery} searchVal={searchQuery} />
-          </>
-        }
-        updateFilters={updateFilters}
-      />
+    </>
+  );
 
-      <div className="mt-3">
-        <Pagination
-          pageNumber={filters.pageNumber ?? 1}
-          totalPages={pageCount}
-          pageSize={filters.pageSize ?? DEFAULT_PAGE_SIZE}
-          totalCount={rowCount}
-          updateFilters={updateFilters}
-        />
-      </div>
+  return (
+    <div className="px-4 mt-2">
+      {/*
+       * The same toolbar, placed twice. Table view hands it to CustomTable so Manage
+       * Columns joins the same row; the other views render it standalone, having no
+       * columns to manage.
+       */}
+      {view === 'table' ? (
+        <>
+          <CustomTable
+            columns={columns}
+            rows={rowData}
+            tableName="Assignments"
+            serialOffset={
+              ((filters.pageNumber ?? 1) - 1) * (filters.pageSize ?? DEFAULT_PAGE_SIZE)
+            }
+            isLoading={loading}
+            entityLabel="assignment"
+            tableHeaderLeft={toolbarLeft}
+            tableHeaderRight={filterControls}
+            updateFilters={updateFilters}
+          />
+
+          <div className="mt-3">
+            <Pagination
+              pageNumber={filters.pageNumber ?? 1}
+              totalPages={pageCount}
+              pageSize={filters.pageSize ?? DEFAULT_PAGE_SIZE}
+              totalCount={rowCount}
+              updateFilters={updateFilters}
+            />
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="flex flex-wrap justify-between items-center gap-x-4 gap-y-2 w-full mb-3">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">{toolbarLeft}</div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 md:gap-x-8">
+              {filterControls}
+            </div>
+          </div>
+
+          {view === 'kanban' && (
+            <AssignmentKanbanView
+              filters={viewFilters}
+              refreshToken={refreshToken}
+              onOpenAssignment={setViewing}
+              onReturn={openReturn}
+              onOpenAsset={(assetId) => router.push(`/assets/${assetId}`)}
+              onAssign={() => setBulkOpen(true)}
+            />
+          )}
+
+          {view === 'analytics' && (
+            <AssignmentAnalyticsView filters={viewFilters} filterSummary={filterSummary} />
+          )}
+        </>
+      )}
 
       {/* Assign modal */}
       <BulkAssignModal

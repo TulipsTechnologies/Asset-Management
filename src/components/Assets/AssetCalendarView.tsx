@@ -242,7 +242,68 @@ const AssetCalendarView = ({ filters, onOpenAsset }: IProps) => {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-7 gap-px bg-gray-100 rounded-xl overflow-hidden border border-gray-100">
+          {/*
+           * Below sm the month grid is the wrong shape for the screen: seven columns in
+           * 375px leaves a 40px cell, where an asset code truncates to a letter and the
+           * grid becomes decoration. The same window is rendered as an agenda instead —
+           * chronological, one readable row per item. Both are CSS-toggled rather than
+           * chosen in JS, so there is no hydration mismatch and no second fetch.
+           */}
+          <div className="sm:hidden space-y-3">
+            {visibleEvents.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-8">
+                {events.length > 0
+                  ? 'Every kind is hidden — turn one back on above.'
+                  : 'Nothing falls due this month for the current filters.'}
+              </p>
+            ) : (
+              [...byDay.entries()]
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([key, dayEvents]) => (
+                  <div key={key} className="rounded-xl border border-gray-100">
+                    <p
+                      className={`px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide rounded-t-xl ${
+                        key === todayKey
+                          ? 'bg-primarycolor/10 text-primarycolor'
+                          : 'bg-gray-50 text-gray-400'
+                      }`}
+                    >
+                      {new Date(key).toLocaleDateString(undefined, {
+                        weekday: 'short',
+                        day: 'numeric',
+                        month: 'short',
+                      })}
+                      {key === todayKey ? ' · Today' : ''}
+                    </p>
+                    <ul className="divide-y divide-gray-50">
+                      {dayEvents.map((event, index) => {
+                        const style = EVENT_STYLES[event.eventType];
+                        return (
+                          <li
+                            key={`${event.assetId}-${event.eventType}-${index}`}
+                            className="flex items-center gap-2.5 px-3 py-2.5 cursor-pointer active:bg-hoverColor"
+                            onClick={() => onOpenAsset(event.assetId)}
+                          >
+                            <span className={`size-2 rounded-full shrink-0 ${style.dot}`}></span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-sm font-semibold text-secondaryColor truncate">
+                                {event.assetCode} · {event.assetName}
+                              </span>
+                              <span className="block text-xs text-gray-500 truncate">
+                                {event.title}
+                                {event.detail ? ` — ${event.detail}` : ''}
+                              </span>
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                ))
+            )}
+          </div>
+
+          <div className="hidden sm:grid grid-cols-7 gap-px bg-gray-100 rounded-xl overflow-hidden border border-gray-100">
             {WEEKDAYS.map((day) => (
               <div
                 key={day}
@@ -365,8 +426,9 @@ const AssetCalendarView = ({ filters, onOpenAsset }: IProps) => {
             </div>
           )}
 
+          {/* Hidden below sm — the agenda above prints its own empty message there. */}
           {!loading && visibleEvents.length === 0 && (
-            <p className="text-sm text-gray-400 text-center py-6">
+            <p className="hidden sm:block text-sm text-gray-400 text-center py-6">
               {events.length > 0
                 ? 'Every kind is hidden — turn one back on above.'
                 : 'Nothing falls due this month for the current filters.'}
