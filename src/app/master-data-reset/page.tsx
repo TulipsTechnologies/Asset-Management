@@ -129,10 +129,14 @@ const MasterDataResetPage = () => {
         <p className="text-xs text-gray-500 mt-1 max-w-2xl">
           Permanently deletes every asset and everything attached to it — assignments,
           transfers, returns, verification campaigns, maintenance, disposals,
-          depreciation books — plus categories, locations, vendors and employees.{' '}
-          <span className="font-medium text-secondaryColor">This cannot be undone.</span>{' '}
-          Your users, permissions, fiscal calendar, asset code format and capitalization
-          policy are kept.
+          depreciation books — plus asset categories, locations and vendors.{' '}
+          <span className="font-medium text-secondaryColor">This cannot be undone.</span>
+          <br />
+          Only Asset Management data is touched.{' '}
+          <span className="font-medium text-secondaryColor">Employees are kept</span> —
+          they belong to TulipsHRM, and this module only borrows them as custodians. Your
+          users, permissions, fiscal calendar, asset code format and capitalization policy
+          are kept too.
         </p>
 
         {loading ? (
@@ -208,7 +212,8 @@ const MasterDataResetPage = () => {
           <p className="text-sm text-gray-600 mt-2">
             Every asset in <span className="font-medium">{preview?.companyName}</span> and
             its whole history will be permanently deleted. This cannot be undone and there
-            is no backup taken by this action.
+            is no backup taken by this action. Employees and other modules&apos; data are
+            not touched.
           </p>
           <div className="flex justify-end gap-3 mt-6">
             <Button variant="secondary" onClick={() => setConfirmOpen(false)} disabled={busy}>
