@@ -87,17 +87,21 @@ const ViewSwitcher = <T extends string>({
             type="button"
             role="tab"
             aria-selected={active}
-            title={option.title ?? option.label}
+            /*
+             * Icon-only, so the control stays compact next to the page's other actions.
+             * The label is not lost: it is the tooltip and the accessible name, so it is
+             * still reachable by hover and by a screen reader.
+             */
+            aria-label={option.label}
+            title={option.title ? `${option.label} — ${option.title}` : option.label}
             onClick={() => select(option.value)}
-            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`inline-flex items-center justify-center size-8 rounded-full transition-colors ${
               active
                 ? 'bg-white text-primarycolor shadow-sm'
                 : 'text-gray-500 hover:text-secondaryColor'
             }`}
           >
             <i className={`icon icon-${option.iconName} text-sm`}></i>
-            {/* The label is the affordance on desktop; the icon carries it on narrow screens. */}
-            <span className="hidden sm:inline">{option.label}</span>
           </button>
         );
       })}
