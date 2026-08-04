@@ -9,6 +9,9 @@ import {
   TTableColumn,
 } from '@/components/CustomTable/CustomTableInterface';
 import CustomCheckbox from '@/components/UI/CustomCheckBox';
+import CustomMenuItem from '@/components/UI/CustomMenuItem';
+import Dropdown from '@/components/UI/Dropdown';
+import ConfirmationModal from '@/components/UI/ConfirmationModel';
 import FilterPanel from '@/components/UI/FilterPanel';
 import Modal from '@/components/UI/Modal';
 import Input from '@/components/UI/Input';
@@ -17,7 +20,7 @@ import TextArea from '@/components/UI/TextArea';
 import SearchBox from '@/components/SearchBox';
 import Pagination from '@/components/UI/Pagination';
 import { IVendor, IVendorFilter } from '@/interface/IVendor';
-import { createVendor, fetchVendors } from '@/services/vendor.service';
+import { createVendor, deleteVendor, fetchVendors, updateVendor } from '@/services/vendor.service';
 import { unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import { VENDOR_TYPE_LABELS, VendorTypeEnum } from '@/enum/vendorEnums';
@@ -57,6 +60,8 @@ const VendorsPage = () => {
   });
   const [formErrors, setFormErrors] = useState<TVendorFormErrors>({});
   const [saving, setSaving] = useState(false);
+  const [editing, setEditing] = useState<IVendor | null>(null);
+  const [deleting, setDeleting] = useState<IVendor | null>(null);
 
   const columns: TTableColumn[] = [
     { key: 'name', label: 'Name', width: 190, type: 'string', name: 'name' },
@@ -66,6 +71,13 @@ const VendorsPage = () => {
     { key: 'email', label: 'Email', width: 180, type: 'string', name: 'email' },
     { key: 'assetCount', label: 'Assets', width: 80, name: 'assetCount' },
     { key: 'isActive', label: 'Active', width: 80, name: 'isActive' },
+    {
+      key: 'actions',
+      label: <i className="icon icon-actions text-[10px]" />,
+      width: 45,
+      canToggle: false,
+      name: 'actions',
+    },
   ];
 
   const loadVendors = useCallback(async () => {
@@ -115,6 +127,7 @@ const VendorsPage = () => {
   };
 
   const openCreate = () => {
+    setEditing(null);
     setForm({
       name: '',
       vendorType: String(VendorTypeEnum.GeneralSupplier),
@@ -130,6 +143,23 @@ const VendorsPage = () => {
     setFormOpen(true);
   };
 
+  const openEdit = (vendor: IVendor) => {
+    setEditing(vendor);
+    setForm({
+      name: vendor.name,
+      vendorType: String(vendor.vendorType),
+      contactPerson: vendor.contactPerson ?? '',
+      phone: vendor.phone ?? '',
+      email: vendor.email ?? '',
+      address: vendor.address ?? '',
+      panNumber: vendor.panNumber ?? '',
+      notes: vendor.notes ?? '',
+      isActive: vendor.isActive,
+    });
+    setFormErrors({});
+    setFormOpen(true);
+  };
+
   const handleSave = async () => {
     const nextErrors: TVendorFormErrors = {};
     if (!form.name.trim()) nextErrors.name = 'Name is required';
@@ -140,31 +170,54 @@ const VendorsPage = () => {
       return;
     }
     setSaving(true);
+    const payload = {
+      name: form.name.trim(),
+      vendorType: Number(form.vendorType) as VendorTypeEnum,
+      contactPerson: form.contactPerson.trim() || undefined,
+      phone: form.phone.trim() || undefined,
+      email: form.email.trim() || undefined,
+      address: form.address.trim() || undefined,
+      panNumber: form.panNumber.trim() || undefined,
+      notes: form.notes.trim() || undefined,
+      isActive: form.isActive,
+    };
     try {
-      const res = await createVendor({
-        name: form.name.trim(),
-        vendorType: Number(form.vendorType) as VendorTypeEnum,
-        contactPerson: form.contactPerson.trim() || undefined,
-        phone: form.phone.trim() || undefined,
-        email: form.email.trim() || undefined,
-        address: form.address.trim() || undefined,
-        panNumber: form.panNumber.trim() || undefined,
-        notes: form.notes.trim() || undefined,
-        isActive: form.isActive,
-      });
+      const res = editing
+        ? await updateVendor(editing.id, { ...payload, rowVersion: editing.rowVersion })
+        : await createVendor(payload);
       if (res?.success) {
-        addToast.success(res.message || 'Vendor created successfully');
+        addToast.success(res.message || 'Vendor saved successfully');
         setFormOpen(false);
         loadVendors();
       } else {
-        // 409 = duplicate name — the message says so; show it verbatim.
-        addToast.error(res?.message || 'Failed to create the vendor');
+        addToast.error(res?.message || 'Failed to save the vendor');
+        if (editing) {
+          // Failed edit (stale rowversion etc.): close and reload — never retry stale.
+          setFormOpen(false);
+          loadVendors();
+        }
       }
     } catch (error) {
-      console.error('Error creating vendor:', error);
-      addToast.error('An error occurred while creating the vendor');
+      console.error('Error saving vendor:', error);
+      addToast.error('An error occurred while saving the vendor');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleting) return;
+    setSaving(true);
+    try {
+      const res = await deleteVendor(deleting.id);
+      if (res?.success) addToast.success(res.message || 'Vendor deleted');
+      else addToast.error(res?.message || 'Could not delete the vendor');
+    } catch {
+      addToast.error('Could not delete the vendor');
+    } finally {
+      setSaving(false);
+      setDeleting(null);
+      loadVendors();
     }
   };
 
@@ -202,6 +255,28 @@ const VendorsPage = () => {
       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
         Inactive
       </span>
+    ),
+    actions: (
+      <div className="flex justify-center">
+        <Dropdown
+          buttonChildren={<i className="icon icon-actions text-[10px]" />}
+          position="fixed"
+        >
+          <CustomMenuItem
+            label="Edit"
+            onClick={() => openEdit(vendor)}
+            icon={<i className="icon icon-edit text-sm" />}
+            border
+            className="!py-2"
+          />
+          <CustomMenuItem
+            label="Delete"
+            onClick={() => setDeleting(vendor)}
+            icon={<i className="icon icon-trash text-sm" />}
+            className="!py-2"
+          />
+        </Dropdown>
+      </div>
     ),
   }));
 
@@ -301,7 +376,7 @@ const VendorsPage = () => {
       <Modal isOpen={formOpen} onClose={() => setFormOpen(false)} size="lg">
         <div className="p-6">
           <h2 className="text-lg font-semibold text-secondaryColor mb-4">
-            Add Vendor
+            {editing ? 'Edit Vendor' : 'Add Vendor'}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
             <Input
@@ -374,6 +449,13 @@ const VendorsPage = () => {
           </div>
         </div>
       </Modal>
+      <ConfirmationModal
+        isOpen={!!deleting}
+        message={`Delete vendor '${deleting?.name}'? The API refuses while assets or work orders still reference it — deactivate instead to keep history.`}
+        loading={saving}
+        onConfirm={handleDelete}
+        onClose={() => setDeleting(null)}
+      />
     </div>
   );
 };

@@ -446,7 +446,7 @@ const PhysicalVerificationPage = () => {
               ? [
                   {
                     label: 'Submit for review',
-                    icon: <i className="icon icon-checklist text-sm" />,
+                    icon: <i className="icon icon-clipboard text-sm" />,
                     action: () => handleSubmit(campaign),
                   },
                 ]

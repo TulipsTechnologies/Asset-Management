@@ -849,7 +849,7 @@ const MaintenancePage = () => {
               ? [
                   {
                     label: 'Convert',
-                    icon: <i className="icon icon-tools text-sm" />,
+                    icon: <i className="icon icon-setting text-sm" />,
                     action: () => openConvert(request),
                   },
                   {
@@ -862,7 +862,7 @@ const MaintenancePage = () => {
                   },
                   {
                     label: 'Withdraw',
-                    icon: <i className="icon icon-refresh text-sm" />,
+                    icon: <i className="icon icon-redo text-sm" />,
                     action: () => {
                       setWithdrawing(request);
                       setWithdrawReason('');
@@ -942,7 +942,7 @@ const MaintenancePage = () => {
               ? [
                   {
                     label: 'Complete',
-                    icon: <i className="icon icon-checklist text-sm" />,
+                    icon: <i className="icon icon-clipboard text-sm" />,
                     action: () => openComplete(workOrder),
                   },
                 ]

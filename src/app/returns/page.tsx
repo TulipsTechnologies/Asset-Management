@@ -455,7 +455,7 @@ const ReturnsPage = () => {
               ? [
                   {
                     label: 'Inspect',
-                    icon: <i className="icon icon-checklist text-sm" />,
+                    icon: <i className="icon icon-clipboard text-sm" />,
                     action: () => openInspect(assetReturn),
                   },
                   {

@@ -256,7 +256,7 @@ const AssetDetailPage = () => {
             onClick={() => router.push('/assets')}
             className="text-sm text-gray-500 hover:text-primarycolor"
           >
-            <i className="icon icon-arrow-left text-xs mr-1" /> Assets
+            <i className="icon icon-left text-xs mr-1" /> Assets
           </button>
           <h1 className="text-lg font-semibold text-secondaryColor mt-1">
             {asset.assetName}

@@ -13,7 +13,15 @@ import Input from '@/components/UI/Input';
 import SearchBox from '@/components/SearchBox';
 import Pagination from '@/components/UI/Pagination';
 import { IEmployee, IEmployeeFilter } from '@/interface/IEmployee';
-import { createEmployee, fetchEmployees } from '@/services/employee.service';
+import {
+  createEmployee,
+  deleteEmployee,
+  fetchEmployees,
+  updateEmployee,
+} from '@/services/employee.service';
+import CustomMenuItem from '@/components/UI/CustomMenuItem';
+import Dropdown from '@/components/UI/Dropdown';
+import ConfirmationModal from '@/components/UI/ConfirmationModel';
 import { unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import useDebounce from '@/hooks/useDebounce';
@@ -54,6 +62,8 @@ const EmployeesPage = () => {
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<TFormState>(emptyForm);
   const [formError, setFormError] = useState('');
+  const [editing, setEditing] = useState<IEmployee | null>(null);
+  const [deleting, setDeleting] = useState<IEmployee | null>(null);
   const [saving, setSaving] = useState(false);
 
   const columns: TTableColumn[] = [
@@ -64,6 +74,13 @@ const EmployeesPage = () => {
     { key: 'email', label: 'Email', width: 190, type: 'string', name: 'email' },
     { key: 'openAssignmentCount', label: 'Assets Held', width: 100, name: 'openAssignmentCount' },
     { key: 'isActive', label: 'Active', width: 80, name: 'isActive' },
+    {
+      key: 'actions',
+      label: <i className="icon icon-actions text-[10px]" />,
+      width: 45,
+      canToggle: false,
+      name: 'actions',
+    },
   ];
 
   const loadEmployees = useCallback(async () => {
@@ -112,34 +129,71 @@ const EmployeesPage = () => {
     }));
   };
 
+  const openEdit = (employee: IEmployee) => {
+    setEditing(employee);
+    setForm({
+      employeeCode: employee.employeeCode ?? '',
+      fullName: employee.fullName,
+      email: employee.email ?? '',
+      phone: employee.phone ?? '',
+      department: employee.department ?? '',
+      designation: employee.designation ?? '',
+    });
+    setFormError('');
+    setFormOpen(true);
+  };
+
   const handleSave = async () => {
     if (!form.fullName.trim()) {
       setFormError('Full name is required');
       return;
     }
     setSaving(true);
+    const payload = {
+      employeeCode: form.employeeCode.trim() || undefined,
+      fullName: form.fullName.trim(),
+      email: form.email.trim() || undefined,
+      phone: form.phone.trim() || undefined,
+      department: form.department.trim() || undefined,
+      designation: form.designation.trim() || undefined,
+      isActive: editing ? editing.isActive : true,
+    };
     try {
-      const res = await createEmployee({
-        employeeCode: form.employeeCode.trim() || undefined,
-        fullName: form.fullName.trim(),
-        email: form.email.trim() || undefined,
-        phone: form.phone.trim() || undefined,
-        department: form.department.trim() || undefined,
-        designation: form.designation.trim() || undefined,
-        isActive: true,
-      });
+      const res = editing
+        ? await updateEmployee(editing.id, { ...payload, rowVersion: editing.rowVersion })
+        : await createEmployee(payload);
       if (res?.success) {
-        addToast.success('Employee created successfully');
+        addToast.success(res.message || 'Employee saved successfully');
         setFormOpen(false);
         loadEmployees();
       } else {
-        addToast.error(res?.message || 'Failed to create the employee');
+        addToast.error(res?.message || 'Failed to save the employee');
+        if (editing) {
+          setFormOpen(false);
+          loadEmployees();
+        }
       }
     } catch (error) {
-      console.error('Error creating employee:', error);
-      addToast.error('An error occurred while creating the employee');
+      console.error('Error saving employee:', error);
+      addToast.error('An error occurred while saving the employee');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleting) return;
+    setSaving(true);
+    try {
+      const res = await deleteEmployee(deleting.id);
+      if (res?.success) addToast.success(res.message || 'Employee deleted');
+      else addToast.error(res?.message || 'Could not delete the employee');
+    } catch {
+      addToast.error('Could not delete the employee');
+    } finally {
+      setSaving(false);
+      setDeleting(null);
+      loadEmployees();
     }
   };
 
@@ -170,6 +224,28 @@ const EmployeesPage = () => {
       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
         Inactive
       </span>
+    ),
+    actions: (
+      <div className="flex justify-center">
+        <Dropdown
+          buttonChildren={<i className="icon icon-actions text-[10px]" />}
+          position="fixed"
+        >
+          <CustomMenuItem
+            label="Edit"
+            onClick={() => openEdit(employee)}
+            icon={<i className="icon icon-edit text-sm" />}
+            border
+            className="!py-2"
+          />
+          <CustomMenuItem
+            label="Delete"
+            onClick={() => setDeleting(employee)}
+            icon={<i className="icon icon-trash text-sm" />}
+            className="!py-2"
+          />
+        </Dropdown>
+      </div>
     ),
   }));
 
@@ -284,6 +360,13 @@ const EmployeesPage = () => {
           </div>
         </div>
       </Modal>
+      <ConfirmationModal
+        isOpen={!!deleting}
+        message={`Delete employee '${deleting?.fullName}'? The API refuses while they hold custody, open assignments or open recovery cases.`}
+        loading={saving}
+        onConfirm={handleDelete}
+        onClose={() => setDeleting(null)}
+      />
     </div>
   );
 };

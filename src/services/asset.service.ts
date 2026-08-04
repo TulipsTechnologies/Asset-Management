@@ -110,3 +110,16 @@ export const activateAsset = (
     completeData: true,
   });
 };
+
+/** Draft-only deletion (soft). The RowVersion round-trip is required. */
+export const deleteAsset = (
+  id: string,
+  rowVersion: string
+): Promise<IResponse<string>> =>
+  requestApi({
+    apiEndpoint: `/Assets/${id}`,
+    method: 'DELETE',
+    body: JSON.stringify({ rowVersion }),
+    contentType: 'application/json',
+    completeData: true,
+  });

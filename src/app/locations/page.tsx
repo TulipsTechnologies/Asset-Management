@@ -16,8 +16,13 @@ import Pagination from '@/components/UI/Pagination';
 import { IAssetLocation, IAssetLocationFilter } from '@/interface/IAssetLocation';
 import {
   createAssetLocation,
+  deleteAssetLocation,
+  updateAssetLocation,
   fetchAssetLocations,
 } from '@/services/assetLocation.service';
+import CustomMenuItem from '@/components/UI/CustomMenuItem';
+import Dropdown from '@/components/UI/Dropdown';
+import ConfirmationModal from '@/components/UI/ConfirmationModel';
 import { unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import useDebounce from '@/hooks/useDebounce';
@@ -46,6 +51,8 @@ const LocationsPage = () => {
     address: '',
   });
   const [formError, setFormError] = useState('');
+  const [editing, setEditing] = useState<IAssetLocation | null>(null);
+  const [deleting, setDeleting] = useState<IAssetLocation | null>(null);
   const [saving, setSaving] = useState(false);
 
   const columns: TTableColumn[] = [
@@ -55,6 +62,13 @@ const LocationsPage = () => {
     { key: 'address', label: 'Address', width: 220, type: 'string', name: 'address' },
     { key: 'assetCount', label: 'Assets', width: 80, name: 'assetCount' },
     { key: 'isActive', label: 'Active', width: 80, name: 'isActive' },
+    {
+      key: 'actions',
+      label: <i className="icon icon-actions text-[10px]" />,
+      width: 45,
+      canToggle: false,
+      name: 'actions',
+    },
   ];
 
   const loadLocations = useCallback(async () => {
@@ -104,7 +118,25 @@ const LocationsPage = () => {
   };
 
   const openCreate = () => {
+    setEditing(null);
     setForm({ name: '', code: '', parentAssetLocationId: '', address: '' });
+    setFormError('');
+    fetchAssetLocations({ pageNumber: 1, pageSize: 500 })
+      .then((res) => {
+        if (res?.success) setAllLocations(unwrapPaged(res).items);
+      })
+      .catch(() => undefined);
+    setFormOpen(true);
+  };
+
+  const openEdit = (location: IAssetLocation) => {
+    setEditing(location);
+    setForm({
+      name: location.name,
+      code: location.code ?? '',
+      parentAssetLocationId: location.parentAssetLocationId ?? '',
+      address: location.address ?? '',
+    });
     setFormError('');
     fetchAssetLocations({ pageNumber: 1, pageSize: 500 })
       .then((res) => {
@@ -120,26 +152,49 @@ const LocationsPage = () => {
       return;
     }
     setSaving(true);
+    const payload = {
+      name: form.name.trim(),
+      code: form.code.trim() || undefined,
+      parentAssetLocationId: form.parentAssetLocationId || undefined,
+      address: form.address.trim() || undefined,
+      isActive: editing ? editing.isActive : true,
+    };
     try {
-      const res = await createAssetLocation({
-        name: form.name.trim(),
-        code: form.code.trim() || undefined,
-        parentAssetLocationId: form.parentAssetLocationId || undefined,
-        address: form.address.trim() || undefined,
-        isActive: true,
-      });
+      const res = editing
+        ? await updateAssetLocation(editing.id, { ...payload, rowVersion: editing.rowVersion })
+        : await createAssetLocation(payload);
       if (res?.success) {
-        addToast.success('Location created successfully');
+        addToast.success(res.message || 'Location saved successfully');
         setFormOpen(false);
         loadLocations();
       } else {
-        addToast.error(res?.message || 'Failed to create the location');
+        addToast.error(res?.message || 'Failed to save the location');
+        if (editing) {
+          setFormOpen(false);
+          loadLocations();
+        }
       }
     } catch (error) {
-      console.error('Error creating location:', error);
-      addToast.error('An error occurred while creating the location');
+      console.error('Error saving location:', error);
+      addToast.error('An error occurred while saving the location');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleting) return;
+    setSaving(true);
+    try {
+      const res = await deleteAssetLocation(deleting.id);
+      if (res?.success) addToast.success(res.message || 'Location deleted');
+      else addToast.error(res?.message || 'Could not delete the location');
+    } catch {
+      addToast.error('Could not delete the location');
+    } finally {
+      setSaving(false);
+      setDeleting(null);
+      loadLocations();
     }
   };
 
@@ -169,6 +224,28 @@ const LocationsPage = () => {
       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
         Inactive
       </span>
+    ),
+    actions: (
+      <div className="flex justify-center">
+        <Dropdown
+          buttonChildren={<i className="icon icon-actions text-[10px]" />}
+          position="fixed"
+        >
+          <CustomMenuItem
+            label="Edit"
+            onClick={() => openEdit(location)}
+            icon={<i className="icon icon-edit text-sm" />}
+            border
+            className="!py-2"
+          />
+          <CustomMenuItem
+            label="Delete"
+            onClick={() => setDeleting(location)}
+            icon={<i className="icon icon-trash text-sm" />}
+            className="!py-2"
+          />
+        </Dropdown>
+      </div>
     ),
   }));
 
@@ -272,6 +349,13 @@ const LocationsPage = () => {
           </div>
         </div>
       </Modal>
+      <ConfirmationModal
+        isOpen={!!deleting}
+        message={`Delete location '${deleting?.name}'? The API refuses while child locations or assets still reference it.`}
+        loading={saving}
+        onConfirm={handleDelete}
+        onClose={() => setDeleting(null)}
+      />
     </div>
   );
 };

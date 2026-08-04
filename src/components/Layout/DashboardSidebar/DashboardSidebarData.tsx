@@ -38,7 +38,7 @@ export const ASSET_MENU_ITEMS: IMenuItem[] = [
   {
     id: 2,
     parentId: null,
-    iconName: 'box',
+    iconName: 'briefcase',
     iconSizeClass: 'text-[16px]',
     label: 'Assets',
     url: '/assets',
@@ -49,7 +49,7 @@ export const ASSET_MENU_ITEMS: IMenuItem[] = [
   {
     id: 4,
     parentId: null,
-    iconName: 'checklist',
+    iconName: 'clipboard',
     iconSizeClass: 'text-[16px]',
     label: 'Assignments',
     url: '/assignments',
@@ -73,7 +73,7 @@ export const ASSET_MENU_ITEMS: IMenuItem[] = [
   {
     id: 6,
     parentId: null,
-    iconName: 'refresh',
+    iconName: 'redo',
     iconSizeClass: 'text-[16px]',
     label: 'Returns',
     url: '/returns',
@@ -81,7 +81,7 @@ export const ASSET_MENU_ITEMS: IMenuItem[] = [
   {
     id: 7,
     parentId: null,
-    iconName: 'checklist',
+    iconName: 'clipboard',
     iconSizeClass: 'text-[16px]',
     label: 'Physical Verification',
     url: '/physical-verification',
@@ -89,7 +89,7 @@ export const ASSET_MENU_ITEMS: IMenuItem[] = [
   {
     id: 8,
     parentId: null,
-    iconName: 'tools',
+    iconName: 'setting',
     iconSizeClass: 'text-[16px]',
     label: 'Maintenance',
     url: '/maintenance',
@@ -97,7 +97,7 @@ export const ASSET_MENU_ITEMS: IMenuItem[] = [
   {
     id: 9,
     parentId: null,
-    iconName: 'graph',
+    iconName: 'trend',
     iconSizeClass: 'text-[16px]',
     label: 'Depreciation',
     url: '/depreciation',
@@ -113,7 +113,7 @@ export const ASSET_MENU_ITEMS: IMenuItem[] = [
   {
     id: 11,
     parentId: null,
-    iconName: 'report',
+    iconName: 'bar-chart',
     iconSizeClass: 'text-[16px]',
     label: 'Reports',
     url: '/reports',

@@ -854,7 +854,7 @@ const DisposalPage = () => {
                   : [
                       {
                         label: 'Execute',
-                        icon: <i className="icon icon-checklist text-sm" />,
+                        icon: <i className="icon icon-clipboard text-sm" />,
                         action: () => openExecute(request),
                       },
                     ]
@@ -863,7 +863,7 @@ const DisposalPage = () => {
                 ? [
                     {
                       label: 'Cancel',
-                      icon: <i className="icon icon-refresh text-sm" />,
+                      icon: <i className="icon icon-redo text-sm" />,
                       action: () => {
                         setCancelling(request);
                         setCancelReason('');

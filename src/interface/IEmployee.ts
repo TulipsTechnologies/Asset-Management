@@ -9,6 +9,8 @@ export interface IEmployee {
   designation?: string | null;
   isActive: boolean;
   openAssignmentCount: number;
+  /** Base64 rowversion — required on update. */
+  rowVersion: string;
 }
 
 export interface IUpsertEmployee {
@@ -19,6 +21,10 @@ export interface IUpsertEmployee {
   department?: string;
   designation?: string;
   isActive: boolean;
+}
+
+export interface IUpdateEmployee extends IUpsertEmployee {
+  rowVersion: string;
 }
 
 export interface IEmployeeFilter {

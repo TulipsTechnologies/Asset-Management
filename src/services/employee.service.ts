@@ -4,6 +4,7 @@ import { IPagedResponse, IResponse } from '@/interface/IGeneric';
 import {
   IEmployee,
   IEmployeeFilter,
+  IUpdateEmployee,
   IUpsertEmployee,
 } from '@/interface/IEmployee';
 
@@ -45,3 +46,19 @@ export const createEmployee = (
     completeData: true,
   });
 };
+
+export const updateEmployee = (
+  id: string,
+  data: IUpdateEmployee
+): Promise<IResponse<string>> =>
+  requestApi({
+    apiEndpoint: `/Employees/${id}`,
+    method: 'PUT',
+    body: JSON.stringify(data),
+    contentType: 'application/json',
+    completeData: true,
+  });
+
+/** Soft delete — refused with a named blocker while live obligations exist. */
+export const deleteEmployee = (id: string): Promise<IResponse<string>> =>
+  requestApi({ apiEndpoint: `/Employees/${id}`, method: 'DELETE', completeData: true });

@@ -310,7 +310,7 @@ const AssignmentsPage = () => {
               ? [
                   {
                     label: 'Return',
-                    icon: <i className="icon icon-refresh text-sm" />,
+                    icon: <i className="icon icon-redo text-sm" />,
                     action: () => openReturn(assignment),
                   },
                 ]

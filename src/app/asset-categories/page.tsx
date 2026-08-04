@@ -76,7 +76,7 @@ const TreeNode = ({
       style={{ paddingLeft: depth * 20 }}
     >
       <i
-        className={`icon ${depth === 0 ? 'icon-category' : 'icon-arrow-right'} text-[11px] text-gray-400`}
+        className={`icon ${depth === 0 ? 'icon-modules' : 'icon-arrow-right'} text-[11px] text-gray-400`}
       />
       <span className="text-xs font-mono text-gray-400">
         {node.categoryCode}
@@ -372,7 +372,7 @@ const AssetCategoriesPage = () => {
             },
             {
               label: 'Delete',
-              icon: <i className="icon icon-delete text-xs" />,
+              icon: <i className="icon icon-trash text-xs" />,
               action: () => setDeleting(category),
             },
           ].map((option, index, arr) => (
@@ -409,7 +409,7 @@ const AssetCategoriesPage = () => {
               <span>Add Category</span>
             </Button>
             <Button variant="secondary" onClick={openTree}>
-              <i className="icon icon-category text-xs"></i>
+              <i className="icon icon-modules text-xs"></i>
               <span>Tree View</span>
             </Button>
           </div>

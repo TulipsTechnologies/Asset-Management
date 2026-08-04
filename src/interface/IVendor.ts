@@ -12,6 +12,8 @@ export interface IVendor {
   notes?: string | null;
   isActive: boolean;
   assetCount: number;
+  /** Base64 rowversion — required on update. */
+  rowVersion: string;
 }
 
 export interface IUpsertVendor {
@@ -24,6 +26,10 @@ export interface IUpsertVendor {
   panNumber?: string;
   notes?: string;
   isActive: boolean;
+}
+
+export interface IUpdateVendor extends IUpsertVendor {
+  rowVersion: string;
 }
 
 export interface IVendorFilter {

@@ -10,6 +10,7 @@ import {
   TTableColumn,
 } from '@/components/CustomTable/CustomTableInterface';
 import CustomMenuItem from '@/components/UI/CustomMenuItem';
+import ConfirmationModal from '@/components/UI/ConfirmationModel';
 import Dropdown from '@/components/UI/Dropdown';
 import Select from '@/components/UI/Select';
 import FilterPanel from '@/components/UI/FilterPanel';
@@ -17,7 +18,7 @@ import SearchBox from '@/components/SearchBox';
 import Pagination from '@/components/UI/Pagination';
 import { IAssetFilter, IAssetListItem } from '@/interface/IAsset';
 import { IAssetCategory } from '@/interface/IAssetCategory';
-import { fetchAssets } from '@/services/asset.service';
+import { deleteAsset, fetchAssets } from '@/services/asset.service';
 import { fetchAssetCategories } from '@/services/assetCategory.service';
 import { unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
@@ -60,6 +61,8 @@ const AssetsPage = () => {
   const initialLifecycle = searchParams.get('lifecycleStatus');
 
   const [assets, setAssets] = useState<IAssetListItem[]>([]);
+  const [deleting, setDeleting] = useState<IAssetListItem | null>(null);
+  const [deletingBusy, setDeletingBusy] = useState(false);
   const [categories, setCategories] = useState<IAssetCategory[]>([]);
   const [loading, setLoading] = useState(false);
   const [rowCount, setRowCount] = useState(0);
@@ -198,6 +201,22 @@ const AssetsPage = () => {
               icon: <i className="icon icon-eye text-sm" />,
               action: () => router.push(`/assets/${asset.id}`),
             },
+            {
+              label: 'Edit',
+              icon: <i className="icon icon-edit text-sm" />,
+              action: () => router.push(`/assets/${asset.id}/edit`),
+            },
+            // A Draft was never in service — deletion is its honest exit. Anything
+            // past Draft leaves through retirement and disposal, never deletion.
+            ...(asset.lifecycleStatus === LifecycleStatusEnum.Draft
+              ? [
+                  {
+                    label: 'Delete',
+                    icon: <i className="icon icon-trash text-sm" />,
+                    action: () => setDeleting(asset),
+                  },
+                ]
+              : []),
           ].map((option, index, arr) => (
             <CustomMenuItem
               key={index}
@@ -212,6 +231,22 @@ const AssetsPage = () => {
       </div>
     ),
   }));
+
+  const handleDelete = async () => {
+    if (!deleting) return;
+    setDeletingBusy(true);
+    try {
+      const res = await deleteAsset(deleting.id, deleting.rowVersion ?? '');
+      if (res?.success) addToast.success(res.message || 'Draft asset deleted');
+      else addToast.error(res?.message || 'Could not delete the asset');
+    } catch {
+      addToast.error('Could not delete the asset');
+    } finally {
+      setDeletingBusy(false);
+      setDeleting(null);
+      loadAssets();
+    }
+  };
 
   return (
     <div className="px-4 mt-2">
@@ -346,6 +381,13 @@ const AssetsPage = () => {
           updateFilters={updateFilters}
         />
       </div>
+      <ConfirmationModal
+        isOpen={!!deleting}
+        message={`Delete draft asset '${deleting?.assetCode}'? Its code will not be reused — asset codes are burned once issued.`}
+        loading={deletingBusy}
+        onConfirm={handleDelete}
+        onClose={() => setDeleting(null)}
+      />
     </div>
   );
 };

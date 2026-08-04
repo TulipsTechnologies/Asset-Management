@@ -32,6 +32,7 @@ import {
   calculateRun,
   capitalizeAsset,
   deleteAssetBook,
+  updateAssetBook,
   discardRun,
   fetchAssetBooks,
   fetchBookSchedule,
@@ -158,6 +159,7 @@ export default function DepreciationPage() {
 
   // ---------------------------------------------------------------- modals
   const [capitalizeOpen, setCapitalizeOpen] = useState(false);
+  const [editingBook, setEditingBook] = useState<IAssetBook | null>(null);
   const [capitalizeForm, setCapitalizeForm] = useState<TCapitalizeForm>(emptyCapitalizeForm);
   const [assetOptions, setAssetOptions] = useState<IAssetListItem[]>([]);
   const [methods, setMethods] = useState<IDepreciationMethod[]>([]);
@@ -261,7 +263,31 @@ export default function DepreciationPage() {
 
   // ---------------------------------------------------------------- actions
 
+  const openEditBook = async (book: IAssetBook) => {
+    setEditingBook(book);
+    setCapitalizeForm({
+      assetId: book.assetId,
+      cost: String(book.cost),
+      currencyId: book.currencyId.trim(),
+      residualValue: String(book.residualValue),
+      usefulLifeMonths: String(book.usefulLifeMonths),
+      depreciationMethodId: book.depreciationMethodId,
+      decliningBalanceFactor: String(book.decliningBalanceFactor),
+      depreciationStartDate: book.depreciationStartDate.slice(0, 10),
+      openingAccumulatedDepreciation: String(book.openingAccumulatedDepreciation),
+      notes: book.notes ?? '',
+    });
+    setCapitalizeOpen(true);
+    try {
+      const methodsResponse = await fetchDepreciationMethods();
+      setMethods(methodsResponse?.data ?? []);
+    } catch {
+      addToast.error('Could not load depreciation methods.');
+    }
+  };
+
   const openCapitalize = async () => {
+    setEditingBook(null);
     setCapitalizeForm(emptyCapitalizeForm);
     setCapitalizeOpen(true);
     try {
@@ -279,6 +305,36 @@ export default function DepreciationPage() {
   const submitCapitalize = async () => {
     if (!capitalizeForm.assetId || !capitalizeForm.depreciationMethodId) {
       addToast.error('Pick an asset and a depreciation method.');
+      return;
+    }
+
+    // Edit mode: the BOOK's rowversion rides; the asset row is untouched.
+    if (editingBook) {
+      setSaving(true);
+      try {
+        const response = await updateAssetBook(editingBook.id, {
+          cost: Number(capitalizeForm.cost || 0),
+          residualValue: Number(capitalizeForm.residualValue || 0),
+          usefulLifeMonths: Number(capitalizeForm.usefulLifeMonths || 0),
+          depreciationMethodId: capitalizeForm.depreciationMethodId,
+          decliningBalanceFactor: Number(capitalizeForm.decliningBalanceFactor || 2),
+          depreciationStartDate: capitalizeForm.depreciationStartDate,
+          openingAccumulatedDepreciation: Number(
+            capitalizeForm.openingAccumulatedDepreciation || 0
+          ),
+          notes: capitalizeForm.notes || undefined,
+          rowVersion: editingBook.rowVersion,
+        });
+        if (response?.success) addToast.success(response.message || 'Book updated.');
+        else addToast.error(response?.message || 'Could not update the book.');
+      } catch {
+        addToast.error('Could not update the book.');
+      } finally {
+        setSaving(false);
+        setCapitalizeOpen(false);
+        setEditingBook(null);
+        loadBooks();
+      }
       return;
     }
 
@@ -557,7 +613,7 @@ export default function DepreciationPage() {
               ? [
                   {
                     label: 'Revise Estimate',
-                    icon: <i className="icon icon-refresh text-sm" />,
+                    icon: <i className="icon icon-redo text-sm" />,
                     action: () => {
                       setRevising(book);
                       setReviseForm({
@@ -571,6 +627,13 @@ export default function DepreciationPage() {
               : []),
             ...(!book.hasPostedDepreciation
               ? [
+                  {
+                    // Basis edit — only until anything posts (Rule A); after that the
+                    // prospective path is Revise Estimate.
+                    label: 'Edit Book',
+                    icon: <i className="icon icon-edit text-sm" />,
+                    action: () => openEditBook(book),
+                  },
                   {
                     label: 'Delete',
                     icon: <i className="icon icon-trash text-sm" />,
@@ -674,7 +737,7 @@ export default function DepreciationPage() {
               ? [
                   {
                     label: 'Reverse',
-                    icon: <i className="icon icon-refresh text-sm" />,
+                    icon: <i className="icon icon-redo text-sm" />,
                     action: () => {
                       setReversing(run);
                       setReverseReason('');
@@ -876,7 +939,9 @@ export default function DepreciationPage() {
       {/* ---------------------------------------------------------------- capitalize */}
       <Modal isOpen={capitalizeOpen} onClose={() => setCapitalizeOpen(false)} size="2xl">
         <div className="p-5">
-          <h2 className="mb-1 text-lg font-semibold text-gray-800">Capitalize Asset</h2>
+          <h2 className="mb-1 text-lg font-semibold text-gray-800">
+            {editingBook ? `Edit Book — ${editingBook.assetCode}` : 'Capitalize Asset'}
+          </h2>
           <p className="mb-4 text-xs text-gray-500">
             Creates the asset book — the authoritative cost record. The book&apos;s cost is
             independent of the asset&apos;s purchase cost from here on.
@@ -886,6 +951,7 @@ export default function DepreciationPage() {
             <Select
               label="Asset"
               required
+              disabled={!!editingBook}
               value={capitalizeForm.assetId}
               onChange={(e) => {
                 const assetId = e.target.value;

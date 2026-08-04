@@ -219,7 +219,7 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
           onClick={() => router.back()}
           className="text-sm text-gray-500 hover:text-primarycolor"
         >
-          <i className="icon icon-arrow-left text-xs mr-1" /> Back
+          <i className="icon icon-left text-xs mr-1" /> Back
         </button>
       </div>
 
