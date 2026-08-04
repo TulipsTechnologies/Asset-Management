@@ -8,6 +8,8 @@ export interface IMenuItem {
   iconName: string;
   label: string;
   url?: string;
+  /** Extra routes this entry owns — the pages its hub links out to. */
+  matchUrls?: string[];
   subMenu?: IMenuItem[];
   target?: HTMLAttributeAnchorTarget;
   isExternal?: boolean;
@@ -21,18 +23,15 @@ export interface IMenuData {
   menuBottom: IMenuItem[];
 }
 
-/** Children carry a right chevron, matching the platform's parent-menu pattern. */
-const CHILD_ICON = 'right';
-
 /**
- * Static sidebar menu for the Asset Management module, grouped the way the module
- * appears once it is mounted inside the main TulipsHRM shell: a handful of parent
- * menus that expand into their pages, rather than one flat list. Ids are stable —
- * retired ones (3) are never reused.
+ * Static sidebar menu for the Asset Management module: six entries, each opening a
+ * hub page whose cards lead to the actual screens — the Settings pattern, applied
+ * to every group. Nothing expands in the rail itself. Ids are stable; retired ones
+ * (2-10, 13) are never reused.
  *
- * Groups follow the lifecycle of an asset: it is REGISTERED, then OPERATED
- * (issued, moved, returned, counted), then carried through its LIFECYCLE
- * (serviced, depreciated, disposed).
+ * The groups follow the life of an asset: it is REGISTERED, then OPERATED (issued,
+ * moved, returned, counted), then carried through its LIFECYCLE (serviced,
+ * depreciated, disposed).
  */
 export const ASSET_MENU_ITEMS: IMenuItem[] = [
   {
@@ -49,32 +48,10 @@ export const ASSET_MENU_ITEMS: IMenuItem[] = [
     iconName: 'briefcase',
     iconSizeClass: 'text-[16px]',
     label: 'Asset Register',
-    subMenu: [
-      {
-        id: 2,
-        parentId: 20,
-        iconName: CHILD_ICON,
-        iconSizeClass: 'text-[11px]',
-        label: 'Assets',
-        url: '/assets',
-      },
-      {
-        id: 3,
-        parentId: 20,
-        iconName: CHILD_ICON,
-        iconSizeClass: 'text-[11px]',
-        label: 'Categories',
-        url: '/asset-categories',
-      },
-      {
-        id: 13,
-        parentId: 20,
-        iconName: CHILD_ICON,
-        iconSizeClass: 'text-[11px]',
-        label: 'Employees',
-        url: '/employees',
-      },
-    ],
+    url: '/asset-register',
+    // The hub's own pages live at their own top-level routes, so the menu entry
+    // has to claim them explicitly or it unhighlights the moment you open one.
+    matchUrls: ['/assets', '/asset-categories', '/employees'],
   },
   {
     id: 21,
@@ -82,40 +59,8 @@ export const ASSET_MENU_ITEMS: IMenuItem[] = [
     iconName: 'stream',
     iconSizeClass: 'text-[16px]',
     label: 'Asset Operations',
-    subMenu: [
-      {
-        id: 4,
-        parentId: 21,
-        iconName: CHILD_ICON,
-        iconSizeClass: 'text-[11px]',
-        label: 'Assignments',
-        url: '/assignments',
-      },
-      {
-        id: 5,
-        parentId: 21,
-        iconName: CHILD_ICON,
-        iconSizeClass: 'text-[11px]',
-        label: 'Transfers',
-        url: '/transfers',
-      },
-      {
-        id: 6,
-        parentId: 21,
-        iconName: CHILD_ICON,
-        iconSizeClass: 'text-[11px]',
-        label: 'Returns',
-        url: '/returns',
-      },
-      {
-        id: 7,
-        parentId: 21,
-        iconName: CHILD_ICON,
-        iconSizeClass: 'text-[11px]',
-        label: 'Physical Verification',
-        url: '/physical-verification',
-      },
-    ],
+    url: '/asset-operations',
+    matchUrls: ['/assignments', '/transfers', '/returns', '/physical-verification'],
   },
   {
     id: 22,
@@ -123,32 +68,8 @@ export const ASSET_MENU_ITEMS: IMenuItem[] = [
     iconName: 'hourglass',
     iconSizeClass: 'text-[16px]',
     label: 'Asset Lifecycle',
-    subMenu: [
-      {
-        id: 8,
-        parentId: 22,
-        iconName: CHILD_ICON,
-        iconSizeClass: 'text-[11px]',
-        label: 'Maintenance',
-        url: '/maintenance',
-      },
-      {
-        id: 9,
-        parentId: 22,
-        iconName: CHILD_ICON,
-        iconSizeClass: 'text-[11px]',
-        label: 'Depreciation',
-        url: '/depreciation',
-      },
-      {
-        id: 10,
-        parentId: 22,
-        iconName: CHILD_ICON,
-        iconSizeClass: 'text-[11px]',
-        label: 'Disposal',
-        url: '/disposal',
-      },
-    ],
+    url: '/asset-lifecycle',
+    matchUrls: ['/maintenance', '/depreciation', '/disposal'],
   },
   {
     id: 11,
@@ -165,5 +86,6 @@ export const ASSET_MENU_ITEMS: IMenuItem[] = [
     iconSizeClass: 'text-[16px]',
     label: 'Settings',
     url: '/configuration',
+    matchUrls: ['/locations', '/vendors', '/asset-code-format'],
   },
 ];
