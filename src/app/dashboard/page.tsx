@@ -26,22 +26,23 @@ interface IKpiCard {
   href?: string;
 }
 
-/** The five numbers leadership scans first. */
+/**
+ * The five numbers worth a headline, each answering a different question: how big is
+ * the register, how much of it is in service, how much is out of action, what has gone
+ * missing, and what nobody has laid eyes on.
+ *
+ * The workflow counts that used to sit in a second row are not gone — they were the
+ * same stories told twice. In Transfer and Held are in the Custody Status strip below,
+ * open work orders and breakdown reports in Maintenance & Safety, and discrepancies on
+ * the verification page a click away. Ten cards competing for attention meant none of
+ * them held it.
+ */
 const KPI_CARDS: IKpiCard[] = [
   { key: 'assetsTotal', label: 'Total Assets', iconName: 'briefcase', tint: 'sky', href: '/assets' },
   { key: 'assetsActive', label: 'Active', iconName: 'checked', tint: 'mint', href: '/assets' },
   { key: 'assetsUnderMaintenance', label: 'Under Maintenance', iconName: 'setting', tint: 'amber', href: '/maintenance' },
-  { key: 'assetsNotVerified', label: 'Never Verified', iconName: 'documents', tint: 'peach', href: '/physical-verification' },
   { key: 'assetsMissing', label: 'Missing Assets', iconName: 'alert', tint: 'pink', href: '/assets' },
-];
-
-/** Workflow at a glance. */
-const WORKFLOW_CARDS: IKpiCard[] = [
-  { key: 'workOrdersOpen', label: 'Open Work Orders', iconName: 'setting', tint: 'indigo', href: '/maintenance' },
-  { key: 'maintenanceRequestsOpen', label: 'Pending Requests', iconName: 'hourglass', tint: 'amber', href: '/maintenance' },
-  { key: 'transfersActive', label: 'Active Transfers', iconName: 'move', tint: 'sky', href: '/transfers' },
-  { key: 'discrepanciesOpen', label: 'Open Discrepancies', iconName: 'alert', tint: 'pink', href: '/physical-verification' },
-  { key: 'assetsHeld', label: 'Service Holds', iconName: 'close-circle', tint: 'lavender', href: '/assets' },
+  { key: 'assetsNotVerified', label: 'Never Verified', iconName: 'documents', tint: 'peach', href: '/physical-verification' },
 ];
 
 /* --------------------------------------------------------------------- */
@@ -495,19 +496,6 @@ const DashboardPage = () => {
             ))}
           </div>
 
-          {/* Workflow cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {WORKFLOW_CARDS.map((card) => (
-              <SummaryCard
-                key={card.key}
-                title={card.label}
-                value={counts ? counts[card.key] ?? 0 : '—'}
-                tint={card.tint}
-                iconName={card.iconName}
-                onClick={card.href ? () => router.push(card.href!) : undefined}
-              />
-            ))}
-          </div>
 
           {/* Approved-disposal callout — each one locks its asset until executed */}
           {counts && counts.disposalsApprovedPending > 0 && (
