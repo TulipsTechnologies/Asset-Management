@@ -28,6 +28,22 @@ const humanize = (key: string) =>
     .replace(/^./, (c) => c.toUpperCase())
     .trim();
 
+/** One glyph per report so the grid is scannable by shape, not just by reading. */
+const REPORT_ICONS: Record<string, string> = {
+  'asset-register': 'briefcase',
+  'asset-movement': 'move',
+  'missing-assets': 'alert',
+  'audit-discrepancies': 'checked',
+  'maintenance-cost': 'setting',
+  'depreciation-detail': 'trend',
+  'nbv-register': 'cash',
+  'disposal-register': 'trash',
+  'fixed-asset-subledger': 'book',
+  'asset-distribution': 'modules',
+  'asset-roll-forward': 'redo',
+  'subledger-reconciliation': 'calculator',
+};
+
 const formatCell = (value: unknown): string => {
   if (value === null || value === undefined || value === '') return '—';
   if (typeof value === 'boolean') return value ? 'Yes' : '—';
@@ -54,6 +70,8 @@ export default function ReportsPage() {
   const [pageCount, setPageCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  /** Where Run Report sends the result. */
+  const [output, setOutput] = useState<'screen' | 'excel'>('screen');
 
   const [filter, setFilter] = useState<IReportFilter>({ pageNumber: 1, pageSize: DEFAULT_PAGE_SIZE });
 
@@ -140,6 +158,13 @@ export default function ReportsPage() {
     }
   };
 
+  /**
+   * Run Report honours the output toggle. On-screen results also refresh on their own
+   * when the filters or the page change, so the button is for re-running deliberately
+   * and for exporting — never the only way to see anything.
+   */
+  const run = () => (output === 'excel' ? exportXlsx() : load());
+
   // Columns derive from the first row — the backend shape is the contract.
   const columns: TTableColumn[] = useMemo(() => {
     if (rows.length === 0) return [];
@@ -163,37 +188,48 @@ export default function ReportsPage() {
 
   return (
     <div className="p-4">
-      <div className="mb-4">
-        <h1 className="text-xl font-semibold text-gray-800">Reports</h1>
-        <p className="text-sm text-gray-500">
-          Server-computed, per-currency, export-ready. The list shows only the reports your
-          permissions can run.
+      <div className="mb-5">
+        <h1 className="text-xl font-semibold text-secondaryColor">Reports &amp; Analytics</h1>
+        <p className="text-sm text-gray-500 mt-1">
+          Run a report on screen or export it as an Excel workbook.
         </p>
       </div>
 
-      <div className="mb-4 flex flex-wrap gap-2">
-        {catalogue.map((descriptor) => (
-          <button
-            key={descriptor.code}
-            type="button"
-            title={descriptor.description}
-            onClick={() => pick(descriptor)}
-            className={`rounded border px-3 py-1.5 text-sm ${
-              selected?.code === descriptor.code
-                ? 'border-primary bg-primary/5 text-primary'
-                : 'border-gray-200 text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            {descriptor.name}
-          </button>
-        ))}
+      {/* Every report the caller's permissions allow, three across. */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {catalogue.map((descriptor) => {
+          const active = selected?.code === descriptor.code;
+          return (
+            <button
+              key={descriptor.code}
+              type="button"
+              onClick={() => pick(descriptor)}
+              className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
+                active
+                  ? 'border-primarycolor bg-primarycolor/10'
+                  : 'border-gray-200 bg-white hover:border-primarycolor/40 hover:bg-hoverColor'
+              }`}
+            >
+              <i
+                className={`icon icon-${REPORT_ICONS[descriptor.code] ?? 'bar-chart'} text-[17px] shrink-0 text-primarycolor`}
+              />
+              <span className="min-w-0 grow truncate text-sm font-medium text-secondaryColor">
+                {descriptor.name}
+              </span>
+              {/* The description lives here rather than under the grid, so picking a
+                  report does not shift the layout to make room for it. */}
+              <i
+                className="icon icon-info shrink-0 text-[15px] text-gray-300"
+                title={descriptor.description}
+              />
+            </button>
+          );
+        })}
       </div>
 
       {selected && (
         <>
-          <p className="mb-3 text-xs text-gray-500">{selected.description}</p>
-
-          <div className="mb-4 flex flex-wrap items-end gap-3">
+          <div className="mt-5 mb-4 flex flex-wrap items-end gap-4 rounded-xl border border-gray-200 bg-white px-5 py-4">
             {selected.supportsDateRange && (
               <>
                 <Input
@@ -242,11 +278,39 @@ export default function ReportsPage() {
                 ]}
               />
             )}
-            <Button onClick={exportXlsx} disabled={exporting || loading}>
-              <i className="icon icon-download text-xs"></i>
-              <span>{exporting ? 'Exporting…' : 'Export to Excel'}</span>
+
+            {/* Where the result goes, chosen before running rather than as a second
+                action afterwards. */}
+            <div className="flex overflow-hidden rounded-full border border-gray-200">
+              {(['screen', 'excel'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setOutput(mode)}
+                  className={`px-4 py-1.5 text-xs font-medium uppercase tracking-wide transition-colors ${
+                    output === mode
+                      ? 'bg-primarycolor text-white'
+                      : 'bg-white text-gray-600 hover:bg-hoverColor'
+                  }`}
+                >
+                  {mode === 'screen' ? 'On screen' : 'Excel'}
+                </button>
+              ))}
+            </div>
+
+            <Button onClick={run} disabled={loading || exporting}>
+              <i className="icon icon-bar-chart text-xs"></i>
+              <span>
+                {loading || exporting
+                  ? output === 'excel'
+                    ? 'Exporting…'
+                    : 'Running…'
+                  : 'Run Report'}
+              </span>
             </Button>
           </div>
+
+          <p className="mb-3 text-xs text-gray-500">{selected.description}</p>
 
           {/* Distinct key AND tableName per report code: CustomTable caches its column
               state by tableName, so a shared name bleeds columns between reports. The key
