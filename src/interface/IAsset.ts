@@ -29,6 +29,10 @@ export interface IAssetListItem {
   conditionName: string;
   assetLocationName?: string | null;
   currentCustodianEmployeeId?: string | null;
+  /** From the asset's book — null until capitalized. */
+  accumulatedDepreciation?: number | null;
+  /** Book cost minus accumulated depreciation — null until capitalized. */
+  netBookValue?: number | null;
   /** Base64 rowversion — round-trip unchanged on future updates (concurrency contract). */
   rowVersion?: string | null;
 }
@@ -66,6 +70,13 @@ export interface ICreateAsset {
   assetName: string;
   assetCategoryId: string;
   assetConditionTypeId: string;
+  /**
+   * Units to register (1–50). The register is item-level: each unit becomes its
+   * own asset row with its own code, assignable to a different person. Requires
+   * tag and serial blank when above 1.
+   */
+  quantity?: number;
+  assetLocationId?: string;
   assetTag?: string;
   manufacturer?: string;
   brand?: string;

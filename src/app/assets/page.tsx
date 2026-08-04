@@ -53,6 +53,17 @@ const StatusBadge = ({
   </span>
 );
 
+/** Nepal standard VAT. Display-only — the register stores net prices. */
+const VAT_RATE = 0.13;
+
+const money = (value?: number | null, currency?: string | null) =>
+  value != null
+    ? `${value.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}${currency ? ` ${currency}` : ''}`
+    : '—';
+
 const AssetsPage = () => {
   const { addToast } = useToast();
   const router = useRouter();
@@ -80,14 +91,20 @@ const AssetsPage = () => {
   const [showFilters, setShowFilters] = useState(false);
 
   const columns: TTableColumn[] = [
-    { key: 'assetCode', label: 'Code', width: 150, type: 'string', name: 'assetCode' },
-    { key: 'assetName', label: 'Name', width: 200, type: 'string', name: 'assetName' },
-    { key: 'assetCategoryName', label: 'Category', width: 150, type: 'string', name: 'assetCategoryName' },
-    { key: 'serialNumber', label: 'Serial No.', width: 140, type: 'string', name: 'serialNumber' },
+    { key: 'assetCode', label: 'Code', width: 140, type: 'string', name: 'assetCode' },
+    { key: 'assetName', label: 'Asset Name', width: 190, type: 'string', name: 'assetName' },
+    { key: 'netPrice', label: 'Net Price', width: 120, name: 'netPrice' },
+    { key: 'units', label: 'Units', width: 60, name: 'units' },
+    { key: 'totalPrice', label: `Total (incl. ${VAT_RATE * 100}% VAT)`, width: 155, name: 'totalPrice' },
+    { key: 'accumulatedDepreciation', label: 'Depreciation', width: 120, name: 'accumulatedDepreciation' },
+    { key: 'netBookValue', label: 'Net Value', width: 120, name: 'netBookValue' },
+    { key: 'assetLocationName', label: 'Location', width: 150, type: 'string', name: 'assetLocationName' },
     { key: 'lifecycleStatus', label: 'Lifecycle', width: 110, name: 'lifecycleStatus' },
-    { key: 'custodyStatus', label: 'Custody', width: 120, name: 'custodyStatus' },
-    { key: 'conditionName', label: 'Condition', width: 110, type: 'string', name: 'conditionName' },
-    { key: 'purchaseCost', label: 'Purchase Cost', width: 130, name: 'purchaseCost' },
+    // Off by default — Manage Columns brings them back per user or company-wide.
+    { key: 'assetCategoryName', label: 'Category', width: 150, type: 'string', name: 'assetCategoryName', visible: false },
+    { key: 'serialNumber', label: 'Serial No.', width: 140, type: 'string', name: 'serialNumber', visible: false },
+    { key: 'custodyStatus', label: 'Custody', width: 120, name: 'custodyStatus', visible: false },
+    { key: 'conditionName', label: 'Condition', width: 110, type: 'string', name: 'conditionName', visible: false },
     {
       key: 'actions',
       label: <i className="icon icon-actions text-[10px]" />,
@@ -165,6 +182,20 @@ const AssetsPage = () => {
       <span className="font-medium text-primarycolor">{asset.assetCode}</span>
     ),
     assetName: asset.assetName,
+    netPrice: money(asset.purchaseCost, asset.currencyId),
+    // Item-level register: every row IS one unit. Registering with Quantity > 1
+    // creates that many rows, each independently assignable.
+    units: 1,
+    totalPrice:
+      asset.purchaseCost != null
+        ? money(
+            Math.round(asset.purchaseCost * (1 + VAT_RATE) * 100) / 100,
+            asset.currencyId
+          )
+        : '—',
+    accumulatedDepreciation: money(asset.accumulatedDepreciation, asset.currencyId),
+    netBookValue: money(asset.netBookValue, asset.currencyId),
+    assetLocationName: asset.assetLocationName || '—',
     assetCategoryName: asset.assetCategoryName,
     serialNumber: asset.serialNumber || '—',
     lifecycleStatus: (
@@ -182,10 +213,6 @@ const AssetsPage = () => {
       />
     ),
     conditionName: asset.conditionName,
-    purchaseCost:
-      asset.purchaseCost != null
-        ? `${asset.currencyId ? `${asset.currencyId} ` : ''}${asset.purchaseCost.toLocaleString()}`
-        : '—',
     actions: (
       <div className="flex gap-x-2 relative bg-white px-4 py-2 -m-2">
         <Dropdown

@@ -43,6 +43,17 @@ import {
 const formatDate = (value?: string | null) =>
   value ? new Date(value).toLocaleDateString() : '—';
 
+/** Nepal standard VAT. Display-only — the register stores net prices. */
+const VAT_RATE = 0.13;
+
+const fmtMoney = (value?: number | null, currency?: string | null) =>
+  value != null
+    ? `${currency ? `${currency} ` : ''}${value.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`
+    : null;
+
 /** Release lifts a Quarantined hold; recommission brings back an OutOfService asset. */
 type THoldAction = 'release' | 'recommission';
 
@@ -393,13 +404,34 @@ const AssetDetailPage = () => {
               value={formatDate(asset.purchaseDate)}
             />
             <InfoField
-              label="Purchase Cost"
+              label="Net Price"
               icon="cash"
+              value={fmtMoney(asset.purchaseCost, asset.currencyId)}
+            />
+            <InfoField
+              label={`Total (incl. ${VAT_RATE * 100}% VAT)`}
+              icon="calculator"
               value={
                 asset.purchaseCost != null
-                  ? `${asset.currencyId ? `${asset.currencyId} ` : ''}${asset.purchaseCost.toLocaleString()}`
+                  ? fmtMoney(
+                      Math.round(asset.purchaseCost * (1 + VAT_RATE) * 100) /
+                        100,
+                      asset.currencyId
+                    )
                   : null
               }
+            />
+            <InfoField
+              label="Depreciation"
+              icon="trend"
+              value={fmtMoney(asset.accumulatedDepreciation, asset.currencyId)}
+              emptyText="Not capitalized"
+            />
+            <InfoField
+              label="Net Book Value"
+              icon="wallet-plus"
+              value={fmtMoney(asset.netBookValue, asset.currencyId)}
+              emptyText="Not capitalized"
             />
             <InfoField
               label="Supplier"
@@ -412,6 +444,16 @@ const AssetDetailPage = () => {
               value={[asset.invoiceNumber, asset.purchaseOrderReference]
                 .filter(Boolean)
                 .join(' / ')}
+            />
+            <InfoField
+              label="Receipt Date"
+              icon="inbox"
+              value={formatDate(asset.receiptDate)}
+            />
+            <InfoField
+              label="Commissioning Date"
+              icon="run"
+              value={formatDate(asset.commissioningDate)}
             />
             <InfoField
               label="Placed In Service"

@@ -9,9 +9,11 @@ import Select from '@/components/UI/Select';
 import TextArea from '@/components/UI/TextArea';
 import { IAsset, ICreateAsset, IUpdateAsset } from '@/interface/IAsset';
 import { IAssetCategory } from '@/interface/IAssetCategory';
+import { IAssetLocation } from '@/interface/IAssetLocation';
 import { IVendor } from '@/interface/IVendor';
 import { createAsset, updateAsset } from '@/services/asset.service';
 import { fetchAssetCategories } from '@/services/assetCategory.service';
+import { fetchAssetLocations } from '@/services/assetLocation.service';
 import { fetchVendors } from '@/services/vendor.service';
 import { unwrapPaged } from '@/utils/serviceUtils';
 import {
@@ -22,7 +24,10 @@ import {
 } from '@/enum/assetEnums';
 
 type TFormErrors = Partial<
-  Record<'assetName' | 'assetCategoryId' | 'assetConditionTypeId', string>
+  Record<
+    'assetName' | 'assetCategoryId' | 'assetConditionTypeId' | 'quantity',
+    string
+  >
 >;
 
 /** ISO datetime from the API → value an <input type="date"> accepts. */
@@ -41,6 +46,7 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
 
   const [categories, setCategories] = useState<IAssetCategory[]>([]);
   const [vendors, setVendors] = useState<IVendor[]>([]);
+  const [locations, setLocations] = useState<IAssetLocation[]>([]);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<TFormErrors>({});
 
@@ -48,6 +54,8 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
     assetName: asset?.assetName ?? '',
     assetCategoryId: asset?.assetCategoryId ?? '',
     assetConditionTypeId: '',
+    assetLocationId: asset?.assetLocationId ?? '',
+    quantity: '1',
     assetTag: asset?.assetTag ?? '',
     serialNumber: asset?.serialNumber ?? '',
     manufacturer: asset?.manufacturer ?? '',
@@ -82,7 +90,27 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
         if (res?.success) setVendors(unwrapPaged(res).items);
       })
       .catch(() => undefined);
+    fetchAssetLocations({ pageNumber: 1, pageSize: 500, isActive: true })
+      .then((res) => {
+        if (res?.success) setLocations(unwrapPaged(res).items);
+      })
+      .catch(() => undefined);
   }, []);
+
+  // Keep an edited asset's current (possibly deactivated) location selectable.
+  const locationOptions = useMemo(() => {
+    const options = locations.map((l) => ({ value: l.id, label: l.name }));
+    if (
+      asset?.assetLocationId &&
+      !locations.some((l) => l.id === asset.assetLocationId)
+    ) {
+      options.push({
+        value: asset.assetLocationId,
+        label: asset.assetLocationName ?? 'Current location',
+      });
+    }
+    return options;
+  }, [locations, asset]);
 
   // Keep an edited asset's current (possibly deactivated) supplier selectable.
   const vendorOptions = useMemo(() => {
@@ -113,6 +141,7 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
   const sharedFields = () => ({
     assetName: form.assetName.trim(),
     assetCategoryId: form.assetCategoryId,
+    assetLocationId: form.assetLocationId || undefined,
     assetTag: form.assetTag.trim() || undefined,
     serialNumber: form.serialNumber.trim() || undefined,
     manufacturer: form.manufacturer.trim() || undefined,
@@ -140,6 +169,7 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
     const payload: ICreateAsset = {
       ...sharedFields(),
       assetConditionTypeId: form.assetConditionTypeId,
+      quantity: Number(form.quantity) || 1,
     };
     const res = await createAsset(payload);
     if (res?.success) {
@@ -159,7 +189,6 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
       assetTypeId: asset.assetTypeId ?? undefined,
       branchId: asset.branchId ?? undefined,
       departmentId: asset.departmentId ?? undefined,
-      assetLocationId: asset.assetLocationId ?? undefined,
       parentAssetId: asset.parentAssetId ?? undefined,
       rowVersion: asset.rowVersion,
     };
@@ -185,6 +214,17 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
       nextErrors.assetCategoryId = 'Category is required';
     if (!isEdit && !form.assetConditionTypeId)
       nextErrors.assetConditionTypeId = 'Condition is required';
+    if (!isEdit) {
+      const quantity = Number(form.quantity);
+      if (!Number.isInteger(quantity) || quantity < 1 || quantity > 50)
+        nextErrors.quantity = 'Units must be a whole number from 1 to 50';
+      else if (
+        quantity > 1 &&
+        (form.assetTag.trim() || form.serialNumber.trim())
+      )
+        nextErrors.quantity =
+          'Multiple units cannot share a tag or serial — leave them blank and set them per unit afterwards';
+    }
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
       return;
@@ -279,6 +319,23 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
             value={form.ownershipType}
             onChange={set('ownershipType')}
           />
+          <Select
+            label="Location"
+            placeholder="Select location (optional)"
+            options={locationOptions}
+            value={form.assetLocationId}
+            onChange={set('assetLocationId')}
+          />
+          {!isEdit && (
+            <Input
+              label="Units"
+              type="number"
+              value={form.quantity}
+              onChange={set('quantity')}
+              error={errors.quantity}
+              helperText="Each unit is registered as its own asset with its own code, so units can be assigned to different people."
+            />
+          )}
           <Input
             label="Asset Tag"
             value={form.assetTag}
