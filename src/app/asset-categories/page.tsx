@@ -30,6 +30,8 @@ import {
   fetchAssetCategoryTree,
   updateAssetCategory,
 } from '@/services/assetCategory.service';
+import { fetchDepreciationMethods } from '@/services/depreciation.service';
+import { IDepreciationMethod } from '@/interface/IDepreciation';
 import { unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import useDebounce from '@/hooks/useDebounce';
@@ -40,6 +42,10 @@ type TFormState = {
   description: string;
   parentAssetCategoryId: string;
   isActive: boolean;
+  // Depreciation defaults — prefill capitalization for assets in this category.
+  defaultDepreciationMethodId: string;
+  defaultUsefulLifeMonths: string;
+  defaultResidualRate: string;
 };
 
 const emptyForm: TFormState = {
@@ -48,6 +54,9 @@ const emptyForm: TFormState = {
   description: '',
   parentAssetCategoryId: '',
   isActive: true,
+  defaultDepreciationMethodId: '',
+  defaultUsefulLifeMonths: '',
+  defaultResidualRate: '',
 };
 
 const DetailField = ({
@@ -125,6 +134,9 @@ const AssetCategoriesPage = () => {
   const [tree, setTree] = useState<IAssetCategoryTree[]>([]);
   const [treeLoading, setTreeLoading] = useState(false);
 
+  // Global seeded lookup — loaded once, on first form open.
+  const [methods, setMethods] = useState<IDepreciationMethod[]>([]);
+
   const columns: TTableColumn[] = [
     { key: 'categoryCode', label: 'Code', width: 120, type: 'string', name: 'categoryCode' },
     { key: 'name', label: 'Name', width: 220, type: 'string', name: 'name' },
@@ -182,11 +194,21 @@ const AssetCategoriesPage = () => {
       .catch(() => undefined);
   };
 
+  const loadMethods = () => {
+    if (methods.length > 0) return;
+    fetchDepreciationMethods()
+      .then((res) => {
+        if (res?.success && res.data) setMethods(res.data);
+      })
+      .catch(() => undefined);
+  };
+
   const openCreate = () => {
     setEditing(null);
     setForm(emptyForm);
     setFormError('');
     loadParentOptions();
+    loadMethods();
     setFormOpen(true);
   };
 
@@ -236,15 +258,39 @@ const AssetCategoriesPage = () => {
       description: category.description ?? '',
       parentAssetCategoryId: category.parentAssetCategoryId ?? '',
       isActive: category.isActive,
+      defaultDepreciationMethodId: category.defaultDepreciationMethodId ?? '',
+      defaultUsefulLifeMonths:
+        category.defaultUsefulLifeMonths != null
+          ? String(category.defaultUsefulLifeMonths)
+          : '',
+      defaultResidualRate:
+        category.defaultResidualRate != null
+          ? String(category.defaultResidualRate)
+          : '',
     });
     setFormError('');
     loadParentOptions();
+    loadMethods();
     setFormOpen(true);
   };
 
   const handleSave = async () => {
     if (!form.categoryCode.trim() || !form.name.trim()) {
       setFormError('Code and name are required');
+      return;
+    }
+    const life = form.defaultUsefulLifeMonths.trim()
+      ? Number(form.defaultUsefulLifeMonths)
+      : undefined;
+    const rate = form.defaultResidualRate.trim()
+      ? Number(form.defaultResidualRate)
+      : undefined;
+    if (life !== undefined && (!Number.isInteger(life) || life < 1 || life > 1200)) {
+      setFormError('Default useful life must be a whole number of months (1–1200)');
+      return;
+    }
+    if (rate !== undefined && (Number.isNaN(rate) || rate < 0 || rate > 100)) {
+      setFormError('Default residual rate must be between 0 and 100');
       return;
     }
     setSaving(true);
@@ -254,6 +300,10 @@ const AssetCategoriesPage = () => {
       description: form.description.trim() || undefined,
       parentAssetCategoryId: form.parentAssetCategoryId || undefined,
       isActive: form.isActive,
+      // Blank fields clear the default — the API assigns these unconditionally.
+      defaultDepreciationMethodId: form.defaultDepreciationMethodId || undefined,
+      defaultUsefulLifeMonths: life,
+      defaultResidualRate: rate,
     };
     try {
       const res = editing
@@ -505,6 +555,56 @@ const AssetCategoriesPage = () => {
                 rows={2}
               />
             </div>
+
+            <div className="md:col-span-2 border-t border-gray-100 pt-4">
+              <h3 className="text-sm font-semibold text-secondaryColor">
+                Depreciation Defaults
+              </h3>
+              <p className="text-xs text-gray-400 mt-1">
+                Prefilled when an asset in this category is capitalized — the
+                accountant can still override per asset. Leave blank for no
+                default.
+              </p>
+            </div>
+            <Select
+              label="Default Method"
+              placeholder="None"
+              options={methods.map((m) => ({ value: m.id, label: m.name }))}
+              value={form.defaultDepreciationMethodId}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  defaultDepreciationMethodId: e.target.value,
+                }))
+              }
+            />
+            <Input
+              label="Default Useful Life (months)"
+              type="number"
+              value={form.defaultUsefulLifeMonths}
+              onChange={(e) => {
+                setForm((prev) => ({
+                  ...prev,
+                  defaultUsefulLifeMonths: e.target.value,
+                }));
+                setFormError('');
+              }}
+              placeholder="e.g. 60"
+            />
+            <Input
+              label="Default Residual Rate (%)"
+              type="number"
+              value={form.defaultResidualRate}
+              onChange={(e) => {
+                setForm((prev) => ({
+                  ...prev,
+                  defaultResidualRate: e.target.value,
+                }));
+                setFormError('');
+              }}
+              placeholder="e.g. 5"
+              helperText="Resolved to an amount at capitalization: cost × rate."
+            />
           </div>
           <p className="text-xs text-gray-400 mt-3">
             Hierarchy is limited to 3 levels; codes are unique per company.

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useToast } from '@/components/Providers/ToastProvider';
 import Button from '@/components/UI/Button';
 import ConfirmationModal from '@/components/UI/ConfirmationModel';
@@ -47,6 +47,7 @@ import {
   reviseEstimate,
 } from '@/services/depreciation.service';
 import { fetchAssets } from '@/services/asset.service';
+import { fetchAssetCategoryById } from '@/services/assetCategory.service';
 import { unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import {
@@ -159,6 +160,9 @@ export default function DepreciationPage() {
 
   // ---------------------------------------------------------------- modals
   const [capitalizeOpen, setCapitalizeOpen] = useState(false);
+  // Bumped whenever the capitalize/edit form is (re)initialized or the asset
+  // changes; an async category-defaults prefill from an older generation is dropped.
+  const prefillGenerationRef = useRef(0);
   const [editingBook, setEditingBook] = useState<IAssetBook | null>(null);
   const [capitalizeForm, setCapitalizeForm] = useState<TCapitalizeForm>(emptyCapitalizeForm);
   const [assetOptions, setAssetOptions] = useState<IAssetListItem[]>([]);
@@ -264,6 +268,7 @@ export default function DepreciationPage() {
   // ---------------------------------------------------------------- actions
 
   const openEditBook = async (book: IAssetBook) => {
+    prefillGenerationRef.current += 1; // any in-flight category prefill is now stale
     setEditingBook(book);
     setCapitalizeForm({
       assetId: book.assetId,
@@ -287,6 +292,7 @@ export default function DepreciationPage() {
   };
 
   const openCapitalize = async () => {
+    prefillGenerationRef.current += 1; // any in-flight category prefill is now stale
     setEditingBook(null);
     setCapitalizeForm(emptyCapitalizeForm);
     setCapitalizeOpen(true);
@@ -299,6 +305,47 @@ export default function DepreciationPage() {
       setMethods(methodsResponse?.data ?? []);
     } catch {
       addToast.error('Could not load assets or depreciation methods.');
+    }
+  };
+
+  // §1.3.6 — the asset's category can carry depreciation defaults; they prefill
+  // this form and the accountant overrides per asset. Applied asynchronously.
+  // A generation token (not an assetId compare) decides whether a late response
+  // may still land: editing the same asset's existing book would pass an id
+  // check, and a stale prefill would silently rewrite the book's parameters.
+  const applyCategoryDefaults = async (
+    assetId: string,
+    categoryId: string,
+    generation: number
+  ) => {
+    try {
+      const res = await fetchAssetCategoryById(categoryId);
+      const category = res?.success ? res.data : null;
+      if (!category) return;
+      if (prefillGenerationRef.current !== generation) return;
+      setCapitalizeForm((prev) => {
+        if (prev.assetId !== assetId) return prev;
+        const next = { ...prev };
+        // Only offer methods the engine implements; a stale category default
+        // pointing elsewhere is skipped rather than creating an uncomputable book.
+        if (
+          category.defaultDepreciationMethodId &&
+          methods.some((m) => m.id === category.defaultDepreciationMethodId)
+        )
+          next.depreciationMethodId = category.defaultDepreciationMethodId;
+        if (category.defaultUsefulLifeMonths != null)
+          next.usefulLifeMonths = String(category.defaultUsefulLifeMonths);
+        if (category.defaultResidualRate != null) {
+          const cost = Number(prev.cost || 0);
+          if (cost > 0)
+            next.residualValue = String(
+              Math.round(cost * category.defaultResidualRate) / 100
+            );
+        }
+        return next;
+      });
+    } catch {
+      // No prefill on failure — the form still works by hand.
     }
   };
 
@@ -956,11 +1003,19 @@ export default function DepreciationPage() {
               onChange={(e) => {
                 const assetId = e.target.value;
                 const asset = assetOptions.find((a) => a.id === assetId);
+                // Reset the depreciation fields so switching assets is
+                // deterministic, then let the category defaults land on top.
                 setCapitalizeForm((prev) => ({
                   ...prev,
                   assetId,
                   cost: asset?.purchaseCost ? String(asset.purchaseCost) : prev.cost,
+                  depreciationMethodId: emptyCapitalizeForm.depreciationMethodId,
+                  usefulLifeMonths: emptyCapitalizeForm.usefulLifeMonths,
+                  residualValue: emptyCapitalizeForm.residualValue,
                 }));
+                const generation = ++prefillGenerationRef.current;
+                if (assetId && asset?.assetCategoryId)
+                  applyCategoryDefaults(assetId, asset.assetCategoryId, generation);
               }}
               options={assetOptions.map((a) => ({
                 label: `${a.assetCode} — ${a.assetName}`,
