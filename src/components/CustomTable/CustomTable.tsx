@@ -1,5 +1,11 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import {
+  deleteTablePreference,
+  fetchTablePreferences,
+  saveTablePreference,
+  TPreferenceScope,
+} from '@/services/tablePreference.service';
 import dynamic from 'next/dynamic';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { CustomTableProps, ICacheData, RowWithFieldProps, TTableColumn } from './CustomTableInterface';
@@ -47,6 +53,14 @@ const CustomTable = ({
   // main TulipsHRM employee toolbar (8px == the old "Medium" default).
   const spacing = 8;
   const [columsOpen, setColumnsOpen] = useState(false);
+  // Column-layout scope (main-app semantics): edits save to the ACTIVE scope.
+  // Resolution on load is personal → company → local cache → code defaults.
+  const [prefScope, setPrefScope] = useState<TPreferenceScope>('personal');
+  const [canManageCompany, setCanManageCompany] = useState(false);
+  const serverPrefsRef = useRef<{ personal?: string | null; company?: string | null }>({});
+  const prefsLoadedRef = useRef(false);
+  const dirtyRef = useRef(false);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [sortConfig, setSortConfig] = useState<{
     columnKey: string;
     direction: 'asc' | 'desc';
@@ -125,41 +139,66 @@ const CustomTable = ({
     setRows(initialRows);
   }, [initialRows]);
 
-  useEffect(() => {
-    if (tableName) {
-      const columnCache = localStorage.getItem(tableName);
-
-      if (columnCache) {
-        const widthDistributions: ICacheData[] = JSON.parse(columnCache);
-
-        // Merge the cached layout onto the CURRENT column set: cached
-        // order/width/locked/visible win for matching keys, columns added
-        // since the cache was written are inserted at their code-defined
-        // position, and cached keys that no longer exist are dropped.
-        setColumns((prevColumns) => {
-          const cachedKeys = new Set(widthDistributions.map((i) => i.key));
-          const merged = widthDistributions
-            .filter((item) => prevColumns.some((col) => col.key === item.key))
-            .map((item) => {
-              const prevCol = prevColumns.find((col) => col.key === item.key)!;
-              return {
-                ...prevCol,
-                width: item.width,
-                locked: item.locked,
-                visible: item.visible,
-              };
-            }) as TTableColumn[];
-
-          prevColumns.forEach((col, index) => {
-            if (!cachedKeys.has(col.key)) {
-              merged.splice(Math.min(index, merged.length), 0, col);
-            }
-          });
-
-          return merged;
-        });
-      }
+  // Merge a saved layout onto the CURRENT column set: saved order/width/locked/visible
+  // win for matching keys, columns added since the layout was written are inserted at
+  // their code-defined position, and saved keys that no longer exist are dropped.
+  const applyLayout = (layoutJson: string) => {
+    let widthDistributions: ICacheData[];
+    try {
+      widthDistributions = JSON.parse(layoutJson);
+    } catch {
+      return;
     }
+    if (!Array.isArray(widthDistributions)) return;
+
+    setColumns((prevColumns) => {
+      const cachedKeys = new Set(widthDistributions.map((i) => i.key));
+      const merged = widthDistributions
+        .filter((item) => prevColumns.some((col) => col.key === item.key))
+        .map((item) => {
+          const prevCol = prevColumns.find((col) => col.key === item.key)!;
+          return {
+            ...prevCol,
+            width: item.width,
+            locked: item.locked,
+            visible: item.visible,
+          };
+        }) as TTableColumn[];
+
+      prevColumns.forEach((col, index) => {
+        if (!cachedKeys.has(col.key)) {
+          merged.splice(Math.min(index, merged.length), 0, col);
+        }
+      });
+
+      return merged;
+    });
+  };
+
+  useEffect(() => {
+    if (!tableName) return;
+
+    // Local cache first for instant paint (legacy behavior), then the server layer:
+    // personal preset wins, company preset is the curated fallback.
+    const columnCache = localStorage.getItem(tableName);
+    if (columnCache) applyLayout(columnCache);
+
+    fetchTablePreferences(tableName)
+      .then((res) => {
+        if (!res?.success || !res.data) return;
+        serverPrefsRef.current = {
+          personal: res.data.personalColumnsJson,
+          company: res.data.companyColumnsJson,
+        };
+        setCanManageCompany(res.data.canManageCompany);
+        const layout = res.data.personalColumnsJson ?? res.data.companyColumnsJson;
+        if (layout) applyLayout(layout);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        prefsLoadedRef.current = true;
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tableName]);
 
   // const initialColLoad = useRef(true);
@@ -182,8 +221,29 @@ const CustomTable = ({
         });
       });
 
-      localStorage.setItem(tableName, JSON.stringify(cacheInfo));
+      const layoutJson = JSON.stringify(cacheInfo);
+
+      // Local cache tracks the PERSONAL view only — a company edit must not
+      // overwrite the operator's own cached layout.
+      if (prefScope === 'personal') localStorage.setItem(tableName, layoutJson);
+
+      // Server save: only user-initiated changes, only once preferences resolved
+      // (the initial seed and layout application must not write anything), and
+      // debounced so a drag doesn't produce a write storm.
+      if (dirtyRef.current && prefsLoadedRef.current && tableName) {
+        if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = setTimeout(() => {
+          saveTablePreference(tableName, prefScope, layoutJson)
+            .then((res) => {
+              if (res?.success) {
+                serverPrefsRef.current[prefScope] = layoutJson;
+              }
+            })
+            .catch(() => undefined);
+        }, 800);
+      }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [columns]);
 
   const handleSort = (columnKey: string) => {
@@ -281,6 +341,7 @@ const CustomTable = ({
     }
   };
   const toggleColumnVisibility = (columnKey: string) => {
+    dirtyRef.current = true;
     setColumns((prevColumns) =>
       prevColumns.map((col) =>
         col.key === columnKey ? { ...col, visible: !col.visible } : col,
@@ -293,6 +354,7 @@ const CustomTable = ({
   };
 
   const handleDragEnd = (result: DropResult) => {
+    dirtyRef.current = true;
     const { source, destination } = result;
 
     if (!destination) return;
@@ -311,6 +373,7 @@ const CustomTable = ({
   };
 
   const toggleColumnLock = (columnKey: string) => {
+    dirtyRef.current = true;
     setColumns((prevColumns) =>
       prevColumns.map((col) =>
         col.key === columnKey ? { ...col, locked: !col.locked } : col,
@@ -332,7 +395,12 @@ const CustomTable = ({
     );
   };
 
-  const startResizing = (
+  const startResizing = (...args: Parameters<typeof startResizingInner>) => {
+    dirtyRef.current = true;
+    return startResizingInner(...args);
+  };
+
+  const startResizingInner = (
     e: React.MouseEvent<HTMLDivElement, MouseEvent>,
     columnKey: string,
   ) => {
@@ -366,13 +434,37 @@ const CustomTable = ({
 
   const handleReset = () => {
     const confirmed = window.confirm(
-      'Are you sure you want to reset this table settings?',
+      prefScope === 'company'
+        ? 'Reset the COMPANY-WIDE column layout for this table? Everyone falls back to the defaults.'
+        : 'Reset your column layout for this table?',
     );
     if (confirmed) {
-      localStorage.removeItem(tableName);
-      if (window) {
-        window.location.reload();
-      }
+      if (prefScope === 'personal') localStorage.removeItem(tableName);
+      deleteTablePreference(tableName, prefScope)
+        .catch(() => undefined)
+        .finally(() => {
+          window.location.reload();
+        });
+    }
+  };
+
+  /**
+   * Switching scope loads that scope's saved layout into the working columns:
+   * company shows the curated layout (or code defaults), personal shows the
+   * caller's own (falling back to company, then defaults) — main-app semantics.
+   */
+  const handleScopeChange = (scope: TPreferenceScope) => {
+    setPrefScope(scope);
+    dirtyRef.current = false;
+    const prefs = serverPrefsRef.current;
+    const layout =
+      scope === 'company'
+        ? prefs.company
+        : (prefs.personal ?? prefs.company);
+    if (layout) {
+      applyLayout(layout);
+    } else {
+      setColumns(initialColumns.map((col) => ({ ...col, visible: col.visible ?? true })));
     }
   };
 
@@ -386,6 +478,20 @@ const CustomTable = ({
               {...provided.droppableProps}
               className="sortable-list"
             >
+              <li>
+                <div className="flex items-center gap-2 p-2 border-b border-gray-100 bg-white">
+                  <i className="icon icon-info text-base text-gray-400"></i>
+                  <select
+                    className="flex-1 text-sm font-medium text-secondaryColor bg-transparent outline-none cursor-pointer"
+                    value={prefScope}
+                    onChange={(e) => handleScopeChange(e.target.value as TPreferenceScope)}
+                    title="Where your column changes are saved"
+                  >
+                    <option value="personal">Personalized</option>
+                    {canManageCompany && <option value="company">Company</option>}
+                  </select>
+                </div>
+              </li>
               <li>
                 <div className="flex justify-between items-center p-2 bg-gray-100">
                   <Tooltip
