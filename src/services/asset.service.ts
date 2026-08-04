@@ -3,11 +3,32 @@ import { buildQuery } from '@/utils/serviceUtils';
 import { IPagedResponse, IResponse } from '@/interface/IGeneric';
 import {
   IAsset,
+  IAssetAnalytics,
+  IAssetCalendarEvent,
   IAssetFilter,
   IAssetListItem,
   ICreateAsset,
   IUpdateAsset,
 } from '@/interface/IAsset';
+
+/**
+ * The filter params every asset feed accepts. The list, the calendar and the analytics
+ * all send exactly this, so switching view can never silently change which assets are
+ * being described — the server starts all three from the same filtered set.
+ *
+ * Paging is excluded: only the list pages, and sending a stale page number to the
+ * calendar or the analytics would quietly narrow them.
+ */
+const assetFilterQuery = (filter: IAssetFilter) => ({
+  Search: filter.search,
+  AssetCategoryId: filter.assetCategoryId,
+  LifecycleStatus: filter.lifecycleStatus,
+  CustodyStatus: filter.custodyStatus,
+  OperationalStatus: filter.operationalStatus,
+  FinancialStatus: filter.financialStatus,
+  VerificationStatus: filter.verificationStatus,
+  OwnershipType: filter.ownershipType,
+});
 
 export const fetchAssets = (
   filter: IAssetFilter = {}
@@ -18,15 +39,41 @@ export const fetchAssets = (
       buildQuery({
         PageNumber: filter.pageNumber,
         PageSize: filter.pageSize,
-        Search: filter.search,
-        AssetCategoryId: filter.assetCategoryId,
-        LifecycleStatus: filter.lifecycleStatus,
-        CustodyStatus: filter.custodyStatus,
-        OperationalStatus: filter.operationalStatus,
-        FinancialStatus: filter.financialStatus,
-        VerificationStatus: filter.verificationStatus,
-        OwnershipType: filter.ownershipType,
+        ...assetFilterQuery(filter),
       }),
+    method: 'GET',
+    completeData: true,
+  });
+};
+
+/**
+ * Dated obligations for the filtered register inside a window — maintenance, warranty,
+ * insurance and verification. Not paged: a window is bounded by its dates.
+ */
+export const fetchAssetCalendar = (
+  filter: IAssetFilter = {},
+  from?: string,
+  to?: string
+): Promise<IResponse<IAssetCalendarEvent[]>> => {
+  return requestApi({
+    apiEndpoint:
+      '/Assets/calendar' +
+      buildQuery({
+        ...assetFilterQuery(filter),
+        From: from,
+        To: to,
+      }),
+    method: 'GET',
+    completeData: true,
+  });
+};
+
+/** Aggregates over the filtered register — composition, value and acquisition trend. */
+export const fetchAssetAnalytics = (
+  filter: IAssetFilter = {}
+): Promise<IResponse<IAssetAnalytics>> => {
+  return requestApi({
+    apiEndpoint: '/Assets/analytics' + buildQuery({ ...assetFilterQuery(filter) }),
     method: 'GET',
     completeData: true,
   });

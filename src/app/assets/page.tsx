@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/components/Providers/ToastProvider';
 import Button from '@/components/UI/Button';
@@ -10,13 +10,22 @@ import {
   ITableFilters,
   TTableColumn,
 } from '@/components/CustomTable/CustomTableInterface';
-import CustomMenuItem from '@/components/UI/CustomMenuItem';
 import ConfirmationModal from '@/components/UI/ConfirmationModel';
-import Dropdown from '@/components/UI/Dropdown';
 import Select from '@/components/UI/Select';
 import FilterPanel from '@/components/UI/FilterPanel';
 import SearchBox from '@/components/SearchBox';
 import Pagination from '@/components/UI/Pagination';
+import ViewSwitcher, { IViewOption, readStoredView } from '@/components/UI/ViewSwitcher';
+import AssetCardView from '@/components/Assets/AssetCardView';
+import AssetCalendarView from '@/components/Assets/AssetCalendarView';
+import AssetAnalyticsView from '@/components/Assets/AssetAnalyticsView';
+import {
+  AssetActionsMenu,
+  IAssetAction,
+  StatusBadge,
+  VAT_RATE,
+  money,
+} from '@/components/Assets/AssetViewShared';
 import { IAssetFilter, IAssetListItem } from '@/interface/IAsset';
 import { IAssetCategory } from '@/interface/IAssetCategory';
 import { deleteAsset, fetchAssets } from '@/services/asset.service';
@@ -36,34 +45,24 @@ import {
 } from '@/enum/assetEnums';
 import useDebounce from '@/hooks/useDebounce';
 
-const StatusBadge = ({
-  value,
-  labels,
-  classes,
-}: {
-  value: number;
-  labels: Record<number, string>;
-  classes?: Record<number, string>;
-}) => (
-  <span
-    className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-      classes?.[value] ?? 'bg-gray-100 text-gray-700'
-    }`}
-  >
-    {labels[value] ?? value}
-  </span>
-);
+/* --------------------------------------------------------------------- */
+/* View modes                                                             */
+/* --------------------------------------------------------------------- */
 
-/** Nepal standard VAT. Display-only — the register stores net prices. */
-const VAT_RATE = 0.13;
+type TAssetView = 'table' | 'card' | 'calendar' | 'analytics';
 
-const money = (value?: number | null, currency?: string | null) =>
-  value != null
-    ? `${value.toLocaleString(undefined, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })}${currency ? ` ${currency}` : ''}`
-    : '—';
+const VIEW_VALUES = ['table', 'card', 'calendar', 'analytics'] as const;
+const VIEW_STORAGE_KEY = 'assets.viewMode';
+
+const VIEW_OPTIONS: IViewOption<TAssetView>[] = [
+  { value: 'table', label: 'Table', iconName: 'three-cols', title: 'Compare assets column by column' },
+  { value: 'card', label: 'Cards', iconName: 'modules', title: 'Browse assets one tile at a time' },
+  { value: 'calendar', label: 'Calendar', iconName: 'calendar', title: 'What falls due, and when' },
+  { value: 'analytics', label: 'Analytics', iconName: 'bar-chart', title: 'What this selection is made of' },
+];
+
+/** Table and Cards page through the same result set; the other two describe it whole. */
+const PAGED_VIEWS: TAssetView[] = ['table', 'card'];
 
 const AssetsPage = () => {
   const { addToast } = useToast();
@@ -72,6 +71,7 @@ const AssetsPage = () => {
 
   const initialLifecycle = searchParams.get('lifecycleStatus');
 
+  const [view, setView] = useState<TAssetView>('table');
   const [assets, setAssets] = useState<IAssetListItem[]>([]);
   const [deleting, setDeleting] = useState<IAssetListItem | null>(null);
   const [deletingBusy, setDeletingBusy] = useState(false);
@@ -90,6 +90,13 @@ const AssetsPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 400);
   const [showFilters, setShowFilters] = useState(false);
+
+  // Restored after mount, never during render: the server has no localStorage, and
+  // painting the remembered view on the first client pass would hydrate mismatched.
+  useEffect(() => {
+    const stored = readStoredView<TAssetView>(VIEW_STORAGE_KEY, VIEW_VALUES);
+    if (stored) setView(stored);
+  }, []);
 
   const columns: TTableColumn[] = [
     { key: 'assetCode', label: 'Code', width: 140, type: 'string', name: 'assetCode' },
@@ -136,9 +143,11 @@ const AssetsPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
+  // Only the paged views need the list. Calendar and Analytics fetch their own shape from
+  // the same filters, so leaving this running would be a wasted request per keystroke.
   useEffect(() => {
-    loadAssets();
-  }, [loadAssets]);
+    if (PAGED_VIEWS.includes(view)) loadAssets();
+  }, [loadAssets, view]);
 
   useEffect(() => {
     // Categories for the filter dropdown (first 500 covers real-world category counts).
@@ -170,12 +179,78 @@ const AssetsPage = () => {
     }));
   };
 
+  /**
+   * The filter identity Calendar and Analytics depend on — deliberately without the page
+   * number, so turning a page in the table does not refetch a calendar that would come
+   * back byte-identical. Memoized on the primitives, because a fresh object every render
+   * would defeat the effect that consumes it.
+   */
+  const viewFilters = useMemo<IAssetFilter>(
+    () => ({
+      search: filters.search,
+      assetCategoryId: filters.assetCategoryId,
+      lifecycleStatus: filters.lifecycleStatus,
+      custodyStatus: filters.custodyStatus,
+      operationalStatus: filters.operationalStatus,
+    }),
+    [
+      filters.search,
+      filters.assetCategoryId,
+      filters.lifecycleStatus,
+      filters.custodyStatus,
+      filters.operationalStatus,
+    ]
+  );
+
   const activeFilterCount = [
     filters.assetCategoryId,
     filters.lifecycleStatus,
     filters.custodyStatus,
     filters.operationalStatus,
   ].filter((value) => value != null).length;
+
+  /** Plain-language echo of the active narrowing, so Analytics can say what it describes. */
+  const filterSummary = useMemo(() => {
+    const parts: string[] = [];
+    if (filters.assetCategoryId) {
+      const category = categories.find((c) => c.id === filters.assetCategoryId);
+      if (category) parts.push(category.name);
+    }
+    if (filters.lifecycleStatus != null) parts.push(LIFECYCLE_LABELS[filters.lifecycleStatus]);
+    if (filters.custodyStatus != null) parts.push(CUSTODY_LABELS[filters.custodyStatus]);
+    if (filters.operationalStatus != null) parts.push(OPERATIONAL_LABELS[filters.operationalStatus]);
+    if (filters.search) parts.push(`matching “${filters.search}”`);
+    return parts.length ? parts.join(' · ') : 'every asset in the register';
+  }, [filters, categories]);
+
+  /**
+   * Declared once, rendered by the table cell and by every card. The lifecycle rule lives
+   * here rather than in each view's markup, so a Delete hidden in one place cannot
+   * reappear in another.
+   */
+  const assetActions = useMemo<IAssetAction[]>(
+    () => [
+      {
+        label: 'View',
+        iconName: 'eye',
+        onClick: (asset) => router.push(`/assets/${asset.id}`),
+      },
+      {
+        label: 'Edit',
+        iconName: 'edit',
+        onClick: (asset) => router.push(`/assets/${asset.id}/edit`),
+      },
+      {
+        // A Draft was never in service — deletion is its honest exit. Anything past Draft
+        // leaves through retirement and disposal, never deletion.
+        label: 'Delete',
+        iconName: 'trash',
+        onClick: (asset) => setDeleting(asset),
+        isAvailable: (asset) => asset.lifecycleStatus === LifecycleStatusEnum.Draft,
+      },
+    ],
+    [router]
+  );
 
   const rowData = assets.map((asset) => ({
     id: asset.id,
@@ -215,48 +290,7 @@ const AssetsPage = () => {
     ),
     conditionName: asset.conditionName,
     actions: (
-      <div className="flex gap-x-2 relative bg-white px-4 py-2 -m-2">
-        <Dropdown
-          buttonChildren={
-            <div className="bg-white/80 px-1.5 py-2 rounded-sm hover:bg-primarycolor hover:text-white">
-              <i className="icon icon-elipsis-v text-sm"></i>
-            </div>
-          }
-        >
-          {[
-            {
-              label: 'View',
-              icon: <i className="icon icon-eye text-sm" />,
-              action: () => router.push(`/assets/${asset.id}`),
-            },
-            {
-              label: 'Edit',
-              icon: <i className="icon icon-edit text-sm" />,
-              action: () => router.push(`/assets/${asset.id}/edit`),
-            },
-            // A Draft was never in service — deletion is its honest exit. Anything
-            // past Draft leaves through retirement and disposal, never deletion.
-            ...(asset.lifecycleStatus === LifecycleStatusEnum.Draft
-              ? [
-                  {
-                    label: 'Delete',
-                    icon: <i className="icon icon-trash text-sm" />,
-                    action: () => setDeleting(asset),
-                  },
-                ]
-              : []),
-          ].map((option, index, arr) => (
-            <CustomMenuItem
-              key={index}
-              label={option.label}
-              onClick={option.action}
-              border={index !== arr.length - 1}
-              icon={option.icon}
-              className="!py-2"
-            />
-          ))}
-        </Dropdown>
-      </div>
+      <AssetActionsMenu asset={asset} actions={assetActions} className="bg-white px-4 py-2 -m-2" />
     ),
   }));
 
@@ -276,144 +310,172 @@ const AssetsPage = () => {
     }
   };
 
+  const filterControls = (
+    <>
+      <FilterPanel
+        open={showFilters}
+        onOpenChange={setShowFilters}
+        activeCount={activeFilterCount}
+        onClearAll={() =>
+          setFilters((prev) => ({
+            ...prev,
+            assetCategoryId: undefined,
+            lifecycleStatus: undefined,
+            custodyStatus: undefined,
+            operationalStatus: undefined,
+            pageNumber: 1,
+          }))
+        }
+      >
+        <Select
+          label="Category"
+          placeholder="All categories"
+          options={categories.map((c) => ({
+            value: c.id,
+            label: `${c.categoryCode} — ${c.name}`,
+          }))}
+          value={filters.assetCategoryId ?? ''}
+          onChange={(e) =>
+            setFilters((prev) => ({
+              ...prev,
+              assetCategoryId: e.target.value || undefined,
+              pageNumber: 1,
+            }))
+          }
+        />
+        <Select
+          label="Lifecycle"
+          placeholder="All"
+          options={enumOptions(LIFECYCLE_LABELS).map((o) => ({
+            value: String(o.value),
+            label: o.label,
+          }))}
+          value={filters.lifecycleStatus != null ? String(filters.lifecycleStatus) : ''}
+          onChange={(e) =>
+            setFilters((prev) => ({
+              ...prev,
+              lifecycleStatus: e.target.value
+                ? (Number(e.target.value) as LifecycleStatusEnum)
+                : undefined,
+              pageNumber: 1,
+            }))
+          }
+        />
+        <Select
+          label="Custody"
+          placeholder="All"
+          options={enumOptions(CUSTODY_LABELS).map((o) => ({
+            value: String(o.value),
+            label: o.label,
+          }))}
+          value={filters.custodyStatus != null ? String(filters.custodyStatus) : ''}
+          onChange={(e) =>
+            setFilters((prev) => ({
+              ...prev,
+              custodyStatus: e.target.value
+                ? (Number(e.target.value) as CustodyStatusEnum)
+                : undefined,
+              pageNumber: 1,
+            }))
+          }
+        />
+        <Select
+          label="Operational"
+          placeholder="All"
+          options={enumOptions(OPERATIONAL_LABELS).map((o) => ({
+            value: String(o.value),
+            label: o.label,
+          }))}
+          value={filters.operationalStatus != null ? String(filters.operationalStatus) : ''}
+          onChange={(e) =>
+            setFilters((prev) => ({
+              ...prev,
+              operationalStatus: e.target.value
+                ? (Number(e.target.value) as OperationalStatusEnum)
+                : undefined,
+              pageNumber: 1,
+            }))
+          }
+        />
+      </FilterPanel>
+      <ImportExportOptions entity="assets" entityLabel="Assets" onImported={loadAssets} />
+      <SearchBox onSearch={setSearchQuery} searchVal={searchQuery} />
+    </>
+  );
+
   return (
     <div className="px-4 mt-2">
-      <CustomTable
-        columns={columns}
-        rows={rowData}
-        tableName="Assets"
-        serialOffset={
-          ((filters.pageNumber ?? 1) - 1) *
-          (filters.pageSize ?? DEFAULT_PAGE_SIZE)
-        }
-        isLoading={loading}
-        entityLabel="asset"
-        tableHeaderLeft={
+      {/*
+       * One toolbar for every view. Filters, search and import/export used to live inside
+       * CustomTable's header, which would have made them table-only — the switcher exists
+       * precisely so the same selection can be looked at four ways.
+       */}
+      <div className="flex flex-wrap justify-between items-center gap-x-4 gap-y-2 w-full mb-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <Button onClick={() => router.push('/assets/create')}>
             <i className="icon icon-plus text-xs"></i>
             <span>Register Asset</span>
           </Button>
-        }
-        tableHeaderRight={
-          <>
-            <FilterPanel
-              open={showFilters}
-              onOpenChange={setShowFilters}
-              activeCount={activeFilterCount}
-              onClearAll={() =>
-                setFilters((prev) => ({
-                  ...prev,
-                  assetCategoryId: undefined,
-                  lifecycleStatus: undefined,
-                  custodyStatus: undefined,
-                  operationalStatus: undefined,
-                  pageNumber: 1,
-                }))
-              }
-            >
-              <Select
-                label="Category"
-                placeholder="All categories"
-                options={categories.map((c) => ({
-                  value: c.id,
-                  label: `${c.categoryCode} — ${c.name}`,
-                }))}
-                value={filters.assetCategoryId ?? ''}
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    assetCategoryId: e.target.value || undefined,
-                    pageNumber: 1,
-                  }))
-                }
-              />
-              <Select
-                label="Lifecycle"
-                placeholder="All"
-                options={enumOptions(LIFECYCLE_LABELS).map((o) => ({
-                  value: String(o.value),
-                  label: o.label,
-                }))}
-                value={
-                  filters.lifecycleStatus != null
-                    ? String(filters.lifecycleStatus)
-                    : ''
-                }
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    lifecycleStatus: e.target.value
-                      ? (Number(e.target.value) as LifecycleStatusEnum)
-                      : undefined,
-                    pageNumber: 1,
-                  }))
-                }
-              />
-              <Select
-                label="Custody"
-                placeholder="All"
-                options={enumOptions(CUSTODY_LABELS).map((o) => ({
-                  value: String(o.value),
-                  label: o.label,
-                }))}
-                value={
-                  filters.custodyStatus != null
-                    ? String(filters.custodyStatus)
-                    : ''
-                }
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    custodyStatus: e.target.value
-                      ? (Number(e.target.value) as CustodyStatusEnum)
-                      : undefined,
-                    pageNumber: 1,
-                  }))
-                }
-              />
-              <Select
-                label="Operational"
-                placeholder="All"
-                options={enumOptions(OPERATIONAL_LABELS).map((o) => ({
-                  value: String(o.value),
-                  label: o.label,
-                }))}
-                value={
-                  filters.operationalStatus != null
-                    ? String(filters.operationalStatus)
-                    : ''
-                }
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    operationalStatus: e.target.value
-                      ? (Number(e.target.value) as OperationalStatusEnum)
-                      : undefined,
-                    pageNumber: 1,
-                  }))
-                }
-              />
-            </FilterPanel>
-            <ImportExportOptions
-              entity="assets"
-              entityLabel="Assets"
-              onImported={loadAssets}
-            />
-            <SearchBox onSearch={setSearchQuery} searchVal={searchQuery} />
-          </>
-        }
-        updateFilters={updateFilters}
-      />
+          <ViewSwitcher
+            options={VIEW_OPTIONS}
+            value={view}
+            onChange={setView}
+            storageKey={VIEW_STORAGE_KEY}
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 md:gap-x-8">
+          {filterControls}
+        </div>
+      </div>
 
-      <div className="mt-3">
-        <Pagination
-          pageNumber={filters.pageNumber ?? 1}
-          totalPages={pageCount}
-          pageSize={filters.pageSize ?? DEFAULT_PAGE_SIZE}
-          totalCount={rowCount}
+      {view === 'table' && (
+        <CustomTable
+          columns={columns}
+          rows={rowData}
+          tableName="Assets"
+          serialOffset={
+            ((filters.pageNumber ?? 1) - 1) * (filters.pageSize ?? DEFAULT_PAGE_SIZE)
+          }
+          isLoading={loading}
+          entityLabel="asset"
           updateFilters={updateFilters}
         />
-      </div>
+      )}
+
+      {view === 'card' && (
+        <AssetCardView
+          assets={assets}
+          loading={loading}
+          actions={assetActions}
+          onOpen={(asset) => router.push(`/assets/${asset.id}`)}
+        />
+      )}
+
+      {view === 'calendar' && (
+        <AssetCalendarView
+          filters={viewFilters}
+          onOpenAsset={(assetId) => router.push(`/assets/${assetId}`)}
+        />
+      )}
+
+      {view === 'analytics' && (
+        <AssetAnalyticsView filters={viewFilters} filterSummary={filterSummary} />
+      )}
+
+      {/* Paging belongs to the views that page. The calendar is bounded by its window and
+          the analytics describe the whole selection, so a pager there would be a lie. */}
+      {PAGED_VIEWS.includes(view) && (
+        <div className="mt-3">
+          <Pagination
+            pageNumber={filters.pageNumber ?? 1}
+            totalPages={pageCount}
+            pageSize={filters.pageSize ?? DEFAULT_PAGE_SIZE}
+            totalCount={rowCount}
+            updateFilters={updateFilters}
+          />
+        </div>
+      )}
+
       <ConfirmationModal
         isOpen={!!deleting}
         message={`Delete draft asset '${deleting?.assetCode}'? Its code will not be reused — asset codes are burned once issued.`}

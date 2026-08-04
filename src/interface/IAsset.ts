@@ -152,3 +152,62 @@ export interface IAssetFilter {
   verificationStatus?: VerificationStatusEnum;
   ownershipType?: OwnershipTypeEnum;
 }
+
+/* ------------------------------------------------------------------------- */
+/* Calendar view                                                             */
+/* ------------------------------------------------------------------------- */
+
+/** Mirrors AssetCalendarEventTypeEnum on the server. */
+export enum AssetCalendarEventTypeEnum {
+  Maintenance = 1,
+  Warranty = 2,
+  Insurance = 3,
+  Verification = 4,
+}
+
+export interface IAssetCalendarEvent {
+  assetId: string;
+  assetCode: string;
+  assetName: string;
+  assetCategoryName?: string | null;
+  assetLocationName?: string | null;
+  eventType: AssetCalendarEventTypeEnum;
+  date: string;
+  title: string;
+  detail?: string | null;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Analytics view                                                            */
+/* ------------------------------------------------------------------------- */
+
+export interface IAssetAnalyticsBucket {
+  label: string;
+  count: number;
+  value: number;
+}
+
+export interface IAssetAcquisitionPoint {
+  year: number;
+  month: number;
+  count: number;
+  cost: number;
+}
+
+export interface IAssetAnalytics {
+  totalAssets: number;
+  totalPurchaseCost: number;
+  totalAccumulatedDepreciation: number;
+  totalNetBookValue: number;
+  capitalizedCount: number;
+  /** > 1 means the money totals mix currencies and must not be shown as one figure. */
+  currencyCount: number;
+  primaryCurrency?: string | null;
+  byCategory: IAssetAnalyticsBucket[];
+  byLifecycle: IAssetAnalyticsBucket[];
+  byCustody: IAssetAnalyticsBucket[];
+  byOperational: IAssetAnalyticsBucket[];
+  byCondition: IAssetAnalyticsBucket[];
+  byLocation: IAssetAnalyticsBucket[];
+  acquisitionByMonth: IAssetAcquisitionPoint[];
+}
