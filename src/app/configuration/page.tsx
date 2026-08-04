@@ -59,6 +59,17 @@ const SECTIONS: IHubSection[] = [
       },
     ],
   },
+  {
+    heading: 'Data',
+    cards: [
+      {
+        label: 'Master Data Reset',
+        description: 'Load a demo register, or permanently clear this company to start fresh',
+        iconName: 'redo',
+        url: '/master-data-reset',
+      },
+    ],
+  },
 ];
 
 const SettingsHubPage = () => (
