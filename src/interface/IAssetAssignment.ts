@@ -50,3 +50,84 @@ export interface IAssetAssignmentFilter {
   employeeId?: string;
   status?: AssignmentStatusEnum;
 }
+
+/* ------------------------------------------------------------------------- */
+/* Bulk assignment — one employee, many assets                               */
+/* ------------------------------------------------------------------------- */
+
+/**
+ * A row in the bulk picker. `eligible` is advisory: it describes the asset when the
+ * feed was built, and the server re-checks on submit, so a row that looked issuable
+ * can still come back blocked.
+ */
+export interface IAssignableAsset {
+  id: string;
+  assetCode: string;
+  assetTag?: string | null;
+  assetName: string;
+  assetCategoryName: string;
+  serialNumber?: string | null;
+  assetLocationName?: string | null;
+  assetConditionTypeId: string;
+  conditionName: string;
+  custodyStatus: number;
+  eligible: boolean;
+  /** Why it cannot be issued right now; null when it can. */
+  blockedReason?: string | null;
+}
+
+export interface IAssignableAssetFilter {
+  pageNumber?: number;
+  pageSize?: number;
+  search?: string;
+  assetCategoryId?: string;
+  /** Also return blocked assets, each carrying its reason. */
+  includeIneligible?: boolean;
+  /** Rehydrate a specific selection (retrying the remainder of a partial batch). */
+  assetIds?: string[];
+}
+
+export interface IBulkAssignItem {
+  assetId: string;
+  conditionAtIssueId?: string;
+  accessories?: string;
+  handoverNotes?: string;
+}
+
+export interface IBulkAssignAssets {
+  employeeId: string;
+  assignmentDate?: string;
+  expectedReturnDate?: string;
+  conditionAtIssueId?: string;
+  accessories?: string;
+  handoverNotes?: string;
+  items: IBulkAssignItem[];
+}
+
+/** Mirrors BulkAssignOutcomeEnum on the server. */
+export enum BulkAssignOutcomeEnum {
+  Assigned = 1,
+  AlreadyAssigned = 2,
+  Blocked = 3,
+  NotFound = 4,
+  Conflict = 5,
+}
+
+export interface IBulkAssignOutcome {
+  assetId: string;
+  /** Withheld when the asset was not found, so the client supplies the label. */
+  assetCode?: string | null;
+  outcome: BulkAssignOutcomeEnum;
+  message: string;
+  assignmentId?: string | null;
+}
+
+export interface IBulkAssignResult {
+  employeeId: string;
+  employeeName: string;
+  requested: number;
+  assigned: number;
+  alreadyAssigned: number;
+  failed: number;
+  outcomes: IBulkAssignOutcome[];
+}

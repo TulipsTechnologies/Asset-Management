@@ -45,6 +45,7 @@ import {
   AssignmentStatusEnum,
 } from '@/enum/assignmentEnums';
 import useDebounce from '@/hooks/useDebounce';
+import BulkAssignModal from '@/components/Assignments/BulkAssignModal';
 
 const formatDate = (value?: string | null) =>
   value ? new Date(value).toLocaleDateString() : '—';
@@ -90,6 +91,7 @@ const AssignmentsPage = () => {
 
   // Assign modal
   const [assignOpen, setAssignOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [viewing, setViewing] = useState<IAssetAssignment | null>(null);
   const [assignableAssets, setAssignableAssets] = useState<IAssetListItem[]>([]);
   const [assignForm, setAssignForm] = useState<TAssignForm>(emptyAssignForm);
@@ -349,10 +351,17 @@ const AssignmentsPage = () => {
         isLoading={loading}
         entityLabel="assignment"
         tableHeaderLeft={
-          <Button onClick={openAssign}>
-            <i className="icon icon-plus text-xs"></i>
-            <span>Assign Asset</span>
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={() => setBulkOpen(true)}>
+              <i className="icon icon-plus text-xs"></i>
+              <span>Assign Assets</span>
+            </Button>
+            {/* The single-asset form stays for the one-off handover, where picking a
+                person and one asset in a small form beats working a list. */}
+            <Button variant="outline" onClick={openAssign}>
+              <span>Single asset</span>
+            </Button>
+          </div>
         }
         tableHeaderRight={
           <>
@@ -431,6 +440,13 @@ const AssignmentsPage = () => {
       </div>
 
       {/* Assign modal */}
+      <BulkAssignModal
+        isOpen={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        employees={employees}
+        onAssigned={loadAssignments}
+      />
+
       <Modal isOpen={assignOpen} onClose={() => setAssignOpen(false)} size="lg">
         <div className="p-6">
           <h2 className="text-lg font-semibold text-secondaryColor mb-4">
