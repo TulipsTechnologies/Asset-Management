@@ -82,27 +82,46 @@ const ViewSwitcher = <T extends string>({
       {options.map((option) => {
         const active = mounted && option.value === value;
         return (
-          <button
-            key={option.value}
-            type="button"
-            role="tab"
-            aria-selected={active}
-            /*
-             * Icon-only, so the control stays compact next to the page's other actions.
-             * The label is not lost: it is the tooltip and the accessible name, so it is
-             * still reachable by hover and by a screen reader.
-             */
-            aria-label={option.label}
-            title={option.title ? `${option.label} — ${option.title}` : option.label}
-            onClick={() => select(option.value)}
-            className={`inline-flex items-center justify-center size-8 rounded-full transition-colors ${
-              active
-                ? 'bg-white text-primarycolor shadow-sm'
-                : 'text-gray-500 hover:text-secondaryColor'
-            }`}
-          >
-            <i className={`icon icon-${option.iconName} text-sm`}></i>
-          </button>
+          /*
+           * Presentational wrapper so the tooltip can anchor to the button without sitting
+           * inside the tablist as a child the role does not allow.
+           */
+          <span key={option.value} role="presentation" className="relative group">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={active}
+              /*
+               * Icon-only to stay compact, so the label has to arrive on hover instead.
+               * A rendered tooltip rather than the `title` attribute: the native one waits
+               * about a second and cannot be styled, which is too slow to answer "what is
+               * this icon" while the pointer is already moving.
+               */
+              aria-label={option.label}
+              onClick={() => select(option.value)}
+              className={`inline-flex items-center justify-center size-8 rounded-full transition-colors ${
+                active
+                  ? 'bg-white text-primarycolor shadow-sm'
+                  : 'text-gray-500 hover:text-secondaryColor'
+              }`}
+            >
+              <i className={`icon icon-${option.iconName} text-sm`}></i>
+            </button>
+
+            <span
+              role="tooltip"
+              className="pointer-events-none absolute left-1/2 top-full z-30 mt-2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-secondaryColor px-2.5 py-1.5 text-left opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100"
+            >
+              <span className="block text-[11px] font-semibold leading-tight text-white">
+                {option.label}
+              </span>
+              {option.title && (
+                <span className="block text-[10px] leading-tight text-white/70 mt-0.5">
+                  {option.title}
+                </span>
+              )}
+            </span>
+          </span>
         );
       })}
     </div>

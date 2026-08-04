@@ -55,7 +55,9 @@ const VIEW_VALUES = ['table', 'card', 'calendar', 'analytics'] as const;
 const VIEW_STORAGE_KEY = 'assets.viewMode';
 
 const VIEW_OPTIONS: IViewOption<TAssetView>[] = [
-  { value: 'table', label: 'Table', iconName: 'three-cols', title: 'Compare assets column by column' },
+  // Rows, not columns: Manage Columns sits inches away in the same toolbar and owns the
+  // three-cols glyph, so sharing it made the two controls look like the same control.
+  { value: 'table', label: 'Table', iconName: 'menu', title: 'Compare assets column by column' },
   { value: 'card', label: 'Cards', iconName: 'modules', title: 'Browse assets one tile at a time' },
   { value: 'calendar', label: 'Calendar', iconName: 'calendar', title: 'What falls due, and when' },
   { value: 'analytics', label: 'Analytics', iconName: 'bar-chart', title: 'What this selection is made of' },
@@ -403,32 +405,30 @@ const AssetsPage = () => {
     </>
   );
 
+  const toolbarLeft = (
+    <>
+      <Button onClick={() => router.push('/assets/create')}>
+        <i className="icon icon-plus text-xs"></i>
+        <span>Register Asset</span>
+      </Button>
+      <ViewSwitcher
+        options={VIEW_OPTIONS}
+        value={view}
+        onChange={setView}
+        storageKey={VIEW_STORAGE_KEY}
+      />
+    </>
+  );
+
   return (
     <div className="px-4 mt-2">
       {/*
-       * One toolbar for every view. Filters, search and import/export used to live inside
-       * CustomTable's header, which would have made them table-only — the switcher exists
-       * precisely so the same selection can be looked at four ways.
+       * The same toolbar, placed twice. In Table view it is handed to CustomTable's own
+       * header so Manage Columns — which only means anything to a table — sits on the same
+       * row as everything else instead of on a line of its own underneath. Every other view
+       * renders it standalone, since there are no columns to manage there.
        */}
-      <div className="flex flex-wrap justify-between items-center gap-x-4 gap-y-2 w-full mb-3">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <Button onClick={() => router.push('/assets/create')}>
-            <i className="icon icon-plus text-xs"></i>
-            <span>Register Asset</span>
-          </Button>
-          <ViewSwitcher
-            options={VIEW_OPTIONS}
-            value={view}
-            onChange={setView}
-            storageKey={VIEW_STORAGE_KEY}
-          />
-        </div>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 md:gap-x-8">
-          {filterControls}
-        </div>
-      </div>
-
-      {view === 'table' && (
+      {view === 'table' ? (
         <CustomTable
           columns={columns}
           rows={rowData}
@@ -438,28 +438,39 @@ const AssetsPage = () => {
           }
           isLoading={loading}
           entityLabel="asset"
+          tableHeaderLeft={toolbarLeft}
+          tableHeaderRight={filterControls}
           updateFilters={updateFilters}
         />
-      )}
+      ) : (
+        <>
+          <div className="flex flex-wrap justify-between items-center gap-x-4 gap-y-2 w-full mb-3">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">{toolbarLeft}</div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 md:gap-x-8">
+              {filterControls}
+            </div>
+          </div>
 
-      {view === 'card' && (
-        <AssetCardView
-          assets={assets}
-          loading={loading}
-          actions={assetActions}
-          onOpen={(asset) => router.push(`/assets/${asset.id}`)}
-        />
-      )}
+          {view === 'card' && (
+            <AssetCardView
+              assets={assets}
+              loading={loading}
+              actions={assetActions}
+              onOpen={(asset) => router.push(`/assets/${asset.id}`)}
+            />
+          )}
 
-      {view === 'calendar' && (
-        <AssetCalendarView
-          filters={viewFilters}
-          onOpenAsset={(assetId) => router.push(`/assets/${assetId}`)}
-        />
-      )}
+          {view === 'calendar' && (
+            <AssetCalendarView
+              filters={viewFilters}
+              onOpenAsset={(assetId) => router.push(`/assets/${assetId}`)}
+            />
+          )}
 
-      {view === 'analytics' && (
-        <AssetAnalyticsView filters={viewFilters} filterSummary={filterSummary} />
+          {view === 'analytics' && (
+            <AssetAnalyticsView filters={viewFilters} filterSummary={filterSummary} />
+          )}
+        </>
       )}
 
       {/* Paging belongs to the views that page. The calendar is bounded by its window and
