@@ -123,7 +123,7 @@ export const ASSET_MENU_ITEMS: IMenuItem[] = [
     parentId: null,
     iconName: 'setting',
     iconSizeClass: 'text-[16px]',
-    label: 'Configuration',
+    label: 'Settings',
     url: '/configuration',
   },
 ];
