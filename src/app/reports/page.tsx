@@ -82,8 +82,14 @@ export default function ReportsPage() {
           fetchReportCatalogue(),
           fetchFiscalYears(),
         ]);
-        setCatalogue(catalogueResponse?.data ?? []);
+        const descriptors = catalogueResponse?.data ?? [];
+        setCatalogue(descriptors);
         setYears(yearResponse?.data ?? []);
+        // Land on the first report the catalogue offers — Asset Register, unless the
+        // caller's permissions hide it — so the page opens with a report on screen
+        // instead of a grid of buttons and nothing under it. Taking [0] rather than
+        // the literal code keeps that true for whatever the catalogue allows.
+        if (descriptors.length > 0) setSelected((prev) => prev ?? descriptors[0]);
       } catch {
         addToast.error('Could not load the report catalogue.');
       }
