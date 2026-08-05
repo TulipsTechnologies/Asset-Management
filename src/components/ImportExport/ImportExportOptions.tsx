@@ -11,6 +11,7 @@ import {
   downloadImportTemplate,
   importFile,
   previewImport,
+  ICellOverride,
   IImportResult,
   TExchangeEntity,
 } from '@/services/dataExchange.service';
@@ -79,6 +80,9 @@ const ImportExportOptions = ({
   /** True when the shown problems came from a CONFIRM that failed after a clean check —
    * the data drifted, and the right next step is re-checking, not editing the file. */
   const [drifted, setDrifted] = useState(false);
+  /** Inline corrections keyed "row|column". They ride BOTH the re-check and the import,
+   * so what is approved is always the same (file + fixes) pair. */
+  const [fixes, setFixes] = useState<Record<string, string>>({});
 
   const download = async (kind: 'template' | 'export') => {
     try {
@@ -110,14 +114,21 @@ const ImportExportOptions = ({
     setPreview(null);
     setResult(null);
     setDrifted(false);
+    setFixes({});
     await runPreview(snapshot, picked.name);
   };
 
-  const runPreview = async (blob: Blob, name: string) => {
+  const toOverrides = (source: Record<string, string>): ICellOverride[] =>
+    Object.entries(source).map(([key, value]) => {
+      const [row, ...column] = key.split('|');
+      return { row: Number(row), column: column.join('|'), value };
+    });
+
+  const runPreview = async (blob: Blob, name: string, withFixes?: Record<string, string>) => {
     setBusy(true);
     setDrifted(false);
     try {
-      const res = await previewImport(entity, blob, name);
+      const res = await previewImport(entity, blob, name, toOverrides(withFixes ?? fixes));
       if (res?.data) {
         setPreview(res.data);
         setResult(null);
@@ -135,7 +146,7 @@ const ImportExportOptions = ({
     if (!bytes) return;
     setBusy(true);
     try {
-      const res = await importFile(entity, bytes, fileName);
+      const res = await importFile(entity, bytes, fileName, toOverrides(fixes));
       if (res?.data) {
         if (res.data.imported) {
           setResult(res.data);
@@ -169,6 +180,7 @@ const ImportExportOptions = ({
     setPreview(null);
     setResult(null);
     setDrifted(false);
+    setFixes({});
   };
 
   const hasProblems = (preview?.problems.length ?? 0) > 0;
@@ -298,28 +310,67 @@ const ImportExportOptions = ({
               {hasProblems ? (
                 <>
                   <p className="text-sm font-medium text-red-700">
-                    {preview.problems.length} problem
-                    {preview.problems.length === 1 ? '' : 's'} block the import — nothing
-                    has been written:
+                    {preview.problems.length === 1
+                      ? '1 problem blocks the import'
+                      : `${preview.problems.length} problems block the import`}{' '}
+                    — nothing has been written. Fixable cells can be corrected right here:
                   </p>
-                  <div className="max-h-56 overflow-y-auto rounded-lg border border-red-100">
+                  <div className="max-h-72 overflow-y-auto rounded-lg border border-red-100">
                     <table className="w-full text-sm">
                       <thead className="bg-red-50 text-left">
                         <tr>
-                          <th className="px-3 py-2 w-16 font-medium text-red-800">Row</th>
+                          <th className="px-3 py-2 w-14 font-medium text-red-800">Row</th>
                           <th className="px-3 py-2 font-medium text-red-800">Problem</th>
+                          <th className="px-3 py-2 w-64 font-medium text-red-800">Fix</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {preview.problems.map((p, i) => (
-                          <tr key={i} className="border-t border-red-50">
-                            <td className="px-3 py-2 text-gray-500 tabular-nums">{p.row}</td>
-                            <td className="px-3 py-2 text-gray-700">{p.problem}</td>
-                          </tr>
-                        ))}
+                        {preview.problems.map((p, i) => {
+                          const fixKey = p.column ? `${p.row}|${p.column}` : null;
+                          return (
+                            <tr key={i} className="border-t border-red-50 align-top">
+                              <td className="px-3 py-2 text-gray-500 tabular-nums">{p.row}</td>
+                              <td className="px-3 py-2 text-gray-700">{p.problem}</td>
+                              <td className="px-3 py-2">
+                                {fixKey ? (
+                                  <div>
+                                    <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-0.5">
+                                      {p.column}
+                                    </p>
+                                    <input
+                                      type="text"
+                                      // The correction replaces the cell for BOTH the
+                                      // re-check and the import — the file itself is
+                                      // never modified.
+                                      defaultValue={fixes[fixKey] ?? p.currentValue ?? ''}
+                                      onChange={(e) =>
+                                        setFixes((current) => ({
+                                          ...current,
+                                          [fixKey]: e.target.value,
+                                        }))
+                                      }
+                                      className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm focus:border-primarycolor focus:outline-none"
+                                    />
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-gray-400">
+                                    Not a single-cell fix — edit the file.
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
+                  {Object.keys(fixes).length > 0 && (
+                    <p className="text-xs text-gray-500">
+                      {Object.keys(fixes).length} fix
+                      {Object.keys(fixes).length === 1 ? '' : 'es'} typed — they apply to
+                      this upload only; your file on disk is not changed.
+                    </p>
+                  )}
                 </>
               ) : (
                 <>
@@ -453,6 +504,18 @@ const ImportExportOptions = ({
             {preview && drifted && (
               <Button onClick={() => bytes && runPreview(bytes, fileName)} disabled={busy}>
                 {busy ? 'Checking…' : 'Check again'}
+              </Button>
+            )}
+            {preview && hasProblems && !drifted && (
+              <Button
+                onClick={() => bytes && runPreview(bytes, fileName)}
+                disabled={busy || Object.keys(fixes).length === 0}
+              >
+                {busy
+                  ? 'Checking…'
+                  : Object.keys(fixes).length > 0
+                    ? `Check again with ${Object.keys(fixes).length} fix${Object.keys(fixes).length === 1 ? '' : 'es'}`
+                    : 'Type a fix to re-check'}
               </Button>
             )}
             {preview && !hasProblems && !drifted && preview.wouldCreate > 0 && (

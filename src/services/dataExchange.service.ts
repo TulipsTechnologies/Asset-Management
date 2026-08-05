@@ -12,6 +12,17 @@ export interface IImportProblem {
   /** The row number as Excel shows it (header is row 1). */
   row: number;
   problem: string;
+  /** When one cell can fix the problem, the column it lives in — offer an inline fix. */
+  column?: string | null;
+  /** The offending value as read from the sheet. */
+  currentValue?: string | null;
+}
+
+/** One corrected cell, typed in the preview instead of round-tripping through Excel. */
+export interface ICellOverride {
+  row: number;
+  column: string;
+  value: string;
 }
 
 /** One kind of side entity the import would create, with the FULL name list. */
@@ -67,9 +78,13 @@ export const downloadExport = (entity: TExchangeEntity): Promise<Response> =>
  * check and the confirm — so the dialog snapshots it once and both requests send
  * the identical bytes: what was previewed is what imports, by construction.
  */
-const asForm = (bytes: Blob, name: string) => {
+const asForm = (bytes: Blob, name: string, overrides?: ICellOverride[]) => {
   const formData = new FormData();
   formData.append('file', bytes, name);
+  // Fixes ride the same request as the bytes they correct — check and import always
+  // see the identical (file + fixes) pair.
+  if (overrides && overrides.length > 0)
+    formData.append('overrides', JSON.stringify(overrides));
   return formData;
 };
 
@@ -77,12 +92,13 @@ const asForm = (bytes: Blob, name: string) => {
 export const importFile = (
   entity: TExchangeEntity,
   bytes: Blob,
-  name: string
+  name: string,
+  overrides?: ICellOverride[]
 ): Promise<IResponse<IImportResult>> =>
   requestApi({
     apiEndpoint: `/DataExchange/import/${entity}`,
     method: 'POST',
-    body: asForm(bytes, name),
+    body: asForm(bytes, name, overrides),
     completeData: true,
   });
 
@@ -90,11 +106,12 @@ export const importFile = (
 export const previewImport = (
   entity: TExchangeEntity,
   bytes: Blob,
-  name: string
+  name: string,
+  overrides?: ICellOverride[]
 ): Promise<IResponse<IImportResult>> =>
   requestApi({
     apiEndpoint: `/DataExchange/import/${entity}/preview`,
     method: 'POST',
-    body: asForm(bytes, name),
+    body: asForm(bytes, name, overrides),
     completeData: true,
   });
