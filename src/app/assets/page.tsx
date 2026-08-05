@@ -245,14 +245,12 @@ const AssetsPage = () => {
   const assetActions = useMemo<IAssetAction[]>(
     () => [
       {
-        label: 'View',
-        iconName: 'eye',
-        onClick: (asset) => router.push(`/assets/${asset.id}`),
-      },
-      {
-        // Issue it straight from the row it is on. The gate here is only what the list
-        // knows — the assign endpoint still has the last word on operational holds,
-        // active transfers, pending returns and approved disposals.
+        // First in the menu, ahead of View. On a row that can be issued, issuing it is the
+        // reason the menu was opened — View and Edit are what you do when it cannot be.
+        //
+        // Only what the list knows is gated here; the assign endpoint still has the last
+        // word on operational holds, active transfers, pending returns and approved
+        // disposals.
         label: 'Assign',
         iconName: 'user-check',
         onClick: (asset) =>
@@ -265,6 +263,11 @@ const AssetsPage = () => {
           asset.lifecycleStatus === LifecycleStatusEnum.Active &&
           (asset.custodyStatus === CustodyStatusEnum.Unassigned ||
             asset.custodyStatus === CustodyStatusEnum.Reserved),
+      },
+      {
+        label: 'View',
+        iconName: 'eye',
+        onClick: (asset) => router.push(`/assets/${asset.id}`),
       },
       {
         label: 'Edit',
