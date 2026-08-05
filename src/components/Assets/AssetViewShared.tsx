@@ -21,6 +21,10 @@ export const money = (value?: number | null, currency?: string | null) =>
       })}${currency ? ` ${currency}` : ''}`
     : '—';
 
+/** Register dates carry no time of day — show the date the operator entered, nothing more. */
+export const shortDate = (value?: string | null) =>
+  value ? new Date(value).toLocaleDateString() : '—';
+
 /** Compact form for dense surfaces — analytics tiles and chart labels. */
 export const compactMoney = (value: number, currency?: string | null) =>
   `${new Intl.NumberFormat(undefined, {

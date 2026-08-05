@@ -96,6 +96,13 @@ export type CustomTableProps = {
    * empty, the bar still appears on selection but only offers Clear Selection.
    */
   bulkActions?: TBulkAction[];
+  /**
+   * Bump this whenever the page changes the ORDER its columns ship in. Saved layouts
+   * written at a lower version keep their widths and visibility but follow the new
+   * code order, so a default change actually reaches operators who already have a
+   * saved layout. Leave unset for tables whose default order has never changed.
+   */
+  layoutVersion?: number;
 };
 export interface ICacheData {
   key: string;

@@ -44,6 +44,7 @@ const CustomTable = ({
   onSelectionChange,
   entityLabel,
   bulkActions,
+  layoutVersion = 0,
 }: CustomTableProps) => {
   const [columns, setColumns] = useState<TTableColumn[]>(
     initialColumns.map((col) => ({ ...col, visible: col.visible ?? true })),
@@ -139,20 +140,47 @@ const CustomTable = ({
     setRows(initialRows);
   }, [initialRows]);
 
+  // Saved layouts are either the legacy bare array or the versioned envelope. A layout
+  // written before the page bumped layoutVersion has an order that predates the current
+  // code defaults, which is the one thing it must not keep dictating.
+  const readLayout = (layoutJson: string): { version: number; entries: ICacheData[] } | null => {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(layoutJson);
+    } catch {
+      return null;
+    }
+    if (Array.isArray(parsed)) return { version: 0, entries: parsed as ICacheData[] };
+    const envelope = parsed as { v?: number; columns?: ICacheData[] };
+    if (!Array.isArray(envelope?.columns)) return null;
+    return { version: envelope.v ?? 0, entries: envelope.columns };
+  };
+
   // Merge a saved layout onto the CURRENT column set: saved order/width/locked/visible
   // win for matching keys, columns added since the layout was written are inserted at
   // their code-defined position, and saved keys that no longer exist are dropped.
+  //
+  // The exception is a stale layout version: the page has since changed which order it
+  // means to ship, so the code order wins and only the operator's widths and visibility
+  // carry over. Their next reorder saves at the current version and takes over again.
   const applyLayout = (layoutJson: string) => {
-    let widthDistributions: ICacheData[];
-    try {
-      widthDistributions = JSON.parse(layoutJson);
-    } catch {
-      return;
-    }
-    if (!Array.isArray(widthDistributions)) return;
+    const layout = readLayout(layoutJson);
+    if (!layout) return;
+    const { version, entries: widthDistributions } = layout;
+    const orderIsStale = version < layoutVersion;
 
     setColumns((prevColumns) => {
-      const cachedKeys = new Set(widthDistributions.map((i) => i.key));
+      const savedByKey = new Map(widthDistributions.map((i) => [i.key, i]));
+
+      if (orderIsStale) {
+        return prevColumns.map((col) => {
+          const saved = savedByKey.get(col.key);
+          return saved
+            ? { ...col, width: saved.width, locked: saved.locked, visible: saved.visible }
+            : col;
+        });
+      }
+
       const merged = widthDistributions
         .filter((item) => prevColumns.some((col) => col.key === item.key))
         .map((item) => {
@@ -166,7 +194,7 @@ const CustomTable = ({
         }) as TTableColumn[];
 
       prevColumns.forEach((col, index) => {
-        if (!cachedKeys.has(col.key)) {
+        if (!savedByKey.has(col.key)) {
           merged.splice(Math.min(index, merged.length), 0, col);
         }
       });
@@ -221,7 +249,7 @@ const CustomTable = ({
         });
       });
 
-      const layoutJson = JSON.stringify(cacheInfo);
+      const layoutJson = JSON.stringify({ v: layoutVersion, columns: cacheInfo });
 
       // Local cache tracks the PERSONAL view only — a company edit must not
       // overwrite the operator's own cached layout.

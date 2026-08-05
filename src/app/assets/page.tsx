@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/components/Providers/ToastProvider';
 import Button from '@/components/UI/Button';
@@ -11,6 +11,7 @@ import {
   TTableColumn,
 } from '@/components/CustomTable/CustomTableInterface';
 import ConfirmationModal from '@/components/UI/ConfirmationModel';
+import Modal from '@/components/UI/Modal';
 import Select from '@/components/UI/Select';
 import FilterPanel from '@/components/UI/FilterPanel';
 import SearchBox from '@/components/SearchBox';
@@ -26,11 +27,19 @@ import {
   StatusBadge,
   VAT_RATE,
   money,
+  shortDate,
 } from '@/components/Assets/AssetViewShared';
 import { IAssetFilter, IAssetListItem } from '@/interface/IAsset';
 import { IAssetCategory } from '@/interface/IAssetCategory';
 import { IEmployee } from '@/interface/IEmployee';
-import { deleteAsset, fetchAssets } from '@/services/asset.service';
+import {
+  activateAsset,
+  bulkActivateAssets,
+  BulkActivateOutcomeEnum,
+  deleteAsset,
+  fetchAssets,
+  IBulkActivateResult,
+} from '@/services/asset.service';
 import { fetchAssetCategories } from '@/services/assetCategory.service';
 import { fetchEmployees } from '@/services/employee.service';
 import { unwrapPaged } from '@/utils/serviceUtils';
@@ -83,6 +92,7 @@ const AssetsPage = () => {
   const [categories, setCategories] = useState<IAssetCategory[]>([]);
   const [employees, setEmployees] = useState<IEmployee[]>([]);
   const [assigning, setAssigning] = useState<IAssignTarget | null>(null);
+  const [bulkActivateResult, setBulkActivateResult] = useState<IBulkActivateResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [rowCount, setRowCount] = useState(0);
   const [pageCount, setPageCount] = useState(0);
@@ -97,6 +107,10 @@ const AssetsPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 400);
   const [showFilters, setShowFilters] = useState(false);
+  const loadTokenRef = useRef(0);
+  // Ids with an activation in flight — the row menu stays open after a click, so without
+  // this a second click would re-send the same, now-spent RowVersion and read as a 409.
+  const activatingRef = useRef<Set<string>>(new Set());
 
   // Restored after mount, never during render: the server has no localStorage, and
   // painting the remembered view on the first client pass would hydrate mismatched.
@@ -106,10 +120,11 @@ const AssetsPage = () => {
   }, []);
 
   const columns: TTableColumn[] = [
+    { key: 'purchaseDate', label: 'Purchase Date', width: 120, type: 'date', name: 'purchaseDate' },
     { key: 'assetCode', label: 'Code', width: 140, type: 'string', name: 'assetCode' },
     { key: 'assetName', label: 'Asset Name', width: 190, type: 'string', name: 'assetName' },
-    { key: 'netPrice', label: 'Net Price', width: 120, name: 'netPrice' },
     { key: 'units', label: 'Units', width: 60, name: 'units' },
+    { key: 'netPrice', label: 'Net Price', width: 120, name: 'netPrice' },
     { key: 'totalPrice', label: `Total (incl. ${VAT_RATE * 100}% VAT)`, width: 155, name: 'totalPrice' },
     { key: 'accumulatedDepreciation', label: 'Depreciation', width: 120, name: 'accumulatedDepreciation' },
     { key: 'netBookValue', label: 'Net Value', width: 120, name: 'netBookValue' },
@@ -130,9 +145,14 @@ const AssetsPage = () => {
   ];
 
   const loadAssets = useCallback(async () => {
+    // Generation token: an action can fire a refresh while a page or filter change is
+    // still in flight, and the register must end up showing the LATEST request's rows,
+    // never whichever response happened to land last.
+    const token = ++loadTokenRef.current;
     setLoading(true);
     try {
       const res = await fetchAssets(filters);
+      if (token !== loadTokenRef.current) return;
       if (res?.success) {
         const paged = unwrapPaged(res);
         setAssets(paged.items);
@@ -142,10 +162,11 @@ const AssetsPage = () => {
         addToast.error(res?.message || 'Failed to fetch assets');
       }
     } catch (error) {
+      if (token !== loadTokenRef.current) return;
       console.error('Error fetching assets:', error);
       addToast.error('An error occurred while fetching assets');
     } finally {
-      setLoading(false);
+      if (token === loadTokenRef.current) setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
@@ -237,10 +258,35 @@ const AssetsPage = () => {
     return parts.length ? parts.join(' · ') : 'every asset in the register';
   }, [filters, categories]);
 
+  const handleActivate = useCallback(
+    async (asset: IAssetListItem) => {
+      // The menu does not close on click, so a second click would otherwise re-send a
+      // token the first call has already spent and report the success as a conflict.
+      if (activatingRef.current.has(asset.id)) return;
+      activatingRef.current.add(asset.id);
+      try {
+        const res = await activateAsset(asset.id, asset.rowVersion ?? '');
+        if (res?.success) addToast.success(res.message || `Asset '${asset.assetCode}' is now Active.`);
+        else addToast.error(res?.message || 'The asset could not be activated.');
+      } catch {
+        addToast.error('The asset could not be activated.');
+      } finally {
+        activatingRef.current.delete(asset.id);
+        loadAssets();
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [loadAssets]
+  );
+
   /**
    * Declared once, rendered by the table cell and by every card. The lifecycle rule lives
    * here rather than in each view's markup, so a Delete hidden in one place cannot
    * reappear in another.
+   *
+   * Kept referentially stable across unrelated re-renders: the rows are built from it, and
+   * a new rows array resets the table's selection — which would empty a bulk selection the
+   * moment the operator opened the filter panel.
    */
   const assetActions = useMemo<IAssetAction[]>(
     () => [
@@ -265,6 +311,16 @@ const AssetsPage = () => {
             asset.custodyStatus === CustodyStatusEnum.Reserved),
       },
       {
+        // Lifecycle is a workflow, not an edit: this calls the activate endpoint with the
+        // row's own token, so a stale row fails alone with the standard 409.
+        label: 'Activate',
+        iconName: 'zap',
+        onClick: (asset) => handleActivate(asset),
+        isAvailable: (asset) =>
+          asset.lifecycleStatus === LifecycleStatusEnum.Draft ||
+          asset.lifecycleStatus === LifecycleStatusEnum.Retired,
+      },
+      {
         label: 'View',
         iconName: 'eye',
         onClick: (asset) => router.push(`/assets/${asset.id}`),
@@ -283,19 +339,20 @@ const AssetsPage = () => {
         isAvailable: (asset) => asset.lifecycleStatus === LifecycleStatusEnum.Draft,
       },
     ],
-    [router]
+    [router, handleActivate]
   );
 
-  const rowData = assets.map((asset) => ({
+  const rowData = useMemo(() => assets.map((asset) => ({
     id: asset.id,
+    purchaseDate: shortDate(asset.purchaseDate),
     assetCode: (
       <span className="font-medium text-primarycolor">{asset.assetCode}</span>
     ),
     assetName: asset.assetName,
-    netPrice: money(asset.purchaseCost, asset.currencyId),
     // Item-level register: every row IS one unit. Registering with Quantity > 1
     // creates that many rows, each independently assignable.
     units: 1,
+    netPrice: money(asset.purchaseCost, asset.currencyId),
     totalPrice:
       asset.purchaseCost != null
         ? money(
@@ -326,7 +383,7 @@ const AssetsPage = () => {
     actions: (
       <AssetActionsMenu asset={asset} actions={assetActions} className="bg-white px-4 py-2 -m-2" />
     ),
-  }));
+  })), [assets, assetActions]);
 
   const handleDelete = async () => {
     if (!deleting) return;
@@ -340,6 +397,35 @@ const AssetsPage = () => {
     } finally {
       setDeletingBusy(false);
       setDeleting(null);
+      loadAssets();
+    }
+  };
+
+  /**
+   * Selected ids come from the table's selection bar; the rowVersions come from the rows
+   * already loaded — activation is an edit of a row the operator is looking at, so each
+   * item carries its own token and a stale one fails only its own asset.
+   */
+  const handleBulkActivate = async (selectedIds: (string | number)[]) => {
+    const items = selectedIds
+      .map((id) => assets.find((a) => a.id === id))
+      .filter((a): a is IAssetListItem => !!a)
+      .map((a) => ({ assetId: a.id, rowVersion: a.rowVersion ?? null }));
+    if (items.length === 0) return;
+
+    try {
+      const res = await bulkActivateAssets(items);
+      if (res?.data) {
+        setBulkActivateResult(res.data);
+        if (res.data.activated > 0) addToast.success(res.message || 'Activation complete.');
+        else if (res.data.failed > 0) addToast.error(res.message || 'Nothing was activated.');
+        else addToast.success(res.message || 'Already active.');
+      } else {
+        addToast.error(res?.message || 'The activation failed.');
+      }
+    } catch {
+      addToast.error('The activation failed.');
+    } finally {
       loadAssets();
     }
   };
@@ -465,6 +551,9 @@ const AssetsPage = () => {
           columns={columns}
           rows={rowData}
           tableName="Assets"
+          // v1: Purchase Date leads the row and Units precedes Net Price. Layouts saved
+          // before this keep their widths but adopt the new order.
+          layoutVersion={1}
           serialOffset={
             ((filters.pageNumber ?? 1) - 1) * (filters.pageSize ?? DEFAULT_PAGE_SIZE)
           }
@@ -473,6 +562,12 @@ const AssetsPage = () => {
           tableHeaderLeft={toolbarLeft}
           tableHeaderRight={filterControls}
           updateFilters={updateFilters}
+          bulkActions={[
+            {
+              label: 'Activate',
+              onClick: handleBulkActivate,
+            },
+          ]}
         />
       ) : (
         <>
@@ -526,6 +621,73 @@ const AssetsPage = () => {
         employees={employees}
         onAssigned={loadAssets}
       />
+
+      {/* Bulk activation report — same honesty rules as bulk assign: failures first,
+          a re-submit reads as already-active, and the counts are the headline. */}
+      <Modal
+        isOpen={!!bulkActivateResult}
+        onClose={() => setBulkActivateResult(null)}
+        size="lg"
+      >
+        {bulkActivateResult && (
+          <div className="p-5">
+            <h2 className="text-lg font-semibold text-secondaryColor mb-4">
+              Activation Report
+            </h2>
+            <div className="text-left">
+              <div className="grid grid-cols-3 gap-3 mb-3">
+                <div className="rounded-xl bg-green-50 px-3 py-2.5 text-center">
+                  <p className="text-2xl font-bold leading-none text-green-700 tabular-nums">
+                    {bulkActivateResult.activated}
+                  </p>
+                  <p className="text-[11px] text-gray-500 mt-1">Activated</p>
+                </div>
+                <div className="rounded-xl bg-sky-50 px-3 py-2.5 text-center">
+                  <p className="text-2xl font-bold leading-none text-sky-700 tabular-nums">
+                    {bulkActivateResult.alreadyActive}
+                  </p>
+                  <p className="text-[11px] text-gray-500 mt-1">Already active</p>
+                </div>
+                <div
+                  className={`rounded-xl px-3 py-2.5 text-center ${
+                    bulkActivateResult.failed > 0 ? 'bg-amber-50' : 'bg-gray-50'
+                  }`}
+                >
+                  <p
+                    className={`text-2xl font-bold leading-none tabular-nums ${
+                      bulkActivateResult.failed > 0 ? 'text-amber-700' : 'text-gray-300'
+                    }`}
+                  >
+                    {bulkActivateResult.failed}
+                  </p>
+                  <p className="text-[11px] text-gray-500 mt-1">Not activated</p>
+                </div>
+              </div>
+              {bulkActivateResult.failed > 0 && (
+                <ul className="max-h-48 overflow-y-auto space-y-1.5">
+                  {bulkActivateResult.outcomes
+                    .filter(
+                      (o) =>
+                        o.outcome !== BulkActivateOutcomeEnum.Activated &&
+                        o.outcome !== BulkActivateOutcomeEnum.AlreadyActive
+                    )
+                    .map((o) => (
+                      <li
+                        key={o.assetId}
+                        className="rounded-lg border border-amber-100 bg-amber-50/60 px-3 py-2 text-xs text-gray-700"
+                      >
+                        <span className="font-semibold">{o.assetCode || '—'}</span>: {o.message}
+                      </li>
+                    ))}
+                </ul>
+              )}
+            </div>
+            <div className="flex justify-end mt-5">
+              <Button onClick={() => setBulkActivateResult(null)}>Done</Button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       <ConfirmationModal
         isOpen={!!deleting}

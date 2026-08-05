@@ -170,3 +170,42 @@ export const deleteAsset = (
     contentType: 'application/json',
     completeData: true,
   });
+
+/** Mirrors BulkActivateOutcomeEnum on the server. */
+export enum BulkActivateOutcomeEnum {
+  Activated = 1,
+  AlreadyActive = 2,
+  Blocked = 3,
+  NotFound = 4,
+  Conflict = 5,
+}
+
+export interface IBulkActivateOutcome {
+  assetId: string;
+  assetCode?: string | null;
+  outcome: BulkActivateOutcomeEnum;
+  message: string;
+}
+
+export interface IBulkActivateResult {
+  requested: number;
+  activated: number;
+  alreadyActive: number;
+  failed: number;
+  outcomes: IBulkActivateOutcome[];
+}
+
+/**
+ * Activate many at once. Always 200 with a per-asset report — `success` is false when
+ * anything was refused, so read `data.outcomes`, not the envelope.
+ */
+export const bulkActivateAssets = (
+  items: { assetId: string; rowVersion: string | null }[]
+): Promise<IResponse<IBulkActivateResult>> =>
+  requestApi({
+    apiEndpoint: '/Assets/bulk-activate',
+    method: 'POST',
+    body: JSON.stringify({ items }),
+    contentType: 'application/json',
+    completeData: true,
+  });
