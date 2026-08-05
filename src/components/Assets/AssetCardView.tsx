@@ -89,6 +89,12 @@ const AssetCardView = ({ assets, loading, actions, onOpen }: IProps) => {
               <i className="icon icon-marker text-[10px] mr-1"></i>
               {asset.assetLocationName || 'No location recorded'}
             </p>
+            {/* The table names the custodian; the card says the same thing rather than
+                leaving "who has it" to the custody badge alone. */}
+            <p className="text-xs text-gray-500 truncate mt-0.5">
+              <i className="icon icon-user-check text-[10px] mr-1"></i>
+              {asset.currentCustodianEmployeeName || 'No custodian'}
+            </p>
 
             <div className="flex flex-wrap gap-1.5 mt-3">
               <StatusBadge

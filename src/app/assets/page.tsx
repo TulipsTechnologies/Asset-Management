@@ -123,6 +123,7 @@ const AssetsPage = () => {
     { key: 'purchaseDate', label: 'Purchase Date', width: 120, type: 'date', name: 'purchaseDate' },
     { key: 'assetCode', label: 'Code', width: 140, type: 'string', name: 'assetCode' },
     { key: 'assetName', label: 'Asset Name', width: 190, type: 'string', name: 'assetName' },
+    { key: 'currentCustodianEmployeeName', label: 'Custodian', width: 150, type: 'string', name: 'currentCustodianEmployeeName' },
     { key: 'units', label: 'Units', width: 60, name: 'units' },
     { key: 'netPrice', label: 'Net Price', width: 120, name: 'netPrice' },
     { key: 'totalPrice', label: `Total (incl. ${VAT_RATE * 100}% VAT)`, width: 155, name: 'totalPrice' },
@@ -349,6 +350,9 @@ const AssetsPage = () => {
       <span className="font-medium text-primarycolor">{asset.assetCode}</span>
     ),
     assetName: asset.assetName,
+    // Named only while someone actually holds it: an unassigned asset has no custodian,
+    // and printing the last one would read as current custody.
+    currentCustodianEmployeeName: asset.currentCustodianEmployeeName || '—',
     // Item-level register: every row IS one unit. Registering with Quantity > 1
     // creates that many rows, each independently assignable.
     units: 1,
@@ -551,9 +555,10 @@ const AssetsPage = () => {
           columns={columns}
           rows={rowData}
           tableName="Assets"
-          // v1: Purchase Date leads the row and Units precedes Net Price. Layouts saved
-          // before this keep their widths but adopt the new order.
-          layoutVersion={1}
+          // v1: Purchase Date leads the row and Units precedes Net Price.
+          // v2: Custodian sits next to Asset Name. Layouts saved before this keep their
+          // widths but adopt the new order.
+          layoutVersion={2}
           serialOffset={
             ((filters.pageNumber ?? 1) - 1) * (filters.pageSize ?? DEFAULT_PAGE_SIZE)
           }

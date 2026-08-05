@@ -29,6 +29,8 @@ export interface IAssetListItem {
   conditionName: string;
   assetLocationName?: string | null;
   currentCustodianEmployeeId?: string | null;
+  /** Who holds the asset right now — null while it is unassigned. */
+  currentCustodianEmployeeName?: string | null;
   /** From the asset's book — null until capitalized. */
   accumulatedDepreciation?: number | null;
   /** Book cost minus accumulated depreciation — null until capitalized. */
