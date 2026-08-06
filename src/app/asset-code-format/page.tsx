@@ -1,5 +1,7 @@
 'use client';
 
+import BackButton from '@/components/UI/BackButton';
+
 import { useCallback, useEffect, useState } from 'react';
 import { useToast } from '@/components/Providers/ToastProvider';
 import Button from '@/components/UI/Button';
@@ -172,6 +174,7 @@ const AssetCodeFormatPage = () => {
 
   return (
     <div className="px-4 sm:px-6 py-6 max-w-3xl">
+      <BackButton className="mb-3" />
       <h1 className="text-xl font-semibold text-secondaryColor">
         Asset Code Format
       </h1>

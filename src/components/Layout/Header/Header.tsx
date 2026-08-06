@@ -1,12 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
-import {
-  INavTarget,
-  LAST_HUB_STORAGE_KEY,
-  resolveBackTarget,
-} from '@/utils/navigation';
+import { useRouter } from 'next/navigation';
 import { useDashbordCtx } from '../DashboardLayout/Contexts/DashboardContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { getInitials } from '@/utils/helpers';
@@ -24,18 +19,7 @@ const Header = () => {
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement | null>(null);
   const router = useRouter();
-  const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState(0);
-
-  /**
-   * Resolved after mount: the remembered hub lives in sessionStorage, and reading it while
-   * rendering on the server would hydrate to a different answer than the browser's.
-   */
-  const [backTarget, setBackTarget] = useState<INavTarget | null>(null);
-  useEffect(() => {
-    const lastHub = sessionStorage.getItem(LAST_HUB_STORAGE_KEY);
-    setBackTarget(resolveBackTarget(pathname ?? '', lastHub));
-  }, [pathname]);
 
   // One-shot unread count from the notification inbox (no polling).
   const appUserId = user?.userId ? String(user.userId) : '';
@@ -89,22 +73,6 @@ const Header = () => {
           Asset Management
         </span>
 
-        {/* One step back up the menu that led here: a detail page returns to its list, a
-            list returns to the hub that offered it. Absent at the top level. */}
-        {backTarget && (
-          <button
-            type="button"
-            onClick={() => router.push(backTarget.url)}
-            title={`Back to ${backTarget.label}`}
-            className="ml-1 sm:ml-2 flex shrink-0 items-center gap-1 rounded-full border border-gray-200 py-1 pl-2 pr-3 text-xs text-gray-600 transition-colors hover:border-primarycolor/40 hover:text-primarycolor"
-          >
-            <i className="icon icon-left text-[10px]" />
-            <span className="hidden sm:inline max-w-[160px] truncate">
-              {backTarget.label}
-            </span>
-            <span className="sm:hidden">Back</span>
-          </button>
-        )}
       </div>
 
       <div className="flex items-center gap-1 sm:gap-2">

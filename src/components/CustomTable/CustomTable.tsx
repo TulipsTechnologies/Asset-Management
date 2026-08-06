@@ -13,6 +13,7 @@ import { sortDate, sortNumber, sortString } from './utils';
 import SelectionBar from './SelectionBar';
 import Tooltip from '../UI/Tooltip';
 import Drawer from '../UI/Drawer';
+import BackButton from '../UI/BackButton';
 import { LoadingSvg } from '@tulipstechnologies/common';
 
 const SquareCheckbox = dynamic(() => import('@/components/UI/SquareCheckBox'), {
@@ -654,6 +655,10 @@ const CustomTable = ({
 
       <div className="flex flex-wrap justify-between items-center gap-x-4 gap-y-2 w-full mb-3">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          {/* Leads the toolbar on every list, so the way back travels with the page rather
+              than with the app header — which the host supplies once this module is mounted
+              inside TulipsHRM. Renders nothing on a top-level page. */}
+          <BackButton />
           {tableHeaderLeft}
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 md:gap-x-8">

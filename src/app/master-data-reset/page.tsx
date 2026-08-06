@@ -1,5 +1,7 @@
 'use client';
 
+import BackButton from '@/components/UI/BackButton';
+
 import { useCallback, useEffect, useState } from 'react';
 import { useToast } from '@/components/Providers/ToastProvider';
 import Button from '@/components/UI/Button';
@@ -101,6 +103,7 @@ const MasterDataResetPage = () => {
 
   return (
     <div className="px-4 sm:px-6 py-6 max-w-4xl">
+      <BackButton className="mb-3" />
       <h1 className="text-xl font-semibold text-secondaryColor">Master Data Reset</h1>
       <p className="text-sm text-gray-500 mt-1">
         Clear a pilot or demo register so the real one starts clean, or load a demo set

@@ -1,5 +1,7 @@
 'use client';
 
+import BackButton from '@/components/UI/BackButton';
+
 import { useCallback, useEffect, useState } from 'react';
 import { useToast } from '@/components/Providers/ToastProvider';
 import Button from '@/components/UI/Button';
@@ -317,6 +319,7 @@ export default function DepreciationConfigurationPage() {
 
   return (
     <div className="p-4 max-w-5xl">
+      <BackButton className="mb-3" />
       <h1 className="mb-1 text-xl font-semibold text-gray-800">Depreciation Settings</h1>
       <p className="mb-5 text-sm text-gray-500">
         The fiscal calendar, capitalization policy and GL account mappings that depreciation
