@@ -556,3 +556,195 @@ input[type="number"]::-webkit-outer-spin-button {
 .no-spinner[type="number"] {
   -moz-appearance: textfield;
 }
+
+/* ------------------------------------------------------------------ printing
+   A printed report is its own document, not a screenshot of the app. While a
+   print is in flight the schedule mounts #schedule-print-root into <body>; this
+   hides every other top-level node so the paper carries the report alone, and
+   the browser supplies page numbers and the date in the page margins. */
+.print-sheet {
+  display: none;
+}
+
+@media print {
+  /* SCOPED to the class the schedule dialog puts on <body> while it is open. Unscoped,
+     this hid every body child on every route and printed the rest of the app blank. */
+  body.schedule-print-active > *:not(#schedule-print-root) {
+    display: none !important;
+  }
+
+  /* A NAMED page, claimed only by the schedule sheet. The app-wide print block above
+     already declares `@page { margin: … !important }`; overriding the anonymous page here
+     would have re-margined every other printable view, and a plain (non-important) rule
+     would simply have lost to it. */
+  @page schedule {
+    size: A4 portrait;
+    margin: 14mm 12mm;
+  }
+
+  .print-sheet {
+    page: schedule;
+  }
+
+  html,
+  body {
+    background: #fff;
+  }
+
+  .print-sheet {
+    display: block;
+    color: #111;
+    font-size: 10pt;
+    line-height: 1.35;
+  }
+
+  .print-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 2px solid #111;
+    padding-bottom: 6pt;
+    margin-bottom: 10pt;
+  }
+
+  .print-company {
+    font-size: 15pt;
+    font-weight: 700;
+    margin: 0;
+  }
+
+  .print-title {
+    font-size: 11pt;
+    margin: 2pt 0 0;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #444;
+  }
+
+  .print-meta {
+    text-align: right;
+    font-size: 8.5pt;
+    color: #444;
+  }
+
+  .print-block {
+    margin-bottom: 9pt;
+    break-inside: avoid;
+  }
+
+  .print-section-title {
+    font-size: 8.5pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #555;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 2pt;
+    margin: 0 0 5pt;
+  }
+
+  .print-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4pt 12pt;
+  }
+
+  .print-grid-figures {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .print-field-label {
+    display: block;
+    font-size: 7.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #777;
+  }
+
+  .print-field-value {
+    display: block;
+    font-size: 10pt;
+    font-weight: 600;
+  }
+
+  .print-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9pt;
+  }
+
+  .print-table th {
+    text-align: left;
+    font-size: 7.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1.5px solid #111;
+    padding: 3pt 4pt;
+  }
+
+  /* Repeat the column headings on every page of a long schedule. */
+  .print-table thead {
+    display: table-header-group;
+  }
+
+  .print-table tbody tr {
+    break-inside: avoid;
+  }
+
+  .print-table td {
+    padding: 2.5pt 4pt;
+    border-bottom: 0.5px solid #e5e5e5;
+  }
+
+  .print-table .right {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .print-table .indent {
+    padding-left: 14pt;
+    color: #444;
+  }
+
+  .print-subhead td {
+    font-size: 7.5pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #555;
+    background: #f2f2f2;
+    padding-top: 5pt;
+  }
+
+  .print-opening td {
+    background: #f7f7f7;
+    font-weight: 600;
+  }
+
+  .print-month td {
+    font-size: 8.5pt;
+    color: #444;
+  }
+
+  .print-table tfoot td {
+    border-top: 1.5px solid #111;
+    border-bottom: none;
+    font-weight: 700;
+    padding-top: 4pt;
+  }
+
+  .print-note {
+    font-size: 8pt;
+    color: #555;
+    font-style: italic;
+    margin-top: 6pt;
+  }
+
+  .print-footer {
+    margin-top: 10pt;
+    padding-top: 4pt;
+    border-top: 0.5px solid #ccc;
+    font-size: 7.5pt;
+    color: #777;
+  }
+}

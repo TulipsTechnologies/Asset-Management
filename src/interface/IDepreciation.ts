@@ -34,6 +34,19 @@ export interface IAssetBook {
   depreciableBase: number;
   /** Once true the basis is frozen — edits are refused, revision is the way forward. */
   hasPostedDepreciation: boolean;
+  /**
+   * How the opening position arrived, derived by the server: 'SystemCalculated' (no opening
+   * balance — the register computed every historical fiscal year, so those years are real
+   * and can be listed), 'ManuallyEntered' (a human typed it at capitalize) or 'Imported'
+   * (the Opening Balance Import wrote it). The last two mean the years behind the balance
+   * are unknown and must not be reconstructed.
+   */
+  openingBalanceOrigin?: 'SystemCalculated' | 'ManuallyEntered' | 'Imported' | null;
+  /** Set only on an imported book. */
+  migrationBatchId?: string | null;
+  cutoverDate?: string | null;
+  openingNetBookValue?: number | null;
+  remainingUsefulLifeMonths?: number | null;
   notes?: string | null;
   createdOn: string;
   rowVersion: string;

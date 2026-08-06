@@ -17,6 +17,21 @@ export async function getAuthToken() {
   return Cookies.get('AuthToken');
 }
 
+/** The signed-in user with their company. The JWT carries the company ID but not its NAME,
+ *  which printed and exported documents have to show. */
+export interface ICurrentUser {
+  id: string;
+  username: string;
+  fullName: string;
+  email: string;
+  companyId?: string | null;
+  companyName?: string | null;
+}
+
+/** GET /api/AppUsers/me — authenticated, no permission gate. */
+export const fetchCurrentUser = (): Promise<IResponse<ICurrentUser>> =>
+  requestApi({ apiEndpoint: '/AppUsers/me', method: 'GET', completeData: true });
+
 /**
  * POST /api/AppUsers/Login {userName, password}
  * → Result envelope {success, statusCode, message, data:{token, ...}}
