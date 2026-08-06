@@ -5,8 +5,22 @@ import {
   useCallback,
   forwardRef,
   useImperativeHandle,
+  createContext,
+  useContext,
 } from "react";
 import { createPortal } from "react-dom";
+
+/**
+ * Lets an item inside the menu dismiss it after acting.
+ *
+ * Menu items stop propagation so a click does not also trigger the row behind them, which
+ * means the outside-click handler never sees it and the menu stayed open — sitting on top of
+ * whatever dialog the item had just opened. Closing through context keeps the event
+ * semantics and still guarantees only one surface is up at a time.
+ */
+const DropdownCloseContext = createContext<(() => void) | null>(null);
+
+export const useDropdownClose = () => useContext(DropdownCloseContext);
 
 interface DropdownProps {
   children: React.ReactNode;
@@ -180,10 +194,19 @@ const Dropdown = forwardRef<DropdownRef, DropdownProps>(
       });
     }, [position]);
 
+    // The actual close is deferred 100ms for the fade, so `isOpen` alone cannot tell a
+    // second synchronous call that the first already happened — and some callers close both
+    // through the ref and through a menu item. Latch it so onClose fires exactly once.
+    const closingRef = useRef(false);
+
     const closeDropdown = useCallback(() => {
-      if (isOpen) {
+      if (isOpen && !closingRef.current) {
+        closingRef.current = true;
         setDropdownStyle((prev) => ({ ...prev, opacity: 0 }));
-        setTimeout(() => setIsOpen(false), 100);
+        setTimeout(() => {
+          setIsOpen(false);
+          closingRef.current = false;
+        }, 100);
         onClose();
       }
     }, [isOpen, onClose]);
@@ -314,7 +337,9 @@ const Dropdown = forwardRef<DropdownRef, DropdownProps>(
               role="menu"
               className={`bg-white shadow-lg border rounded-md z-[9999] min-w-[200px] ${containerClassName}`}
             >
-              {children}
+              <DropdownCloseContext.Provider value={closeDropdown}>
+                {children}
+              </DropdownCloseContext.Provider>
             </div>,
             document.body
           )}

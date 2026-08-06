@@ -6,6 +6,11 @@ interface ConfirmationModalProps {
   onClose: () => void;
   isOpen: boolean;
   loading?: boolean;
+  /**
+   * Confirm in a destructive (red) style. Auto-on when the message is about deleting or
+   * removing, so a delete never asks for confirmation behind a green, go-ahead button.
+   */
+  danger?: boolean;
 }
 
 const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
@@ -14,8 +19,13 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   onClose,
   isOpen,
   loading = false,
+  danger,
 }) => {
   if (!isOpen) return null;
+
+  // Prefix match, not whole-word: these messages say "deleted", "deletion", "removing",
+  // "discarded" far more often than the bare verb.
+  const isDanger = danger ?? /\b(delet|remov|discard)/i.test(message);
 
   const handleConfirm = () => {
     if (loading) return;
@@ -49,9 +59,13 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
           </button>
           <button
             onClick={handleConfirm}
-            className="px-4 py-2 bg-green-400 text-white rounded hover:bg-green-400"
+            className={`px-4 py-2 text-white rounded ${
+              isDanger
+                ? 'bg-red-600 hover:bg-red-700'
+                : 'bg-green-400 hover:bg-green-500'
+            }`}
           >
-            {loading ? <LoadingSvg /> : "Yes"}
+            {loading ? <LoadingSvg /> : 'Yes'}
           </button>
         </div>
       </div>

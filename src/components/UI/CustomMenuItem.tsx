@@ -1,4 +1,5 @@
 import { FC, ReactNode } from 'react';
+import { useDropdownClose } from '@/components/UI/Dropdown';
 
 interface CustomMenuItemProps {
   onClick: () => void;
@@ -23,19 +24,30 @@ const CustomMenuItem: FC<CustomMenuItemProps> = ({
     danger ??
     (typeof label === 'string' && label.trim().toLowerCase() === 'delete');
 
+  const closeDropdown = useDropdownClose();
+
+  /**
+   * Dismiss the menu, THEN act. Most of these items open a dialog, and leaving the menu up
+   * behind it left two surfaces competing for the same click.
+   */
+  const activate = () => {
+    closeDropdown?.();
+    onClick();
+  };
+
   return (
     <div
       role="menuitem"
       tabIndex={0}
       onClick={(e) => {
         e.stopPropagation();
-        onClick();
+        activate();
       }}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           e.stopPropagation();
-          onClick();
+          activate();
         }
       }}
       className={`flex items-center py-3 px-3 cursor-pointer ${

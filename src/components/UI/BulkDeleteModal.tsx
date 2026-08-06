@@ -50,8 +50,8 @@ export default function BulkDeleteModal({
               <Button variant="secondary" onClick={onClose} disabled={running}>
                 Cancel
               </Button>
-              <Button onClick={onConfirm} disabled={running}>
-                {running ? `Deleting… ` : `Delete ${count} ${plural}`}
+              <Button variant="danger" onClick={onConfirm} disabled={running}>
+                {running ? 'Deleting…' : `Delete ${count} ${plural}`}
               </Button>
             </div>
           </>
