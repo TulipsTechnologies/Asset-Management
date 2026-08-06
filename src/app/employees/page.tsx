@@ -25,6 +25,8 @@ import CustomMenuItem from '@/components/UI/CustomMenuItem';
 import Dropdown from '@/components/UI/Dropdown';
 import RowKebab from '@/components/UI/RowKebab';
 import ConfirmationModal from '@/components/UI/ConfirmationModel';
+import BulkDeleteModal from '@/components/UI/BulkDeleteModal';
+import { IBulkResult, runBulkAction, summariseBulk } from '@/utils/bulkActions';
 import { unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import useDebounce from '@/hooks/useDebounce';
@@ -51,6 +53,12 @@ const EmployeesPage = () => {
   const { addToast } = useToast();
 
   const [employees, setEmployees] = useState<IEmployee[]>([]);
+
+  // Bulk delete: the selection handed over by the table, and the report that follows.
+  const [bulkIds, setBulkIds] = useState<string[]>([]);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const [bulkResult, setBulkResult] = useState<IBulkResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [rowCount, setRowCount] = useState(0);
   const [pageCount, setPageCount] = useState(0);
@@ -281,6 +289,30 @@ const EmployeesPage = () => {
     ),
   }));
 
+
+  /**
+   * Bulk delete. Each row still goes through the same endpoint as the row action, so a
+   * referential refusal is the server's own sentence and is reported per row.
+   */
+  const runBulkDelete = async () => {
+    if (bulkIds.length === 0) return;
+    setBulkRunning(true);
+    try {
+      const targets = bulkIds.map((id) => ({
+        id,
+        label: employees.find((item) => item.id === id)?.fullName ?? id,
+      }));
+      const result = await runBulkAction(targets, (id) => deleteEmployee(id));
+      setBulkResult(result);
+      if (result.refused.length === 0) addToast.success(summariseBulk(result));
+      else if (result.succeeded.length === 0) addToast.error(summariseBulk(result));
+      else addToast.warning(summariseBulk(result));
+    } finally {
+      setBulkRunning(false);
+      loadEmployees();
+    }
+  };
+
   return (
     <div className="px-4 mt-2">
       <CustomTable
@@ -293,6 +325,17 @@ const EmployeesPage = () => {
         }
         isLoading={loading}
         entityLabel="employee"
+        bulkActions={[
+          {
+            label: 'Delete',
+            danger: true,
+            onClick: (selectedIds) => {
+              setBulkIds(selectedIds.map(String));
+              setBulkResult(null);
+              setBulkOpen(true);
+            },
+          },
+        ]}
         tableHeaderLeft={
           <Button
             onClick={() => {
@@ -411,6 +454,20 @@ const EmployeesPage = () => {
           </div>
         </div>
       </Modal>
+      <BulkDeleteModal
+        open={bulkOpen}
+        entityLabel="employee"
+        count={bulkIds.length}
+        running={bulkRunning}
+        result={bulkResult}
+        onConfirm={runBulkDelete}
+        onClose={() => {
+          setBulkOpen(false);
+          setBulkResult(null);
+          setBulkIds([]);
+        }}
+      />
+
       <ConfirmationModal
         isOpen={!!deleting}
         message={`Delete employee '${deleting?.fullName}'? The API refuses while they hold custody, open assignments or open recovery cases.`}

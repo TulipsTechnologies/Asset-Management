@@ -25,6 +25,8 @@ import Dropdown from '@/components/UI/Dropdown';
 import RowKebab from '@/components/UI/RowKebab';
 import CustomMenuItem from '@/components/UI/CustomMenuItem';
 import ConfirmationModal from '@/components/UI/ConfirmationModel';
+import BulkDeleteModal from '@/components/UI/BulkDeleteModal';
+import { IBulkResult, runBulkAction, summariseBulk } from '@/utils/bulkActions';
 import {
   createAssetCategory,
   deleteAssetCategory,
@@ -139,6 +141,12 @@ const AssetCategoriesPage = () => {
 
   // Global seeded lookup — loaded once, on first form open.
   const [methods, setMethods] = useState<IDepreciationMethod[]>([]);
+
+  // Bulk delete: the ids the selection bar handed over, and the report that follows.
+  const [bulkIds, setBulkIds] = useState<string[]>([]);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const [bulkResult, setBulkResult] = useState<IBulkResult | null>(null);
 
   const columns: TTableColumn[] = [
     { key: 'categoryCode', label: 'Code', width: 120, type: 'string', name: 'categoryCode' },
@@ -370,6 +378,33 @@ const AssetCategoriesPage = () => {
     }
   };
 
+  /**
+   * Bulk delete. Each category is still deleted by the same endpoint as the row action, so
+   * every referential refusal ("still has child categories and 4 assets") is the server's
+   * own and is reported per row rather than collapsed into one verdict.
+   */
+  const runBulkDelete = async () => {
+    if (bulkIds.length === 0) return;
+    setBulkRunning(true);
+    try {
+      const targets = bulkIds.map((id) => ({
+        id,
+        label:
+          categories.find((c) => c.id === id)?.name ??
+          categories.find((c) => c.id === id)?.categoryCode ??
+          id,
+      }));
+      const result = await runBulkAction(targets, (id) => deleteAssetCategory(id));
+      setBulkResult(result);
+      if (result.refused.length === 0) addToast.success(summariseBulk(result));
+      else if (result.succeeded.length === 0) addToast.error(summariseBulk(result));
+      else addToast.warning(summariseBulk(result));
+    } finally {
+      setBulkRunning(false);
+      loadCategories();
+    }
+  };
+
   const updateFilters = (updates: Partial<ITableFilters>) => {
     setFilters((prev) => ({
       ...prev,
@@ -458,6 +493,17 @@ const AssetCategoriesPage = () => {
         }
         isLoading={loading}
         entityLabel="category"
+        bulkActions={[
+          {
+            label: 'Delete',
+            danger: true,
+            onClick: (selectedIds) => {
+              setBulkIds(selectedIds.map(String));
+              setBulkResult(null);
+              setBulkOpen(true);
+            },
+          },
+        ]}
         tableHeaderLeft={
           <div className="flex gap-2">
             <Button onClick={openCreate}>
@@ -809,6 +855,20 @@ const AssetCategoriesPage = () => {
         }
         onConfirm={handleDelete}
         onClose={() => setDeleting(null)}
+      />
+
+      <BulkDeleteModal
+        open={bulkOpen}
+        entityLabel="category"
+        count={bulkIds.length}
+        running={bulkRunning}
+        result={bulkResult}
+        onConfirm={runBulkDelete}
+        onClose={() => {
+          setBulkOpen(false);
+          setBulkResult(null);
+          setBulkIds([]);
+        }}
       />
 
       <Modal isOpen={treeOpen} onClose={() => setTreeOpen(false)} size="lg">

@@ -25,6 +25,8 @@ import CustomMenuItem from '@/components/UI/CustomMenuItem';
 import Dropdown from '@/components/UI/Dropdown';
 import RowKebab from '@/components/UI/RowKebab';
 import ConfirmationModal from '@/components/UI/ConfirmationModel';
+import BulkDeleteModal from '@/components/UI/BulkDeleteModal';
+import { IBulkResult, runBulkAction, summariseBulk } from '@/utils/bulkActions';
 import { unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import useDebounce from '@/hooks/useDebounce';
@@ -33,6 +35,12 @@ const LocationsPage = () => {
   const { addToast } = useToast();
 
   const [locations, setLocations] = useState<IAssetLocation[]>([]);
+
+  // Bulk delete: the selection handed over by the table, and the report that follows.
+  const [bulkIds, setBulkIds] = useState<string[]>([]);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const [bulkResult, setBulkResult] = useState<IBulkResult | null>(null);
   const [allLocations, setAllLocations] = useState<IAssetLocation[]>([]);
   const [loading, setLoading] = useState(false);
   const [rowCount, setRowCount] = useState(0);
@@ -252,6 +260,30 @@ const LocationsPage = () => {
     ),
   }));
 
+
+  /**
+   * Bulk delete. Each row still goes through the same endpoint as the row action, so a
+   * referential refusal is the server's own sentence and is reported per row.
+   */
+  const runBulkDelete = async () => {
+    if (bulkIds.length === 0) return;
+    setBulkRunning(true);
+    try {
+      const targets = bulkIds.map((id) => ({
+        id,
+        label: locations.find((item) => item.id === id)?.name ?? id,
+      }));
+      const result = await runBulkAction(targets, (id) => deleteAssetLocation(id));
+      setBulkResult(result);
+      if (result.refused.length === 0) addToast.success(summariseBulk(result));
+      else if (result.succeeded.length === 0) addToast.error(summariseBulk(result));
+      else addToast.warning(summariseBulk(result));
+    } finally {
+      setBulkRunning(false);
+      loadLocations();
+    }
+  };
+
   return (
     <div className="px-4 mt-2">
       <CustomTable
@@ -264,6 +296,17 @@ const LocationsPage = () => {
         }
         isLoading={loading}
         entityLabel="location"
+        bulkActions={[
+          {
+            label: 'Delete',
+            danger: true,
+            onClick: (selectedIds) => {
+              setBulkIds(selectedIds.map(String));
+              setBulkResult(null);
+              setBulkOpen(true);
+            },
+          },
+        ]}
         tableHeaderLeft={
           <Button onClick={openCreate}>
             <i className="icon icon-plus text-xs"></i>
@@ -359,6 +402,20 @@ const LocationsPage = () => {
           </div>
         </div>
       </Modal>
+      <BulkDeleteModal
+        open={bulkOpen}
+        entityLabel="location"
+        count={bulkIds.length}
+        running={bulkRunning}
+        result={bulkResult}
+        onConfirm={runBulkDelete}
+        onClose={() => {
+          setBulkOpen(false);
+          setBulkResult(null);
+          setBulkIds([]);
+        }}
+      />
+
       <ConfirmationModal
         isOpen={!!deleting}
         message={`Delete location '${deleting?.name}'? The API refuses while child locations or assets still reference it.`}

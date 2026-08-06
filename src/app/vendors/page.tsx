@@ -14,6 +14,8 @@ import CustomMenuItem from '@/components/UI/CustomMenuItem';
 import Dropdown from '@/components/UI/Dropdown';
 import RowKebab from '@/components/UI/RowKebab';
 import ConfirmationModal from '@/components/UI/ConfirmationModel';
+import BulkDeleteModal from '@/components/UI/BulkDeleteModal';
+import { IBulkResult, runBulkAction, summariseBulk } from '@/utils/bulkActions';
 import FilterPanel from '@/components/UI/FilterPanel';
 import Modal from '@/components/UI/Modal';
 import Input from '@/components/UI/Input';
@@ -36,6 +38,12 @@ const VendorsPage = () => {
   const { addToast } = useToast();
 
   const [vendors, setVendors] = useState<IVendor[]>([]);
+
+  // Bulk delete: the selection handed over by the table, and the report that follows.
+  const [bulkIds, setBulkIds] = useState<string[]>([]);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const [bulkResult, setBulkResult] = useState<IBulkResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [rowCount, setRowCount] = useState(0);
   const [pageCount, setPageCount] = useState(0);
@@ -283,6 +291,30 @@ const VendorsPage = () => {
     ),
   }));
 
+
+  /**
+   * Bulk delete. Each row still goes through the same endpoint as the row action, so a
+   * referential refusal is the server's own sentence and is reported per row.
+   */
+  const runBulkDelete = async () => {
+    if (bulkIds.length === 0) return;
+    setBulkRunning(true);
+    try {
+      const targets = bulkIds.map((id) => ({
+        id,
+        label: vendors.find((item) => item.id === id)?.name ?? id,
+      }));
+      const result = await runBulkAction(targets, (id) => deleteVendor(id));
+      setBulkResult(result);
+      if (result.refused.length === 0) addToast.success(summariseBulk(result));
+      else if (result.succeeded.length === 0) addToast.error(summariseBulk(result));
+      else addToast.warning(summariseBulk(result));
+    } finally {
+      setBulkRunning(false);
+      loadVendors();
+    }
+  };
+
   return (
     <div className="px-4 mt-2">
       <CustomTable
@@ -295,6 +327,17 @@ const VendorsPage = () => {
         }
         isLoading={loading}
         entityLabel="vendor"
+        bulkActions={[
+          {
+            label: 'Delete',
+            danger: true,
+            onClick: (selectedIds) => {
+              setBulkIds(selectedIds.map(String));
+              setBulkResult(null);
+              setBulkOpen(true);
+            },
+          },
+        ]}
         tableHeaderLeft={
           <Button onClick={openCreate}>
             <i className="icon icon-plus text-xs"></i>
@@ -457,6 +500,20 @@ const VendorsPage = () => {
           </div>
         </div>
       </Modal>
+      <BulkDeleteModal
+        open={bulkOpen}
+        entityLabel="vendor"
+        count={bulkIds.length}
+        running={bulkRunning}
+        result={bulkResult}
+        onConfirm={runBulkDelete}
+        onClose={() => {
+          setBulkOpen(false);
+          setBulkResult(null);
+          setBulkIds([]);
+        }}
+      />
+
       <ConfirmationModal
         isOpen={!!deleting}
         message={`Delete vendor '${deleting?.name}'? The API refuses while assets or work orders still reference it — deactivate instead to keep history.`}
