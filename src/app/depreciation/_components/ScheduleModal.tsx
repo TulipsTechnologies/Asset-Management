@@ -325,8 +325,8 @@ export default function ScheduleModal({
           <div className="shrink-0 border-b border-gray-100 px-6 pb-4 pr-14 pt-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
-                <h2 className="text-lg font-semibold text-gray-800">Depreciation Schedule</h2>
-                <p className="mt-0.5 truncate text-sm text-gray-500">
+                <h2 className="text-lg font-semibold text-secondaryColor">Depreciation Schedule</h2>
+                <p className="mt-0.5 truncate text-xs text-gray-500">
                   {book.assetCode} · {book.assetName}
                   {book.assetCategoryName ? (
                     <span className="text-gray-400"> · {book.assetCategoryName}</span>

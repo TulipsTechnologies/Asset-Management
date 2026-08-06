@@ -1032,14 +1032,7 @@ const CampaignDetailPage = () => {
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-y-2">
         <div>
-          <button
-            onClick={() => router.push('/physical-verification')}
-            className="text-sm text-gray-500 hover:text-primarycolor"
-          >
-            <i className="icon icon-left text-xs mr-1" /> Physical
-            Verification
-          </button>
-          <h1 className="text-lg font-semibold text-secondaryColor mt-1 flex items-center gap-3">
+          <h1 className="text-lg font-semibold text-secondaryColor flex items-center gap-3">
             {campaign.name}
             <span
               className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
@@ -1050,12 +1043,18 @@ const CampaignDetailPage = () => {
               {AUDIT_CAMPAIGN_STATUS_LABELS[campaign.status] ?? campaign.status}
             </span>
           </h1>
-          <p className="text-xs text-gray-400 mt-1">Scopes: {scopesSummary}</p>
+          <p className="text-xs text-gray-500 mt-0.5">Scopes: {scopesSummary}</p>
           {campaign.description && (
-            <p className="text-xs text-gray-400 mt-0.5">{campaign.description}</p>
+            <p className="text-xs text-gray-500 mt-0.5">{campaign.description}</p>
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => router.push('/physical-verification')}
+            className="text-sm text-gray-500 hover:text-primarycolor"
+          >
+            <i className="icon icon-left text-xs mr-1" /> Back
+          </button>
           {campaign.status === AuditCampaignStatusEnum.Draft && (
             <Button
               onClick={() =>
@@ -1148,7 +1147,7 @@ const CampaignDetailPage = () => {
           {/* Scan panel — recording is only open while InProgress */}
           {inProgress && (
             <div className="bg-white rounded-xl p-6">
-              <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+              <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
                 Scan / Enter Code
               </h2>
               <div className="flex items-end gap-x-4 max-w-xl">

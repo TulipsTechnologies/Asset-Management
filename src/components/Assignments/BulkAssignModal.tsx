@@ -558,7 +558,7 @@ const BulkAssignModal = ({
             {formError && <p className="text-sm text-red-600 mt-3">{formError}</p>}
 
             <div className="flex justify-end gap-3 mt-5">
-              <Button variant="outline" onClick={onClose} disabled={saving}>
+              <Button variant="secondary" onClick={onClose} disabled={saving}>
                 Cancel
               </Button>
               <Button onClick={submit} disabled={saving || selectedCount === 0}>

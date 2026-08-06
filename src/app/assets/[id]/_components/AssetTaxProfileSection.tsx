@@ -229,7 +229,7 @@ export default function AssetTaxProfileSection({ assetId }: { assetId: string })
 
       <Modal isOpen={editing} onClose={() => setEditing(false)} size="lg">
         <div className="p-5">
-          <h2 className="mb-1 text-lg font-semibold text-gray-800">
+          <h2 className="mb-1 text-lg font-semibold text-secondaryColor">
             {profile ? 'Update IRD Classification' : 'Assign IRD Classification'}
           </h2>
           <p className="mb-4 text-xs text-gray-500">

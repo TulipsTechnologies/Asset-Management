@@ -204,7 +204,7 @@ export default function TaxRunModal({
   return (
     <Modal isOpen={open} onClose={onClose} size="3xl">
       <div className="p-5">
-        <h2 className="mb-1 text-lg font-semibold text-gray-800">
+        <h2 className="mb-1 text-lg font-semibold text-secondaryColor">
           Nepal IRD Tax Depreciation
         </h2>
         <p className="mb-4 text-xs text-gray-500">

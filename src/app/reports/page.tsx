@@ -193,10 +193,10 @@ export default function ReportsPage() {
   });
 
   return (
-    <div className="p-4">
+    <div className="px-4 mt-2">
       <div className="mb-5">
-        <h1 className="text-xl font-semibold text-secondaryColor">Reports &amp; Analytics</h1>
-        <p className="text-sm text-gray-500 mt-1">
+        <h1 className="text-lg font-semibold text-secondaryColor">Reports &amp; Analytics</h1>
+        <p className="text-xs text-gray-500 mt-0.5">
           Run a report on screen or export it as an Excel workbook.
         </p>
       </div>

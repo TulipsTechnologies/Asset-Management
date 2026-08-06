@@ -991,6 +991,14 @@ const MaintenancePage = () => {
 
   return (
     <div className="px-4 mt-2">
+      <div className="mb-4">
+        <h1 className="text-lg font-semibold text-secondaryColor">Maintenance</h1>
+        <p className="mt-0.5 text-xs text-gray-500">
+          Breakdown and preventive requests, triaged into work orders that record
+          the work done and what it cost.
+        </p>
+      </div>
+
       {/* Tab switcher: triage queue vs the work itself */}
       <div className="flex border-b gap-x-10 mb-4">
         {(

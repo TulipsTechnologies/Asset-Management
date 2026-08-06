@@ -320,16 +320,16 @@ export default function DepreciationConfigurationPage() {
   return (
     <div className="p-4 max-w-5xl">
       <BackButton className="mb-3" />
-      <h1 className="mb-1 text-xl font-semibold text-gray-800">Depreciation Settings</h1>
-      <p className="mb-5 text-sm text-gray-500">
+      <h1 className="text-lg font-semibold text-secondaryColor">Depreciation Settings</h1>
+      <p className="mt-0.5 mb-5 text-xs text-gray-500">
         The fiscal calendar, capitalization policy and GL account mappings that depreciation
         runs and disposal journals depend on.
       </p>
 
       {/* ------------------------------------------------ policy */}
-      <section className="mb-6 rounded border border-gray-200 p-4">
+      <section className="mb-6 rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-gray-800">Capitalization Policy</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Capitalization Policy</h2>
           <Button onClick={() => setPolicyOpen(true)}>Set Policy</Button>
         </div>
         {effectivePolicy ? (
@@ -351,9 +351,9 @@ export default function DepreciationConfigurationPage() {
       </section>
 
       {/* ------------------------------------------------ fiscal years */}
-      <section className="mb-6 rounded border border-gray-200 p-4">
+      <section className="mb-6 rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-gray-800">Fiscal Calendar</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Fiscal Calendar</h2>
           <Button onClick={openYearModal}>New Fiscal Year</Button>
         </div>
         <p className="mb-3 text-xs text-gray-500">
@@ -451,9 +451,9 @@ export default function DepreciationConfigurationPage() {
       </section>
 
       {/* ------------------------------------------------ account mappings */}
-      <section className="mb-6 rounded border border-gray-200 p-4">
+      <section className="mb-6 rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-gray-800">GL Account Mappings</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500">GL Account Mappings</h2>
           <Button onClick={() => openMappingModal()}>New Mapping</Button>
         </div>
         <p className="mb-3 text-xs text-gray-500">
@@ -518,7 +518,7 @@ export default function DepreciationConfigurationPage() {
       {/* ------------------------------------------------ policy modal */}
       <Modal isOpen={policyOpen} onClose={() => setPolicyOpen(false)} size="lg">
         <div className="p-5">
-          <h2 className="mb-1 text-lg font-semibold text-gray-800">Capitalization Policy</h2>
+          <h2 className="mb-1 text-lg font-semibold text-secondaryColor">Capitalization Policy</h2>
           <p className="mb-4 text-xs text-gray-500">
             The previous policy is retired, not overwritten. The currency cannot change while
             capitalized assets are on the register.
@@ -563,7 +563,7 @@ export default function DepreciationConfigurationPage() {
       {/* ------------------------------------------------ fiscal year modal */}
       <Modal isOpen={yearOpen} onClose={() => setYearOpen(false)} size="3xl">
         <div className="p-5">
-          <h2 className="mb-1 text-lg font-semibold text-gray-800">New Fiscal Year</h2>
+          <h2 className="mb-1 text-lg font-semibold text-secondaryColor">New Fiscal Year</h2>
           <p className="mb-4 text-xs text-gray-500">
             Dates prefill with a 30/31-day alternation as a starting point — correct each
             month against the published patro before saving. Month lengths of 29–32 days are
@@ -641,7 +641,7 @@ export default function DepreciationConfigurationPage() {
       {/* ------------------------------------------------ mapping modal */}
       <Modal isOpen={mappingOpen} onClose={() => setMappingOpen(false)} size="2xl">
         <div className="p-5">
-          <h2 className="mb-1 text-lg font-semibold text-gray-800">
+          <h2 className="mb-1 text-lg font-semibold text-secondaryColor">
             {editingMapping ? 'Edit Mapping' : 'New Mapping'}
           </h2>
           <p className="mb-4 text-xs text-gray-500">
@@ -725,7 +725,7 @@ export default function DepreciationConfigurationPage() {
       {/* ------------------------------------------------ reopen modal */}
       <Modal isOpen={!!reopening} onClose={() => setReopening(null)} size="lg">
         <div className="p-5">
-          <h2 className="mb-1 text-lg font-semibold text-gray-800">
+          <h2 className="mb-1 text-lg font-semibold text-secondaryColor">
             Reopen {reopening?.fiscalYearCode} · {reopening?.monthName}
           </h2>
           <p className="mb-4 text-xs text-gray-500">

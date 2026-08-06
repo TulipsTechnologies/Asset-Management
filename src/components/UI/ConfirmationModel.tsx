@@ -1,4 +1,5 @@
-import { LoadingSvg } from "@tulipstechnologies/common";
+import Button from '@/components/UI/Button';
+import Modal from '@/components/UI/Modal';
 
 interface ConfirmationModalProps {
   message: string;
@@ -13,6 +14,10 @@ interface ConfirmationModalProps {
   danger?: boolean;
 }
 
+/**
+ * Quick yes/no confirm, built on UI/Modal like every other dialog so it gets
+ * Escape-to-close, the body scroll lock, focus management and the portal for free.
+ */
 const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   message,
   onConfirm,
@@ -21,8 +26,6 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   loading = false,
   danger,
 }) => {
-  if (!isOpen) return null;
-
   // Prefix match, not whole-word: these messages say "deleted", "deletion", "removing",
   // "discarded" far more often than the bare verb.
   const isDanger = danger ?? /\b(delet|remov|discard)/i.test(message);
@@ -33,43 +36,24 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
     onClose();
   };
 
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
   return (
-    <div
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]"
-      style={{ margin: 0, padding: 0 }}
-      onClick={handleBackdropClick}
-    >
-      <div
-        className="bg-white rounded-lg p-6 max-w-sm w-full mx-4 shadow-2xl relative"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <p className="text-gray-800 mb-6">{message}</p>
-        <div className="flex justify-end space-x-4">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-gray-600 border border-gray-300 rounded hover:bg-gray-100"
-          >
+    <Modal isOpen={isOpen} onClose={onClose} size="sm" showCloseBtn={false}>
+      <div className="p-6">
+        <p className="text-gray-800">{message}</p>
+        <div className="mt-6 flex justify-end gap-3">
+          <Button variant="secondary" onClick={onClose} disabled={loading}>
             No
-          </button>
-          <button
+          </Button>
+          <Button
+            variant={isDanger ? 'danger' : 'primary'}
             onClick={handleConfirm}
-            className={`px-4 py-2 text-white rounded ${
-              isDanger
-                ? 'bg-red-600 hover:bg-red-700'
-                : 'bg-green-400 hover:bg-green-500'
-            }`}
+            loading={loading}
           >
-            {loading ? <LoadingSvg /> : 'Yes'}
-          </button>
+            Yes
+          </Button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 };
 

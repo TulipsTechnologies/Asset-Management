@@ -104,8 +104,8 @@ const MasterDataResetPage = () => {
   return (
     <div className="px-4 sm:px-6 py-6 max-w-4xl">
       <BackButton className="mb-3" />
-      <h1 className="text-xl font-semibold text-secondaryColor">Master Data Reset</h1>
-      <p className="text-sm text-gray-500 mt-1">
+      <h1 className="text-lg font-semibold text-secondaryColor">Master Data Reset</h1>
+      <p className="text-xs text-gray-500 mt-0.5">
         Clear a pilot or demo register so the real one starts clean, or load a demo set
         into an empty company.
       </p>
@@ -206,7 +206,12 @@ const MasterDataResetPage = () => {
         )}
       </section>
 
-      <Modal isOpen={confirmOpen} onClose={() => setConfirmOpen(false)} size="md">
+      <Modal
+        isOpen={confirmOpen}
+        onClose={busy ? () => undefined : () => setConfirmOpen(false)}
+        showCloseBtn={!busy}
+        size="md"
+      >
         <div className="p-6">
           <h2 className="text-lg font-semibold text-red-700">
             Delete {totalRows.toLocaleString()} record
@@ -222,14 +227,9 @@ const MasterDataResetPage = () => {
             <Button variant="secondary" onClick={() => setConfirmOpen(false)} disabled={busy}>
               Cancel
             </Button>
-            <button
-              type="button"
-              onClick={runReset}
-              disabled={busy}
-              className="inline-flex items-center gap-2 rounded-full bg-red-600 px-5 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:bg-gray-300"
-            >
+            <Button variant="danger" onClick={runReset} disabled={busy}>
               {busy ? 'Deleting…' : 'Yes, delete everything'}
-            </button>
+            </Button>
           </div>
         </div>
       </Modal>

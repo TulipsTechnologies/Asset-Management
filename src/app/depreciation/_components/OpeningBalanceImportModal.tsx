@@ -197,7 +197,7 @@ export default function OpeningBalanceImportModal({
   return (
     <Modal isOpen={open} onClose={() => { reset(); onClose(); }} size="3xl">
       <div className="p-5">
-        <h2 className="mb-1 text-lg font-semibold text-gray-800">Opening Balance Import</h2>
+        <h2 className="mb-1 text-lg font-semibold text-secondaryColor">Opening Balance Import</h2>
         <p className="mb-4 text-xs text-gray-500">
           Adopts the previous system&apos;s figures for many assets at once. Validation shows
           every problem before anything is adopted; approval makes the figures authoritative

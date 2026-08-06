@@ -10,6 +10,13 @@ import ReasonBanner from '@/components/UI/ReasonBanner';
 import Select from '@/components/UI/Select';
 import TextArea from '@/components/UI/TextArea';
 import ToggleSwitch from '@/components/UI/ToggleSwitch';
+import {
+  DetailField,
+  GroupLabel,
+  Panel,
+  PanelBox,
+  Row,
+} from '@/components/UI/FormLayout';
 import { IAssetBook } from '@/interface/IDepreciation';
 import { IAssetListItem } from '@/interface/IAsset';
 import { FINANCIAL_LABELS, FinancialStatusEnum } from '@/enum/assetEnums';
@@ -89,113 +96,6 @@ const money = (amount: number, currency: string) =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })} ${currency.trim()}`;
-
-/** Full-width label that groups the fields beneath it inside the single form card. */
-const GroupLabel = ({ children, hint }: { children: string; hint?: string }) => (
-  <div className="md:col-span-2 mt-2 first:mt-0">
-    <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-      {children}
-    </h2>
-    {hint && <p className="mt-0.5 text-xs text-gray-400">{hint}</p>}
-    <div className="mt-3 border-b border-gray-100" />
-  </div>
-);
-
-/** Small label-over-value pair, for the summary strip inside a modal. */
-const DetailField = ({
-  label,
-  value,
-}: {
-  label: string;
-  value?: string | number | null;
-}) => (
-  <div>
-    <p className="text-xs text-gray-500">{label}</p>
-    <p className="text-sm font-medium text-gray-800">{value ?? '—'}</p>
-  </div>
-);
-
-/** A collapsible side panel: circular icon, bold title, chevron, boxed body. */
-const Panel = ({
-  title,
-  icon,
-  iconClass = 'text-primarycolor border-primarycolor/30 bg-primarycolor/5',
-  open,
-  onToggle,
-  children,
-}: {
-  title: string;
-  icon: string;
-  iconClass?: string;
-  open: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
-}) => (
-  <div className="rounded-xl border border-gray-100 bg-white shadow-sm">
-    <button
-      type="button"
-      onClick={onToggle}
-      className="flex w-full items-center justify-between gap-3 px-5 py-4"
-    >
-      <span className="flex min-w-0 items-center gap-2.5">
-        <span
-          className={`flex size-8 shrink-0 items-center justify-center rounded-full border ${iconClass}`}
-        >
-          <i className={`icon icon-${icon} text-sm`} />
-        </span>
-        <span className="truncate text-base font-bold text-secondaryColor">{title}</span>
-      </span>
-      <i
-        className={`icon icon-arrow-down shrink-0 text-xs text-gray-400 transition-transform ${
-          open ? 'rotate-180' : ''
-        }`}
-      />
-    </button>
-    {open && <div className="px-5 pb-5">{children}</div>}
-  </div>
-);
-
-/** The boxed area inside a panel, matching the sample's inset card. */
-const PanelBox = ({ children }: { children: React.ReactNode }) => (
-  <div className="rounded-lg border border-gray-200 px-4 py-3">{children}</div>
-);
-
-/** A label/value row. `divider` draws the rule above it that precedes a result. */
-const Row = ({
-  label,
-  value,
-  op,
-  divider,
-  highlight,
-  muted,
-}: {
-  label: string;
-  value?: string | null;
-  op?: '−' | '÷' | '=';
-  divider?: boolean;
-  highlight?: boolean;
-  muted?: boolean;
-}) => (
-  <div
-    className={`flex items-baseline justify-between gap-3 py-2 ${
-      divider ? 'border-t border-gray-200' : ''
-    }`}
-  >
-    <span className="flex items-baseline gap-1.5 text-sm text-gray-600">
-      <span className="w-2 shrink-0 text-gray-300">{op ?? ''}</span>
-      {label}
-    </span>
-    <span
-      className={
-        highlight
-          ? 'whitespace-nowrap text-lg font-bold tabular-nums text-primarycolor'
-          : `text-sm tabular-nums ${muted ? 'text-gray-400' : 'font-medium text-gray-800'}`
-      }
-    >
-      {value ?? '—'}
-    </span>
-  </div>
-);
 
 export default function CapitalizeForm() {
   const router = useRouter();
@@ -1819,7 +1719,7 @@ export default function CapitalizeForm() {
       {/* ------------------------------------------------- year-by-year history */}
       <Modal isOpen={historyOpen} onClose={() => setHistoryOpen(false)} size="3xl">
         <div className="p-5">
-          <h2 className="mb-1 text-lg font-semibold text-gray-800">
+          <h2 className="mb-1 text-lg font-semibold text-secondaryColor">
             Depreciation year by year
           </h2>
           <p className="mb-4 text-xs text-gray-500">

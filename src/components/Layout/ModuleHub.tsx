@@ -44,13 +44,13 @@ const ModuleHub = ({
 
   return (
   <div className="px-4 sm:px-6 py-6">
-    <h1 className="text-xl font-semibold text-secondaryColor">{title}</h1>
-    <p className="text-sm text-gray-500 mt-1">{description}</p>
+    <h1 className="text-lg font-semibold text-secondaryColor">{title}</h1>
+    <p className="text-xs text-gray-500 mt-0.5">{description}</p>
 
     {sections.map((section, index) => (
       <section key={section.heading ?? index} className="mt-7">
         {section.heading && (
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
             {section.heading}
           </h2>
         )}

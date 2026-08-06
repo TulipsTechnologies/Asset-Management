@@ -790,10 +790,10 @@ const DashboardPage = () => {
     <div className="px-4 sm:px-6 py-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-secondaryColor">
+          <h1 className="text-lg font-semibold text-secondaryColor">
             Asset Management Dashboard
           </h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <p className="text-xs text-gray-500 mt-0.5">
             Register health, custody and accounting at a glance.
           </p>
         </div>

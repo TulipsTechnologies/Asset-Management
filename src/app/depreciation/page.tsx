@@ -837,10 +837,10 @@ export default function DepreciationPage() {
   // ---------------------------------------------------------------- render
 
   return (
-    <div className="p-4">
+    <div className="px-4 mt-2">
       <div className="mb-4">
-        <h1 className="text-xl font-semibold text-gray-800">Depreciation</h1>
-        <p className="text-sm text-gray-500">
+        <h1 className="text-lg font-semibold text-secondaryColor">Depreciation</h1>
+        <p className="mt-0.5 text-xs text-gray-500">
           Asset books, period runs and the journal outbox. Asset Management proposes
           journals; it never writes to Finance directly.
         </p>
@@ -861,7 +861,7 @@ export default function DepreciationPage() {
             aria-selected={activeTab === tab.id}
             className={`px-4 py-2 text-sm font-medium ${
               activeTab === tab.id
-                ? 'border-b-2 border-primary text-primary'
+                ? 'border-b-2 border-primarycolor text-secondaryColor'
                 : 'text-gray-500 hover:text-gray-700'
             }`}
             onClick={() => setActiveTab(tab.id)}
@@ -996,7 +996,7 @@ export default function DepreciationPage() {
       {/* ---------------------------------------------------------------- revise */}
       <Modal isOpen={!!revising} onClose={() => setRevising(null)} size="lg">
         <div className="p-5">
-          <h2 className="mb-1 text-lg font-semibold text-gray-800">Revise Estimate</h2>
+          <h2 className="mb-1 text-lg font-semibold text-secondaryColor">Revise Estimate</h2>
           <p className="mb-4 text-xs text-gray-500">
             Applied <strong>prospectively</strong>: periods already posted keep the numbers
             they were posted with, and the remaining carrying amount is re-spread over the
@@ -1060,7 +1060,7 @@ export default function DepreciationPage() {
       {/* ---------------------------------------------------------------- calculate */}
       <Modal isOpen={calculateOpen} onClose={() => setCalculateOpen(false)} size="lg">
         <div className="p-5">
-          <h2 className="mb-1 text-lg font-semibold text-gray-800">Calculate Depreciation</h2>
+          <h2 className="mb-1 text-lg font-semibold text-secondaryColor">Calculate Depreciation</h2>
           <p className="mb-4 text-xs text-gray-500">
             Amounts owed from earlier periods that were never run are swept into this one as
             flagged catch-up lines, rather than being lost.
@@ -1184,7 +1184,7 @@ export default function DepreciationPage() {
         <div className="flex max-h-[86vh] flex-col">
           <div className="shrink-0 border-b border-gray-100 px-6 pb-4 pr-14 pt-5">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-lg font-semibold text-gray-800">
+              <h2 className="text-lg font-semibold text-secondaryColor">
                 Depreciation Run — {viewingRun?.fiscalYearCode} · {viewingRun?.monthName}
               </h2>
               {viewingRun && (
@@ -1386,9 +1386,9 @@ export default function DepreciationPage() {
       </Modal>
 
       {/* ---------------------------------------------------------------- reverse */}
-      <Modal isOpen={!!reversing} onClose={() => setReversing(null)} size="lg">
+      <Modal isOpen={!!reversing} onClose={() => setReversing(null)} size="md">
         <div className="p-5">
-          <h2 className="mb-1 text-lg font-semibold text-gray-800">Reverse Run</h2>
+          <h2 className="mb-1 text-lg font-semibold text-secondaryColor">Reverse Run</h2>
           <p className="mb-4 text-xs text-gray-500">
             Restores every book&apos;s accumulated depreciation and emits a reversing journal
             proposal. Only the latest posted run can be reversed, and only while its period
@@ -1406,7 +1406,7 @@ export default function DepreciationPage() {
             <Button variant="secondary" onClick={() => setReversing(null)}>
               Cancel
             </Button>
-            <Button onClick={submitReverse} disabled={saving}>
+            <Button variant="danger" onClick={submitReverse} disabled={saving}>
               {saving ? 'Reversing…' : 'Reverse'}
             </Button>
           </div>
@@ -1416,7 +1416,7 @@ export default function DepreciationPage() {
       {/* ---------------------------------------------------------------- proposal */}
       <Modal isOpen={!!viewingProposal} onClose={() => setViewingProposal(null)} size="3xl">
         <div className="p-5">
-          <h2 className="mb-4 text-lg font-semibold text-gray-800">Journal Proposal</h2>
+          <h2 className="mb-4 text-lg font-semibold text-secondaryColor">Journal Proposal</h2>
 
           <div className="mb-4 grid grid-cols-4 gap-4 rounded bg-gray-50 p-3">
             <DetailField

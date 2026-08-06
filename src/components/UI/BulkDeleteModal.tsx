@@ -35,14 +35,21 @@ export default function BulkDeleteModal({
   const plural = count === 1 ? entityLabel : `${entityLabel}s`;
 
   return (
-    <Modal isOpen={open} onClose={onClose} size="lg">
+    // While rows are deleting, Escape/backdrop/X must not dismiss the dialog —
+    // it is about to show which rows were refused and why.
+    <Modal
+      isOpen={open}
+      onClose={running ? () => undefined : onClose}
+      showCloseBtn={!running}
+      size="lg"
+    >
       <div className="p-6">
         {!result ? (
           <>
             <h2 className="text-lg font-semibold text-secondaryColor">
               Delete {count} {plural}?
             </h2>
-            <p className="mt-1.5 text-sm text-gray-600">
+            <p className="mt-1.5 text-xs text-gray-500">
               Each one is checked on its own. Any that something still depends on is kept, and
               you will be told which and why.
             </p>
@@ -64,7 +71,7 @@ export default function BulkDeleteModal({
                   } deleted`
                 : 'Some were kept'}
             </h2>
-            <p className="mt-1.5 text-sm text-gray-600">
+            <p className="mt-1.5 text-xs text-gray-500">
               {result.succeeded.length} deleted · {result.refused.length} kept
             </p>
 

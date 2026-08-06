@@ -175,10 +175,10 @@ const AssetCodeFormatPage = () => {
   return (
     <div className="px-4 sm:px-6 py-6 max-w-3xl">
       <BackButton className="mb-3" />
-      <h1 className="text-xl font-semibold text-secondaryColor">
+      <h1 className="text-lg font-semibold text-secondaryColor">
         Asset Code Format
       </h1>
-      <p className="text-sm text-gray-500 mt-1">
+      <p className="text-xs text-gray-500 mt-0.5">
         The pattern for codes assigned at registration. Changes apply to codes
         generated from now on — existing codes are printed on labels and never
         change.
