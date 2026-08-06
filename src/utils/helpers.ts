@@ -6,9 +6,13 @@ export const fetchUserPermissionsList = (token: string): number[] => {
 
   const decodedData = jwt.decode(token) as JwtPayload | null;
   if (!decodedData) return [];
-  if (!decodedData.permissions) return [];
 
-  return decodedData.permissions
+  // This API issues the CSV under "UserPermisssions" (backend's spelling, verbatim);
+  // "permissions" is kept as a fallback for tokens following the HRM convention.
+  const csv = decodedData.UserPermisssions ?? decodedData.permissions;
+  if (!csv) return [];
+
+  return csv
     .split(',')
     .map((permission) => Number(permission))
     .filter((n) => !Number.isNaN(n));

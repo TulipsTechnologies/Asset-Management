@@ -1,6 +1,8 @@
 'use client';
 
 import ModuleHub, { IHubSection } from '@/components/Layout/ModuleHub';
+import { Permission } from '@/enum/permissions';
+import { useUserPermissions } from '@/hooks/useUserPermissions';
 
 /**
  * Settings hub — the same card-grid design every parent menu uses (ModuleHub).
@@ -72,12 +74,32 @@ const SECTIONS: IHubSection[] = [
   },
 ];
 
-const SettingsHubPage = () => (
-  <ModuleHub
-    title="Settings"
-    description="Manage the configuration used across the register, custody and accounting."
-    sections={SECTIONS}
-  />
-);
+/** Shown only to holders of ManageSystemTest — mirrors the backend section fence. */
+const SYSTEM_TEST_SECTION: IHubSection = {
+  heading: 'System Test & Demo',
+  cards: [
+    {
+      label: 'System Test & Demo',
+      description: 'Health checks, deterministic regression runs, demo environments and run reports',
+      iconName: 'clipboard',
+      url: '/system-test',
+    },
+  ],
+};
+
+const SettingsHubPage = () => {
+  const { can } = useUserPermissions();
+  const sections = can(Permission.ManageSystemTest)
+    ? [...SECTIONS, SYSTEM_TEST_SECTION]
+    : SECTIONS;
+
+  return (
+    <ModuleHub
+      title="Settings"
+      description="Manage the configuration used across the register, custody and accounting."
+      sections={sections}
+    />
+  );
+};
 
 export default SettingsHubPage;

@@ -14,6 +14,11 @@ export interface JwtPayload {
   companyId?: string;
   /** Comma-separated permission ids, when present. */
   permissions?: string;
+  /**
+   * The claim this API actually issues (triple-s spelling is the backend's, verbatim):
+   * a CSV of permission ids, e.g. "1" for TotalAccess.
+   */
+  UserPermisssions?: string;
   /** Comma-separated module ids, when present. */
   modules?: string;
   exp?: number;

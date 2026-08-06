@@ -26,6 +26,9 @@ export enum Permission {
   ViewAssetReports = 44,
   ManageAssetSettings = 45,
   ViewAssetAuditLogs = 46,
+  ResetCompanyData = 47,
+  /** §12.15: pinned to 56 — the backend enum appends it after ReviewTaxDepreciation (55). */
+  ManageSystemTest = 56,
 }
 
 /** OR semantics, TotalAccess short-circuits — mirrors the backend check. */
