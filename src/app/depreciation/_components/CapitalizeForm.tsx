@@ -66,7 +66,9 @@ const emptyForm: TForm = {
   cost: '',
   currencyId: 'NPR',
   residualValue: '0',
-  usefulLifeMonths: '60',
+  // No default life: a prefilled 60 was silently adopted as the asset's life, and it decided
+  // where depreciation stopped. Required only where the method actually needs it.
+  usefulLifeMonths: '',
   depreciationMethodId: '',
   decliningBalanceFactor: '1',
   annualRatePercent: '',
@@ -195,18 +197,6 @@ const Row = ({
   </div>
 );
 
-/** A single eligibility line: a tick or a cross, and what it means. */
-const Check = ({ ok, label }: { ok: boolean; label: string }) => (
-  <div className="flex items-start gap-2 py-1.5">
-    <i
-      className={`icon icon-${ok ? 'check-circle' : 'alert'} mt-0.5 text-sm ${
-        ok ? 'text-primarycolor' : 'text-red-500'
-      }`}
-    />
-    <span className={`text-sm ${ok ? 'text-gray-600' : 'text-red-600'}`}>{label}</span>
-  </div>
-);
-
 export default function CapitalizeForm() {
   const router = useRouter();
   const params = useSearchParams();
@@ -278,7 +268,19 @@ export default function CapitalizeForm() {
         ]);
         if (!cancelled) {
           setMethods(methodsResponse?.data ?? []);
-          setFiscalYears(yearsResponse?.data ?? []);
+          const years = yearsResponse?.data ?? [];
+          setFiscalYears(years);
+
+          // Default the tax-entry year to the CURRENT fiscal year — the common case is an
+          // asset entering the pool now. An edit loads its own stored year afterwards.
+          const today = new Date().toISOString().slice(0, 10);
+          const current = years.find(
+            (y) => y.startDate.slice(0, 10) <= today && y.endDate.slice(0, 10) >= today
+          );
+          if (current)
+            setForm((prev) =>
+              prev.taxEntryYearCode ? prev : { ...prev, taxEntryYearCode: current.code }
+            );
         }
 
         if (isEdit) {
@@ -527,6 +529,41 @@ export default function CapitalizeForm() {
     };
   })();
 
+  /** The configured fiscal year containing today. Everything tax-entry hangs off it. */
+  const currentFiscalYear = (() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return (
+      fiscalYears.find(
+        (y) => y.startDate.slice(0, 10) <= today && y.endDate.slice(0, 10) >= today
+      ) ?? null
+    );
+  })();
+
+  /**
+   * Tax-entry years, read from the company's fiscal calendar rather than typed: every year
+   * from the one the asset was acquired in through the current one, newest first. A future
+   * year is never offered — an asset cannot have entered a pool that has not started.
+   * An asset older than the calendar simply gets every year the calendar has.
+   */
+  const taxEntryYearOptions = (() => {
+    if (fiscalYears.length === 0) return [];
+    const today = new Date().toISOString().slice(0, 10);
+    const acquired = (form.availableForUseDate || form.depreciationStartDate || '').slice(0, 10);
+
+    const acquisitionYear = acquired
+      ? fiscalYears.find(
+          (y) => y.startDate.slice(0, 10) <= acquired && y.endDate.slice(0, 10) >= acquired
+        )
+      : undefined;
+    const floor = acquisitionYear?.startDate.slice(0, 10) ?? '';
+
+    return fiscalYears
+      .filter((y) => y.startDate.slice(0, 10) <= today)
+      .filter((y) => !floor || y.startDate.slice(0, 10) >= floor)
+      .sort((a, b) => b.startDate.localeCompare(a.startDate))
+      .map((y) => ({ value: y.code, label: y.code }));
+  })();
+
   const selectedAsset = assetOptions.find((a) => a.id === form.assetId) ?? null;
 
   const residualTooHigh = residual > cost && cost > 0;
@@ -536,39 +573,64 @@ export default function CapitalizeForm() {
 
   // Mirrors what the server will check. Shown before submitting so a refusal is not the
   // first time the operator learns something is wrong.
-  const eligibility = [
-    { ok: !!form.assetId, label: isEdit ? 'Book loaded' : 'An asset is selected' },
+  /**
+   * What still stands between this form and a book — nothing more.
+   *
+   * An item appears only while it is UNMET, so the panel is a short to-do list that empties
+   * as the form is filled, rather than a wall of ticks restating every rule. Each line names
+   * the field and what to do with it; the arithmetic that explains why lives in the
+   * calculator beside it, not here.
+   */
+  const blockers = [
+    { ok: !!form.assetId, label: isEdit ? 'Load a book' : 'Select an asset' },
     {
       ok:
         isEdit ||
         !selectedAsset ||
         selectedAsset.financialStatus !== FinancialStatusEnum.Capitalized,
-      label: 'The asset is not already capitalized',
+      label: 'This asset is already capitalized',
     },
-    { ok: !!form.depreciationMethodId, label: 'A depreciation method is chosen' },
-    ...(isStraightLine
-      ? [{ ok: lifeMonths > 0, label: 'Useful life is set — straight line charges the base over it' }]
-      : []),
-    ...(isRateBased
-      ? [{ ok: annualRatePct > 0, label: 'An annual rate is set (life is only an optional cap)' }]
-      : []),
-    { ok: cost > 0, label: 'Cost is greater than zero' },
-    { ok: !residualTooHigh, label: 'Residual value does not exceed the cost' },
-    { ok: !openingTooHigh, label: 'Opening accumulated fits within the depreciable base' },
-    {
-      ok: !needsThroughDate,
-      label: 'A day-based book with an opening balance states what was already charged',
-    },
-    {
-      ok: !nbvMismatch,
-      label: 'Opening NBV agrees with cost minus opening accumulated',
-    },
-    {
-      ok: !!form.availableForUseDate,
-      label: 'An in-service date is set as the depreciation anchor',
-    },
+    { ok: cost > 0, label: 'Enter a cost' },
+    { ok: !!form.depreciationMethodId, label: 'Choose a depreciation method' },
+    ...(isStraightLine ? [{ ok: lifeMonths > 0, label: 'Enter a useful life' }] : []),
+    ...(isRateBased ? [{ ok: annualRatePct > 0, label: 'Enter an annual rate' }] : []),
+    { ok: !!form.availableForUseDate, label: 'Set the in-service date' },
+    { ok: !residualTooHigh, label: 'Residual value exceeds the cost' },
+    { ok: !openingTooHigh, label: 'Opening accumulated exceeds the depreciable base' },
+    { ok: !nbvMismatch, label: 'Opening NBV does not match cost less opening accumulated' },
+    { ok: !needsThroughDate, label: 'Set the last depreciation-through date' },
   ];
-  const eligible = eligibility.every((c) => c.ok);
+  const outstanding = blockers.filter((item) => !item.ok);
+  const eligible = outstanding.length === 0;
+
+  /**
+   * A life that has already run out. This is the single most misread state on this screen:
+   * the schedule then legitimately ends in a past fiscal year, and it reads as the register
+   * having "stopped early" when in fact the entered life expired there. Say so where the
+   * life is entered, in the asset's own fiscal terms.
+   */
+  const lifeAlreadyOver =
+    !!lifeEnd && lifeMonths > 0 && lifeEnd < new Date().toISOString().slice(0, 10);
+
+  /** Worth saying, but not blocking. */
+  const advisories = [
+    ...(lifeAlreadyOver
+      ? [
+          `This useful life ends ${lifeEnd} — already past, so nothing after that date is scheduled and the asset is fully depreciated on arrival. Check the life before saving.`,
+        ]
+      : []),
+    ...(backdated
+      ? [
+          `About ${elapsedMonths} month${elapsedMonths === 1 ? '' : 's'} have already passed with no opening balance recorded. Use the calculator to set one, or the whole cost spreads over the periods that remain.`,
+        ]
+      : []),
+    ...(calendarGap
+      ? [
+          `The fiscal calendar starts at ${calendarGap.earliestCode}, after this asset does — those earlier periods cannot hold history until they are created.`,
+        ]
+      : []),
+    ...(taxOn && !form.irdClassCode ? ['No IRD class chosen — the tax book will not be started.'] : []),
+  ];
 
   /**
    * "It cost this much and was bought then — what is it worth now?"
@@ -628,6 +690,97 @@ export default function CapitalizeForm() {
         });
     } catch {
       setFailure({ message: 'Could not work out the value to date.' });
+    } finally {
+      setProjecting(false);
+    }
+  };
+
+  /**
+   * "Depreciate the past, then open the current year at what is left."
+   *
+   * Runs the same server projection the calculator uses and writes its cutover triple —
+   * accumulated through the last CLOSED fiscal year, the NBV that leaves, and the
+   * through-date — into the Opening Balance fields, then switches the form to that mode.
+   *
+   * Deliberately one click and not automatic at submit: it moves the whole of the asset's
+   * history out of the current period's P&L and into the opening position, which is a
+   * ledger decision. The operator is left looking at the three figures in editable fields,
+   * and nothing is written until they save.
+   */
+  const applyHistoryThroughLastClosedYear = async () => {
+    if (projecting) return;
+
+    // Same precondition the calculator uses. Without it the server rejects the half-filled
+    // request and the operator is shown its wire-level complaint instead of what to do.
+    const ready =
+      !!form.depreciationMethodId &&
+      cost > 0 &&
+      (isRateBased ? annualRatePct > 0 || lifeMonths > 0 : lifeMonths > 0);
+    if (!ready) {
+      setFailure({
+        message: isRateBased
+          ? 'Pick a method and enter a cost and an annual rate before calculating the history.'
+          : 'Pick a method and enter a cost and useful life before calculating the history.',
+      });
+      return;
+    }
+
+    setProjecting(true);
+    setFailure(null);
+    try {
+      const response = await projectDepreciation({
+        depreciationMethodId: form.depreciationMethodId,
+        cost,
+        residualValue: residual,
+        usefulLifeMonths: lifeMonths > 0 ? lifeMonths : undefined,
+        annualRatePercent: namedRatePct > 0 ? namedRatePct : undefined,
+        forecastYears: lifeMonths > 0 ? undefined : forecastYears,
+        decliningBalanceFactor: Number(form.decliningBalanceFactor || 1),
+        depreciationStartDate: form.depreciationStartDate,
+      });
+
+      if (!response?.success || !response.data) {
+        setFailure({
+          code: response?.reasonCode,
+          message: response?.message || 'Could not work out the history for this asset.',
+        });
+        return;
+      }
+
+      const projected = response.data;
+      if (
+        !projected.isFiscalAligned ||
+        projected.accumulatedThroughCutover == null ||
+        !projected.cutoverThroughDate
+      ) {
+        // No closed fiscal year to cut over at — the calendar does not reach the start
+        // date, or none has ended yet. Say which rather than writing a misleading zero.
+        setProjection(projected);
+        setProjectedInputs(projectionFingerprint);
+        setFailure({
+          message: projected.isFiscalAligned
+            ? 'No fiscal year has closed yet for this asset, so there is no history to carry forward.'
+            : 'The fiscal calendar does not reach this asset’s start date, so its history cannot be dated. Create the earlier fiscal years first.',
+        });
+        return;
+      }
+
+      set({
+        openingAccumulatedDepreciation: String(projected.accumulatedThroughCutover),
+        ...(projected.netBookValueAtCutover != null
+          ? { openingNetBookValue: String(projected.netBookValueAtCutover) }
+          : {}),
+        lastDepreciationThroughDate: projected.cutoverThroughDate.slice(0, 10),
+      });
+      setStartMode('opening');
+      setProjection(null);
+      addToast.success(
+        `History through ${projected.lastClosedFiscalYearCode} set as the opening balance. ${
+          projected.currentFiscalYearCode ?? 'The current fiscal year'
+        } opens at ${money(projected.netBookValueAtCutover ?? 0, currency)}.`
+      );
+    } catch {
+      setFailure({ message: 'Could not work out the history for this asset.' });
     } finally {
       setProjecting(false);
     }
@@ -844,11 +997,11 @@ export default function CapitalizeForm() {
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold text-secondaryColor">
-            {isEdit ? `Edit Book — ${book?.assetCode}` : 'Capitalize Asset'}
+            {isEdit ? `Depreciation Setup — ${book?.assetCode}` : 'Depreciation Setup'}
           </h1>
           <p className="mt-0.5 text-xs text-gray-500">
-            Creates the asset book — the authoritative cost record. The book&apos;s cost is
-            independent of the asset&apos;s purchase cost from here on.
+            Sets how this asset depreciates and creates its book — the authoritative cost
+            record, independent of the asset&apos;s purchase cost from here on.
           </p>
         </div>
         <button
@@ -961,12 +1114,21 @@ export default function CapitalizeForm() {
                         : undefined
                     }
                   />
-                  <Input
+                  <Select
                     label="Tax Entry Year"
                     value={form.taxEntryYearCode}
                     onChange={(e) => set({ taxEntryYearCode: e.target.value })}
-                    placeholder="2083/84"
-                    helperText="Bikram Sambat, as 2083/84."
+                    options={taxEntryYearOptions}
+                    placeholder={
+                      fiscalYears.length === 0
+                        ? 'No fiscal calendar configured'
+                        : 'Select a fiscal year'
+                    }
+                    helperText={
+                      currentFiscalYear
+                        ? `The year this asset first entered the tax pool — from its acquisition year through the current year (${currentFiscalYear.code}).`
+                        : 'The year this asset first entered the tax pool.'
+                    }
                   />
                   <Select
                     label="Tax Entry Period"
@@ -1196,13 +1358,35 @@ export default function CapitalizeForm() {
             )}
 
             {startMode === 'historical' && !isEdit && (
-              <p className="md:col-span-2 rounded bg-gray-50 px-3 py-2 text-xs text-gray-500">
-                The register will compute the asset&apos;s past itself: every period from the
-                start date is scheduled, a run sweeps the years already gone as historical
-                catch-up, and the current fiscal year is charged period by period. Needs the
-                fiscal calendar to reach back to the start date — the panel on the right
-                offers to create the missing years.
-              </p>
+              <div className="md:col-span-2 rounded bg-gray-50 px-3 py-2.5">
+                <p className="text-xs text-gray-500">
+                  The register computes the asset&apos;s past itself: every period from the
+                  start date is scheduled, and a run then sweeps the years already gone as
+                  historical catch-up — one large charge in the current period&apos;s P&amp;L.
+                  Needs the fiscal calendar to reach back to the start date.
+                </p>
+                {backdated && (
+                  <div className="mt-2 border-t border-gray-200 pt-2">
+                    <p className="text-xs text-gray-600">
+                      For an asset this old the usual choice is to close the past instead:
+                      depreciate through the last closed fiscal year, and open the current one
+                      at the value that leaves. The figures are the same either way — only
+                      where the history lands differs.
+                    </p>
+                    <Button
+                      variant="secondary"
+                      size="small"
+                      className="mt-2"
+                      disabled={projecting}
+                      onClick={applyHistoryThroughLastClosedYear}
+                    >
+                      {projecting
+                        ? 'Calculating…'
+                        : 'Calculate history and set the opening balance'}
+                    </Button>
+                  </div>
+                )}
+              </div>
             )}
 
             <GroupLabel>Notes</GroupLabel>
@@ -1316,9 +1500,32 @@ export default function CapitalizeForm() {
             onToggle={() => toggle('eligibility')}
           >
             <PanelBox>
-              {eligibility.map((check) => (
-                <Check key={check.label} ok={check.ok} label={check.label} />
-              ))}
+              {eligible ? (
+                <p className="flex items-center gap-2 py-1 text-sm text-primarycolor">
+                  <i className="icon icon-check-circle text-xs" />
+                  Ready to {isEdit ? 'save' : 'capitalize'}.
+                </p>
+              ) : (
+                <ul className="space-y-1.5 py-0.5">
+                  {outstanding.map((item) => (
+                    <li key={item.label} className="flex items-start gap-2 text-sm text-gray-700">
+                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" />
+                      {item.label}
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {advisories.length > 0 && (
+                <ul className="mt-2 space-y-1.5 border-t border-gray-100 pt-2">
+                  {advisories.map((note) => (
+                    <li key={note} className="flex items-start gap-2 text-xs text-amber-700">
+                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400" />
+                      {note}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </PanelBox>
           </Panel>
 
@@ -1592,12 +1799,10 @@ export default function CapitalizeForm() {
 
                 {backdated && (
                   <p className="rounded bg-amber-50 px-2 py-1.5 text-xs text-amber-800">
-                    About <strong>{elapsedMonths}</strong> of the {lifeMonths || '—'} months
-                    have already passed, and no opening accumulated depreciation is recorded
-                    for them. The whole cost would then be spread over the periods that
-                    remain, charging far more per period than the asset really consumes.
-                    Enter what has already been depreciated as{' '}
-                    <strong>Opening Accumulated Depreciation</strong>.
+                    <strong>{elapsedMonths}</strong> of the {lifeMonths || '—'} months have
+                    already passed with nothing recorded against them. Calculate the value
+                    below and save it as the opening balance, or the whole cost spreads over
+                    the periods that remain.
                   </p>
                 )}
               </div>
