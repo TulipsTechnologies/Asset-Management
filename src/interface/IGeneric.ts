@@ -4,6 +4,38 @@ export interface IResponse<T> {
   statusCode: number;
   message: string | null;
   data: T;
+  /**
+   * Stable machine-readable refusal code. Optional because httpService synthesises
+   * envelopes for a 401 and for a network failure, and neither carries one — branch on
+   * this, never on the wording of `message`.
+   */
+  reasonCode?: string | null;
+}
+
+/**
+ * One structured refusal. Returned inside a CommandEnvelope (`data.reasons`) by the tax
+ * endpoints, and as `data.blockers` by the convention-change preview.
+ */
+export interface IReasonDetail {
+  code: string;
+  message: string;
+  subject?: string | null;
+  subjectId?: string | null;
+  rowNumber?: number | null;
+  field?: string | null;
+  currencyId?: string | null;
+  values?: Record<string, unknown> | null;
+}
+
+/** The envelope every tax command returns. `entityId` is what was created or changed. */
+export interface ICommandEnvelope {
+  commandId?: string | null;
+  correlationId?: string | null;
+  wasReplayed: boolean;
+  entityId?: string | null;
+  ruleSetId?: string | null;
+  engineVersion?: string | null;
+  reasons: IReasonDetail[];
 }
 
 /**
@@ -14,6 +46,7 @@ export interface IPagedResponse<T> {
   success: boolean;
   statusCode: number;
   message: string | null;
+  reasonCode?: string | null;
   data: T[];
   currentPage: number;
   pageCount: number;

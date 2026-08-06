@@ -31,6 +31,7 @@ import {
 } from '@/services/depreciation.service';
 import { fetchAssetCategories } from '@/services/assetCategory.service';
 import { unwrapPaged } from '@/utils/serviceUtils';
+import { draftFiscalPeriods } from '@/utils/fiscalYear';
 import {
   FiscalPeriodStatusEnum,
   PERIOD_STATUS_LABELS,
@@ -40,11 +41,6 @@ const formatDate = (value?: string | null) =>
   value ? new Date(value).toLocaleDateString() : '—';
 
 /** Bikram Sambat month names, Shrawan first — the fiscal year's fixed order. */
-const BS_MONTHS = [
-  'Shrawan', 'Bhadra', 'Ashwin', 'Kartik', 'Mangsir', 'Poush',
-  'Magh', 'Falgun', 'Chaitra', 'Baisakh', 'Jestha', 'Ashadh',
-];
-
 type TMappingForm = {
   assetCategoryId: string;
   depreciationExpenseAccount: string;
@@ -172,32 +168,16 @@ export default function DepreciationConfigurationPage() {
   };
 
   /**
-   * Pre-fills 12 period drafts from the year start using 30/31-day alternation as a
-   * STARTING POINT ONLY — real Bikram Sambat month lengths (29–32 days) come from the
-   * published patro, which is why every date stays editable. The backend never generates
-   * periods for the same reason.
+   * Pre-fills 12 period drafts from the year start. Shared with the capitalize screen's
+   * "create earlier fiscal years" action so there is one drafting rule, not two — see
+   * draftFiscalPeriods for why the dates are a starting point and stay editable.
    */
   const draftPeriods = () => {
     if (!yearForm.startDate) {
       addToast.error('Pick the fiscal year start date first.');
       return;
     }
-    const drafts: IUpsertFiscalPeriod[] = [];
-    let cursor = new Date(yearForm.startDate);
-    for (let i = 0; i < 12; i++) {
-      const start = new Date(cursor);
-      const end = new Date(cursor);
-      end.setDate(end.getDate() + (i % 2 === 0 ? 31 : 30) - 1);
-      drafts.push({
-        periodOrdinal: i + 1,
-        monthName: BS_MONTHS[i],
-        startDate: start.toISOString().slice(0, 10),
-        endDate: end.toISOString().slice(0, 10),
-      });
-      cursor = new Date(end);
-      cursor.setDate(cursor.getDate() + 1);
-    }
-    setPeriodDrafts(drafts);
+    setPeriodDrafts(draftFiscalPeriods(yearForm.startDate));
   };
 
   const submitYear = async () => {

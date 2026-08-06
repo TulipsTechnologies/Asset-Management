@@ -1,6 +1,6 @@
 import { requestApi } from './httpService';
 import { buildQuery } from '@/utils/serviceUtils';
-import { IPagedResponse, IResponse } from '@/interface/IGeneric';
+import { ICommandEnvelope, IPagedResponse, IResponse } from '@/interface/IGeneric';
 import {
   IAssetBook,
   IAssetBookFilter,
@@ -16,6 +16,12 @@ import {
   IFiscalYear,
   IJournalProposal,
   IJournalProposalFilter,
+  IChangeBookConvention,
+  IConventionChangePreview,
+  ICreateMigrationBatch,
+  IMigrationBatch,
+  IDepreciationProjection,
+  IProjectAssetDepreciation,
   IReviseEstimate,
   IUpdateAssetBook,
   IUpsertCapitalizationPolicy,
@@ -130,6 +136,11 @@ export const fetchDepreciationRuns = (
     method: 'GET',
     completeData: true,
   });
+
+export const fetchDepreciationRun = (
+  id: string
+): Promise<IResponse<IDepreciationRun>> =>
+  requestApi({ apiEndpoint: `/DepreciationRuns/${id}`, method: 'GET', completeData: true });
 
 export const fetchRunDetails = (
   id: string
@@ -316,3 +327,109 @@ export const fetchJournalProposal = (
   id: string
 ): Promise<IResponse<IJournalProposal>> =>
   requestApi({ apiEndpoint: `/JournalProposals/${id}`, method: 'GET', completeData: true });
+
+// ---------------------------------------------------------------- book convention
+
+/**
+ * What switching this book to actual calendar days would do — period by period, and what it
+ * would NOT do (posted periods keep their numbers). Changes nothing.
+ */
+export const previewBookConvention = (
+  bookId: string,
+  effectiveFrom: string
+): Promise<IResponse<IConventionChangePreview>> =>
+  requestApi({
+    apiEndpoint:
+      `/BookConvention/books/${bookId}/preview-daily` + buildQuery({ effectiveFrom }),
+    method: 'GET',
+    completeData: true,
+  });
+
+/**
+ * Apply the change, prospectively. A refusal still returns the complete preview in `data`,
+ * so the blockers stay readable — do not discard the body on a non-2xx.
+ */
+export const switchBookConventionToDaily = (
+  bookId: string,
+  body: IChangeBookConvention
+): Promise<IResponse<IConventionChangePreview>> =>
+  requestApi({
+    apiEndpoint: `/BookConvention/books/${bookId}/switch-to-daily`,
+    method: 'POST',
+    body: JSON.stringify(body),
+    contentType: 'application/json',
+    completeData: true,
+  });
+
+/**
+ * What an asset bought years ago is worth today — depreciation to date, net book value and
+ * the year-by-year derivation. A projection: it writes nothing and needs no fiscal calendar,
+ * which is what lets it answer for years the register has no periods for.
+ */
+export const projectDepreciation = (
+  body: IProjectAssetDepreciation
+): Promise<IResponse<IDepreciationProjection>> =>
+  requestApi({
+    apiEndpoint: '/AssetBooks/projection',
+    method: 'POST',
+    body: JSON.stringify(body),
+    contentType: 'application/json',
+    completeData: true,
+  });
+
+// ---------------------------------------------------------------- opening balance import
+
+/**
+ * Bulk opening balances ride the migration workflow: create a batch, validate it, approve
+ * it, apply it. Approval is what makes the balances authoritative — applied books resume
+ * after their through-date and their history is never regenerated.
+ */
+export const createMigrationBatch = (
+  body: ICreateMigrationBatch
+): Promise<IResponse<IMigrationBatch>> =>
+  requestApi({
+    apiEndpoint: '/DepreciationMigration/batches',
+    method: 'POST',
+    body: JSON.stringify(body),
+    contentType: 'application/json',
+    completeData: true,
+  });
+
+export const validateMigrationBatch = (id: string): Promise<IResponse<IMigrationBatch>> =>
+  requestApi({
+    apiEndpoint: `/DepreciationMigration/batches/${id}/validate`,
+    method: 'POST',
+    completeData: true,
+  });
+
+export const approveMigrationBatch = (
+  id: string,
+  rowVersion: string,
+  validationSnapshotHash: string
+): Promise<IResponse<ICommandEnvelope>> =>
+  requestApi({
+    apiEndpoint: `/DepreciationMigration/batches/${id}/approve`,
+    method: 'POST',
+    body: JSON.stringify({ rowVersion, validationSnapshotHash }),
+    contentType: 'application/json',
+    completeData: true,
+  });
+
+export const applyMigrationBatch = (
+  id: string,
+  rowVersion: string
+): Promise<IResponse<ICommandEnvelope>> =>
+  requestApi({
+    apiEndpoint: `/DepreciationMigration/batches/${id}/apply`,
+    method: 'POST',
+    body: JSON.stringify({ rowVersion }),
+    contentType: 'application/json',
+    completeData: true,
+  });
+
+export const fetchMigrationBatch = (id: string): Promise<IResponse<IMigrationBatch>> =>
+  requestApi({
+    apiEndpoint: `/DepreciationMigration/batches/${id}`,
+    method: 'GET',
+    completeData: true,
+  });

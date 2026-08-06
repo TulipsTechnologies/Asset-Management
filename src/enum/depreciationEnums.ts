@@ -14,6 +14,17 @@ export enum DepreciationRunStatusEnum {
   Discarded = 6,
 }
 
+/**
+ * How a book measures a period. Only 2 and 3 are day-based; 1 is what every book created
+ * before the daily engine used, and remains the default.
+ */
+export enum DepreciationConventionEnum {
+  FullMonth = 1,
+  StartExcludedEndIncluded = 2,
+  StartIncludedEndIncluded = 3,
+  NextMonth = 4,
+}
+
 export enum FiscalPeriodStatusEnum {
   Open = 1,
   Closed = 2,
@@ -87,6 +98,7 @@ export const PROPOSAL_SOURCE_LABELS: Record<number, string> = {
 
 /** Seeded global lookup — the engine resolves by CODE, so the UI does too. */
 export const DEPRECIATION_METHOD_CODES = {
+  WrittenDownValue: 'WrittenDownValue',
   StraightLine: 'StraightLine',
   DecliningBalance: 'DecliningBalance',
   None: 'None',
@@ -99,3 +111,30 @@ export const DEPRECIATION_METHOD_CODES = {
  */
 export const RUN_INCLUSION_NOTE =
   'A run includes every capitalized asset with an active book — including assets that are out of service, under maintenance or retired from use. Depreciation stops only at disposal.';
+
+export const CONVENTION_LABELS: Record<number, string> = {
+  [DepreciationConventionEnum.FullMonth]: 'Full Month',
+  [DepreciationConventionEnum.StartExcludedEndIncluded]: 'Actual Calendar Days',
+  [DepreciationConventionEnum.StartIncludedEndIncluded]: 'Actual Calendar Days (start included)',
+  [DepreciationConventionEnum.NextMonth]: 'Next Month',
+};
+
+export const CONVENTION_BADGE_CLASSES: Record<number, string> = {
+  [DepreciationConventionEnum.FullMonth]: 'bg-gray-100 text-gray-700',
+  [DepreciationConventionEnum.StartExcludedEndIncluded]: 'bg-blue-100 text-blue-700',
+  [DepreciationConventionEnum.StartIncludedEndIncluded]: 'bg-blue-100 text-blue-700',
+  [DepreciationConventionEnum.NextMonth]: 'bg-gray-100 text-gray-700',
+};
+
+/** The two the capitalize form offers. The other two exist but are not chooseable here. */
+export const CONVENTION_OPTIONS = [
+  { value: String(DepreciationConventionEnum.FullMonth), label: 'Full Month' },
+  {
+    value: String(DepreciationConventionEnum.StartExcludedEndIncluded),
+    label: 'Actual Calendar Days',
+  },
+];
+
+export const isDayBasedConvention = (convention?: number | null) =>
+  convention === DepreciationConventionEnum.StartExcludedEndIncluded ||
+  convention === DepreciationConventionEnum.StartIncludedEndIncluded;

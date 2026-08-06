@@ -3,6 +3,7 @@
 import { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/Providers/ToastProvider';
+import ReasonBanner from '@/components/UI/ReasonBanner';
 import Button from '@/components/UI/Button';
 import ConfirmationModal from '@/components/UI/ConfirmationModel';
 import CustomTable from '@/components/CustomTable/CustomTable';
@@ -13,6 +14,7 @@ import {
 import CustomCheckbox from '@/components/UI/CustomCheckBox';
 import CustomMenuItem from '@/components/UI/CustomMenuItem';
 import Dropdown from '@/components/UI/Dropdown';
+import RowKebab from '@/components/UI/RowKebab';
 import Modal from '@/components/UI/Modal';
 import Input from '@/components/UI/Input';
 import Select from '@/components/UI/Select';
@@ -451,17 +453,31 @@ const DisposalPage = () => {
    * transitions mutate rowversions, stale rows must not linger.
    */
   const runTransition = async (
-    fn: () => Promise<{ success?: boolean; message?: string | null }>
+    fn: () => Promise<{
+      success?: boolean;
+      message?: string | null;
+      reasonCode?: string | null;
+    }>
   ) => {
     try {
       const res = await fn();
       if (res?.success) {
+        // On a completed disposal the server appends what happened to the Nepal tax pool —
+        // either the movement it created, or that the asset carries no tax classification
+        // so none was. Shown verbatim; the frontend does not classify it.
         addToast.success(res.message || 'Done');
       } else {
         // 409s ("retire the asset first", "only a Loss or Theft disposal…",
         // "a verification campaign in progress", stale rowVersion) carry the
-        // real UX — show them verbatim.
-        addToast.error(res?.message || 'The operation failed');
+        // real UX — show them verbatim. The tax-integration refusals additionally
+        // carry a stable code, which is what a client should branch on.
+        addToast.error(
+          <ReasonBanner
+            code={res?.reasonCode}
+            message={res?.message || 'The operation failed'}
+            severity="error"
+          />
+        );
       }
     } catch (error) {
       console.error('Disposal transition failed:', error);
@@ -823,11 +839,7 @@ const DisposalPage = () => {
       actions: (
         <div className="flex gap-x-2 relative bg-white px-4 py-2 -m-2">
           <Dropdown
-            buttonChildren={
-              <div className="bg-white/80 px-1.5 py-2 rounded-sm hover:bg-primarycolor hover:text-white">
-                <i className="icon icon-elipsis-v text-sm"></i>
-              </div>
-            }
+            buttonChildren={<RowKebab />}
           >
             {[
               {

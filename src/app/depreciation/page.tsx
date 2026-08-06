@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/Providers/ToastProvider';
 import Button from '@/components/UI/Button';
 import ConfirmationModal from '@/components/UI/ConfirmationModel';
@@ -11,6 +12,7 @@ import {
 } from '@/components/CustomTable/CustomTableInterface';
 import CustomMenuItem from '@/components/UI/CustomMenuItem';
 import Dropdown from '@/components/UI/Dropdown';
+import RowKebab from '@/components/UI/RowKebab';
 import Modal from '@/components/UI/Modal';
 import Input from '@/components/UI/Input';
 import Select from '@/components/UI/Select';
@@ -19,8 +21,8 @@ import SearchBox from '@/components/SearchBox';
 import Pagination from '@/components/UI/Pagination';
 import {
   IAssetBook,
-  IDepreciationMethod,
   IDepreciationRun,
+  IDepreciationExclusion,
   IDepreciationRunDetail,
   IDepreciationSchedule,
   IFiscalPeriod,
@@ -30,13 +32,11 @@ import { IAssetListItem } from '@/interface/IAsset';
 import {
   approveRun,
   calculateRun,
-  capitalizeAsset,
   deleteAssetBook,
-  updateAssetBook,
   discardRun,
   fetchAssetBooks,
   fetchBookSchedule,
-  fetchDepreciationMethods,
+  fetchDepreciationRun,
   fetchDepreciationRuns,
   fetchFiscalPeriods,
   fetchJournalProposal,
@@ -46,14 +46,22 @@ import {
   reverseRun,
   reviseEstimate,
 } from '@/services/depreciation.service';
-import { fetchAssets } from '@/services/asset.service';
-import { fetchAssetCategoryById } from '@/services/assetCategory.service';
+import { assignAssetTaxClass, seedNepalRulePack } from '@/services/tax.service';
+import ReasonBanner from '@/components/UI/ReasonBanner';
+import ConventionSwitchModal from './_components/ConventionSwitchModal';
+import ScheduleModal from './_components/ScheduleModal';
+import TaxRunModal from './_components/TaxRunModal';
+import OpeningBalanceImportModal from './_components/OpeningBalanceImportModal';
+import { NEPAL_TAX_CLASSES, TAX_ENTRY_PERIODS, TaxTreatmentEnum } from '@/interface/ITax';
 import { unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import {
+  AssetBookStatusEnum,
   BOOK_STATUS_BADGE_CLASSES,
   BOOK_STATUS_LABELS,
-  DEPRECIATION_METHOD_CODES,
+  CONVENTION_BADGE_CLASSES,
+  CONVENTION_LABELS,
+  DepreciationConventionEnum,
   DepreciationRunStatusEnum,
   FiscalPeriodStatusEnum,
   PROPOSAL_SOURCE_LABELS,
@@ -95,34 +103,9 @@ const DetailField = ({
   </div>
 );
 
-type TCapitalizeForm = {
-  assetId: string;
-  cost: string;
-  currencyId: string;
-  residualValue: string;
-  usefulLifeMonths: string;
-  depreciationMethodId: string;
-  decliningBalanceFactor: string;
-  depreciationStartDate: string;
-  openingAccumulatedDepreciation: string;
-  notes: string;
-};
-
-const emptyCapitalizeForm: TCapitalizeForm = {
-  assetId: '',
-  cost: '',
-  currencyId: 'NPR',
-  residualValue: '0',
-  usefulLifeMonths: '60',
-  depreciationMethodId: '',
-  decliningBalanceFactor: '2',
-  depreciationStartDate: new Date().toISOString().slice(0, 10),
-  openingAccumulatedDepreciation: '0',
-  notes: '',
-};
-
 export default function DepreciationPage() {
   const { addToast } = useToast();
+  const router = useRouter();
 
   const [activeTab, setActiveTab] = useState<'books' | 'runs' | 'proposals'>('books');
 
@@ -159,14 +142,6 @@ export default function DepreciationPage() {
   });
 
   // ---------------------------------------------------------------- modals
-  const [capitalizeOpen, setCapitalizeOpen] = useState(false);
-  // Bumped whenever the capitalize/edit form is (re)initialized or the asset
-  // changes; an async category-defaults prefill from an older generation is dropped.
-  const prefillGenerationRef = useRef(0);
-  const [editingBook, setEditingBook] = useState<IAssetBook | null>(null);
-  const [capitalizeForm, setCapitalizeForm] = useState<TCapitalizeForm>(emptyCapitalizeForm);
-  const [assetOptions, setAssetOptions] = useState<IAssetListItem[]>([]);
-  const [methods, setMethods] = useState<IDepreciationMethod[]>([]);
   const [saving, setSaving] = useState(false);
 
   const [viewingBook, setViewingBook] = useState<IAssetBook | null>(null);
@@ -176,13 +151,25 @@ export default function DepreciationPage() {
   const [reviseForm, setReviseForm] = useState({ residualValue: '', usefulLifeMonths: '', reason: '' });
 
   const [deletingBook, setDeletingBook] = useState<IAssetBook | null>(null);
+  const [switchingBook, setSwitchingBook] = useState<IAssetBook | null>(null);
+  const [taxRunOpen, setTaxRunOpen] = useState(false);
+  const [openingImportOpen, setOpeningImportOpen] = useState(false);
 
   const [calculateOpen, setCalculateOpen] = useState(false);
   const [openPeriods, setOpenPeriods] = useState<IFiscalPeriod[]>([]);
   const [selectedPeriodId, setSelectedPeriodId] = useState('');
+  // Separate from the page-wide `saving` so the run's own in-flight state governs the
+  // button, and the modal can stay open afterwards to show what the run did.
+  const [calculating, setCalculating] = useState(false);
+  const [calculateResult, setCalculateResult] = useState<IDepreciationRun | null>(null);
+  const [calculateFailure, setCalculateFailure] = useState<{
+    code?: string | null;
+    message?: string | null;
+  } | null>(null);
 
   const [viewingRun, setViewingRun] = useState<IDepreciationRun | null>(null);
   const [runDetails, setRunDetails] = useState<IDepreciationRunDetail[]>([]);
+  const [runExclusions, setRunExclusions] = useState<IDepreciationExclusion[]>([]);
 
   const [reversing, setReversing] = useState<IDepreciationRun | null>(null);
   const [reverseReason, setReverseReason] = useState('');
@@ -267,166 +254,12 @@ export default function DepreciationPage() {
 
   // ---------------------------------------------------------------- actions
 
-  const openEditBook = async (book: IAssetBook) => {
-    prefillGenerationRef.current += 1; // any in-flight category prefill is now stale
-    setEditingBook(book);
-    setCapitalizeForm({
-      assetId: book.assetId,
-      cost: String(book.cost),
-      currencyId: book.currencyId.trim(),
-      residualValue: String(book.residualValue),
-      usefulLifeMonths: String(book.usefulLifeMonths),
-      depreciationMethodId: book.depreciationMethodId,
-      decliningBalanceFactor: String(book.decliningBalanceFactor),
-      depreciationStartDate: book.depreciationStartDate.slice(0, 10),
-      openingAccumulatedDepreciation: String(book.openingAccumulatedDepreciation),
-      notes: book.notes ?? '',
-    });
-    setCapitalizeOpen(true);
-    try {
-      const methodsResponse = await fetchDepreciationMethods();
-      setMethods(methodsResponse?.data ?? []);
-    } catch {
-      addToast.error('Could not load depreciation methods.');
-    }
-  };
+  // Capitalization and basis edits live on their own page: the form carries three related
+  // decisions and the arithmetic that ties them together, which a dialog had no room for.
+  const openEditBook = (book: IAssetBook) =>
+    router.push(`/depreciation/capitalize?bookId=${book.id}`);
 
-  const openCapitalize = async () => {
-    prefillGenerationRef.current += 1; // any in-flight category prefill is now stale
-    setEditingBook(null);
-    setCapitalizeForm(emptyCapitalizeForm);
-    setCapitalizeOpen(true);
-    try {
-      const [assetsResponse, methodsResponse] = await Promise.all([
-        fetchAssets({ pageNumber: 1, pageSize: 200 }),
-        fetchDepreciationMethods(),
-      ]);
-      setAssetOptions(unwrapPaged<IAssetListItem>(assetsResponse).items);
-      setMethods(methodsResponse?.data ?? []);
-    } catch {
-      addToast.error('Could not load assets or depreciation methods.');
-    }
-  };
-
-  // §1.3.6 — the asset's category can carry depreciation defaults; they prefill
-  // this form and the accountant overrides per asset. Applied asynchronously.
-  // A generation token (not an assetId compare) decides whether a late response
-  // may still land: editing the same asset's existing book would pass an id
-  // check, and a stale prefill would silently rewrite the book's parameters.
-  const applyCategoryDefaults = async (
-    assetId: string,
-    categoryId: string,
-    generation: number
-  ) => {
-    try {
-      const res = await fetchAssetCategoryById(categoryId);
-      const category = res?.success ? res.data : null;
-      if (!category) return;
-      if (prefillGenerationRef.current !== generation) return;
-      setCapitalizeForm((prev) => {
-        if (prev.assetId !== assetId) return prev;
-        const next = { ...prev };
-        // Only offer methods the engine implements; a stale category default
-        // pointing elsewhere is skipped rather than creating an uncomputable book.
-        if (
-          category.defaultDepreciationMethodId &&
-          methods.some((m) => m.id === category.defaultDepreciationMethodId)
-        )
-          next.depreciationMethodId = category.defaultDepreciationMethodId;
-        if (category.defaultUsefulLifeMonths != null)
-          next.usefulLifeMonths = String(category.defaultUsefulLifeMonths);
-        if (category.defaultResidualRate != null) {
-          const cost = Number(prev.cost || 0);
-          if (cost > 0)
-            next.residualValue = String(
-              Math.round(cost * category.defaultResidualRate) / 100
-            );
-        }
-        return next;
-      });
-    } catch {
-      // No prefill on failure — the form still works by hand.
-    }
-  };
-
-  const submitCapitalize = async () => {
-    if (!capitalizeForm.assetId || !capitalizeForm.depreciationMethodId) {
-      addToast.error('Pick an asset and a depreciation method.');
-      return;
-    }
-
-    // Edit mode: the BOOK's rowversion rides; the asset row is untouched.
-    if (editingBook) {
-      setSaving(true);
-      try {
-        const response = await updateAssetBook(editingBook.id, {
-          cost: Number(capitalizeForm.cost || 0),
-          residualValue: Number(capitalizeForm.residualValue || 0),
-          usefulLifeMonths: Number(capitalizeForm.usefulLifeMonths || 0),
-          depreciationMethodId: capitalizeForm.depreciationMethodId,
-          decliningBalanceFactor: Number(capitalizeForm.decliningBalanceFactor || 2),
-          depreciationStartDate: capitalizeForm.depreciationStartDate,
-          openingAccumulatedDepreciation: Number(
-            capitalizeForm.openingAccumulatedDepreciation || 0
-          ),
-          notes: capitalizeForm.notes || undefined,
-          rowVersion: editingBook.rowVersion,
-        });
-        if (response?.success) addToast.success(response.message || 'Book updated.');
-        else addToast.error(response?.message || 'Could not update the book.');
-      } catch {
-        addToast.error('Could not update the book.');
-      } finally {
-        setSaving(false);
-        setCapitalizeOpen(false);
-        setEditingBook(null);
-        loadBooks();
-      }
-      return;
-    }
-
-    const asset = assetOptions.find((a) => a.id === capitalizeForm.assetId);
-    if (!asset?.rowVersion) {
-      addToast.error('That asset could not be resolved. Reload and try again.');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const response = await capitalizeAsset({
-        assetId: capitalizeForm.assetId,
-        cost: Number(capitalizeForm.cost || 0),
-        currencyId: capitalizeForm.currencyId.trim().toUpperCase(),
-        residualValue: Number(capitalizeForm.residualValue || 0),
-        usefulLifeMonths: Number(capitalizeForm.usefulLifeMonths || 0),
-        depreciationMethodId: capitalizeForm.depreciationMethodId,
-        decliningBalanceFactor: Number(capitalizeForm.decliningBalanceFactor || 2),
-        depreciationStartDate: capitalizeForm.depreciationStartDate,
-        openingAccumulatedDepreciation: Number(
-          capitalizeForm.openingAccumulatedDepreciation || 0
-        ),
-        notes: capitalizeForm.notes || undefined,
-        rowVersion: asset.rowVersion,
-      });
-
-      if (response?.success) {
-        addToast.success(response.message || 'Asset capitalized.');
-        setCapitalizeOpen(false);
-        loadBooks();
-      } else {
-        // Failed workflow action: close and reload rather than retrying a stale token.
-        addToast.error(response?.message || 'Could not capitalize the asset.');
-        setCapitalizeOpen(false);
-        loadBooks();
-      }
-    } catch {
-      addToast.error('Could not capitalize the asset.');
-      setCapitalizeOpen(false);
-      loadBooks();
-    } finally {
-      setSaving(false);
-    }
-  };
+  const openCapitalize = () => router.push('/depreciation/capitalize');
 
   const openSchedule = async (book: IAssetBook) => {
     setViewingBook(book);
@@ -478,6 +311,8 @@ export default function DepreciationPage() {
 
   const openCalculate = async () => {
     setSelectedPeriodId('');
+    setCalculateResult(null);
+    setCalculateFailure(null);
     setCalculateOpen(true);
     try {
       const response = await fetchFiscalPeriods({
@@ -496,27 +331,55 @@ export default function DepreciationPage() {
       addToast.error('Pick a period to run.');
       return;
     }
-    setSaving(true);
+    // Guard against a second submission while the first is in flight: the server refuses a
+    // duplicate run for the period, but a double-click should not depend on that.
+    if (calculating) return;
+
+    setCalculating(true);
+    setCalculateFailure(null);
     try {
       const response = await calculateRun(selectedPeriodId);
-      if (response?.success) addToast.success(response.message || 'Run calculated.');
-      else addToast.error(response?.message || 'Could not calculate the run.');
-    } catch {
-      addToast.error('Could not calculate the run.');
-    } finally {
-      setSaving(false);
-      setCalculateOpen(false);
-      setActiveTab('runs');
+
+      if (!response?.success) {
+        setCalculateFailure({
+          code: response?.reasonCode,
+          message: response?.message || 'Could not calculate the run.',
+        });
+        return;
+      }
+
+      addToast.success(response.message || 'Run calculated.');
+
+      // The calculate endpoint returns only the new run's id, so the figures the summary
+      // shows — counts, total, exclusions — are read back from the run itself.
+      const run = await fetchDepreciationRun(response.data);
+      if (run?.success && run.data) setCalculateResult(run.data);
+      else setCalculateOpen(false);
+
       loadRuns();
+    } catch {
+      setCalculateFailure({ message: 'Could not calculate the run.' });
+    } finally {
+      setCalculating(false);
     }
   };
 
   const openRunDetails = async (run: IDepreciationRun) => {
     setViewingRun(run);
     setRunDetails([]);
+    setRunExclusions([]);
     try {
-      const response = await fetchRunDetails(run.id);
-      setRunDetails(response?.data ?? []);
+      // Two reads: the lines, and the run itself — the exclusion list is only populated on
+      // a single-run fetch, not on the list the table was built from.
+      const [details, full] = await Promise.all([
+        fetchRunDetails(run.id),
+        fetchDepreciationRun(run.id),
+      ]);
+      setRunDetails(details?.data ?? []);
+      if (full?.success && full.data) {
+        setRunExclusions(full.data.exclusions ?? []);
+        setViewingRun(full.data);
+      }
     } catch {
       addToast.error('Could not load run details.');
     }
@@ -581,6 +444,7 @@ export default function DepreciationPage() {
     { key: 'accumulated', label: 'Accumulated', width: 130, name: 'accumulated' },
     { key: 'nbv', label: 'Net Book Value', width: 140, name: 'nbv' },
     { key: 'method', label: 'Method', width: 130, name: 'method' },
+    { key: 'convention', label: 'Convention', width: 120, name: 'convention' },
     { key: 'status', label: 'Status', width: 90, name: 'status' },
     {
       key: 'actions',
@@ -595,6 +459,7 @@ export default function DepreciationPage() {
     { key: 'period', label: 'Period', width: 160, type: 'string', name: 'period' },
     { key: 'status', label: 'Status', width: 110, name: 'status' },
     { key: 'assetCount', label: 'Assets', width: 80, name: 'assetCount' },
+    { key: 'excludedAssetCount', label: 'Excluded', width: 90, name: 'excludedAssetCount' },
     { key: 'totalAmount', label: 'Total', width: 150, name: 'totalAmount' },
     { key: 'runDate', label: 'Run Date', width: 110, name: 'runDate' },
     { key: 'postedOn', label: 'Posted', width: 110, name: 'postedOn' },
@@ -638,6 +503,18 @@ export default function DepreciationPage() {
     accumulated: money(book.accumulatedDepreciation, book.currencyId),
     nbv: money(book.netBookValue, book.currencyId),
     method: book.depreciationMethodName,
+    convention: (
+      <Badge
+        label={
+          CONVENTION_LABELS[book.depreciationConvention] ??
+          String(book.depreciationConvention)
+        }
+        classes={
+          CONVENTION_BADGE_CLASSES[book.depreciationConvention] ??
+          'bg-gray-100 text-gray-700'
+        }
+      />
+    ),
     status: (
       <Badge
         label={BOOK_STATUS_LABELS[book.status] ?? String(book.status)}
@@ -647,7 +524,8 @@ export default function DepreciationPage() {
     actions: (
       <div className="flex justify-center">
         <Dropdown
-          buttonChildren={<i className="icon icon-actions text-[10px]" />}
+          ariaLabel="Row actions"
+          buttonChildren={<RowKebab />}
           position="fixed"
         >
           {[
@@ -669,6 +547,18 @@ export default function DepreciationPage() {
                         reason: '',
                       });
                     },
+                  },
+                ]
+              : []),
+            // Prospective, so it is offered whether or not anything has posted — posted
+            // periods keep the numbers they were posted with.
+            ...(book.depreciationConvention === DepreciationConventionEnum.FullMonth &&
+            book.status === AssetBookStatusEnum.Active
+              ? [
+                  {
+                    label: 'Switch to Actual Calendar Days',
+                    icon: <i className="icon icon-calendar text-sm" />,
+                    action: () => setSwitchingBook(book),
                   },
                 ]
               : []),
@@ -720,13 +610,22 @@ export default function DepreciationPage() {
       />
     ),
     assetCount: run.assetCount,
+    excludedAssetCount:
+      run.excludedAssetCount > 0 ? (
+        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700">
+          {run.excludedAssetCount}
+        </span>
+      ) : (
+        <span className="text-gray-400">0</span>
+      ),
     totalAmount: money(run.totalAmount, run.currencyId),
     runDate: formatDate(run.runDate),
     postedOn: formatDate(run.postedOn),
     actions: (
       <div className="flex justify-center">
         <Dropdown
-          buttonChildren={<i className="icon icon-actions text-[10px]" />}
+          ariaLabel="Row actions"
+          buttonChildren={<RowKebab />}
           position="fixed"
         >
           {[
@@ -825,7 +724,8 @@ export default function DepreciationPage() {
     actions: (
       <div className="flex justify-center">
         <Dropdown
-          buttonChildren={<i className="icon icon-actions text-[10px]" />}
+          ariaLabel="Row actions"
+          buttonChildren={<RowKebab />}
           position="fixed"
         >
           <CustomMenuItem
@@ -839,9 +739,7 @@ export default function DepreciationPage() {
     ),
   }));
 
-  const selectedMethodCode = methods.find(
-    (m) => m.id === capitalizeForm.depreciationMethodId
-  )?.code;
+  const selectedPeriod = openPeriods.find((p) => p.id === selectedPeriodId);
 
   // ---------------------------------------------------------------- render
 
@@ -896,10 +794,16 @@ export default function DepreciationPage() {
             isLoading={booksLoading}
             entityLabel="book"
             tableHeaderLeft={
-              <Button onClick={openCapitalize}>
-                <i className="icon icon-plus text-xs"></i>
-                <span>Capitalize Asset</span>
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button onClick={openCapitalize}>
+                  <i className="icon icon-plus text-xs"></i>
+                  <span>Capitalize Asset</span>
+                </Button>
+                <Button variant="secondary" onClick={() => setOpeningImportOpen(true)}>
+                  <i className="icon icon-import text-xs"></i>
+                  <span>Opening Balance Import</span>
+                </Button>
+              </div>
             }
             tableHeaderRight={
               <SearchBox
@@ -938,10 +842,16 @@ export default function DepreciationPage() {
             isLoading={runsLoading}
             entityLabel="run"
             tableHeaderLeft={
-              <Button onClick={openCalculate}>
-                <i className="icon icon-plus text-xs"></i>
-                <span>Calculate Run</span>
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button onClick={openCalculate}>
+                  <i className="icon icon-plus text-xs"></i>
+                  <span>Calculate Run</span>
+                </Button>
+                <Button variant="secondary" onClick={() => setTaxRunOpen(true)}>
+                  <i className="icon icon-file text-xs"></i>
+                  <span>Nepal Tax Run</span>
+                </Button>
+              </div>
             }
           />
           <Pagination
@@ -983,243 +893,12 @@ export default function DepreciationPage() {
         </>
       )}
 
-      {/* ---------------------------------------------------------------- capitalize */}
-      <Modal isOpen={capitalizeOpen} onClose={() => setCapitalizeOpen(false)} size="2xl">
-        <div className="p-5">
-          <h2 className="mb-1 text-lg font-semibold text-gray-800">
-            {editingBook ? `Edit Book — ${editingBook.assetCode}` : 'Capitalize Asset'}
-          </h2>
-          <p className="mb-4 text-xs text-gray-500">
-            Creates the asset book — the authoritative cost record. The book&apos;s cost is
-            independent of the asset&apos;s purchase cost from here on.
-          </p>
-
-          <div className="grid grid-cols-2 gap-4">
-            <Select
-              label="Asset"
-              required
-              disabled={!!editingBook}
-              value={capitalizeForm.assetId}
-              onChange={(e) => {
-                const assetId = e.target.value;
-                const asset = assetOptions.find((a) => a.id === assetId);
-                // Reset the depreciation fields so switching assets is
-                // deterministic, then let the category defaults land on top.
-                setCapitalizeForm((prev) => ({
-                  ...prev,
-                  assetId,
-                  cost: asset?.purchaseCost ? String(asset.purchaseCost) : prev.cost,
-                  depreciationMethodId: emptyCapitalizeForm.depreciationMethodId,
-                  usefulLifeMonths: emptyCapitalizeForm.usefulLifeMonths,
-                  residualValue: emptyCapitalizeForm.residualValue,
-                }));
-                const generation = ++prefillGenerationRef.current;
-                if (assetId && asset?.assetCategoryId)
-                  applyCategoryDefaults(assetId, asset.assetCategoryId, generation);
-              }}
-              options={assetOptions.map((a) => ({
-                label: `${a.assetCode} — ${a.assetName}`,
-                value: a.id,
-              }))}
-              placeholder="Select an asset"
-            />
-            <Select
-              label="Depreciation Method"
-              required
-              value={capitalizeForm.depreciationMethodId}
-              onChange={(e) =>
-                setCapitalizeForm((prev) => ({
-                  ...prev,
-                  depreciationMethodId: e.target.value,
-                }))
-              }
-              options={methods.map((m) => ({ label: m.name, value: m.id }))}
-              placeholder="Select a method"
-            />
-            <Input
-              label="Cost"
-              type="number"
-              required
-              value={capitalizeForm.cost}
-              onChange={(e) =>
-                setCapitalizeForm((prev) => ({ ...prev, cost: e.target.value }))
-              }
-              helperText="Defaults from the asset's purchase cost, then becomes independent."
-            />
-            <Input
-              label="Currency"
-              required
-              value={capitalizeForm.currencyId}
-              onChange={(e) =>
-                setCapitalizeForm((prev) => ({ ...prev, currencyId: e.target.value }))
-              }
-              helperText="Must match the company base currency."
-            />
-            <Input
-              label="Residual Value"
-              type="number"
-              value={capitalizeForm.residualValue}
-              onChange={(e) =>
-                setCapitalizeForm((prev) => ({ ...prev, residualValue: e.target.value }))
-              }
-            />
-            <Input
-              label="Useful Life (months)"
-              type="number"
-              required
-              value={capitalizeForm.usefulLifeMonths}
-              onChange={(e) =>
-                setCapitalizeForm((prev) => ({
-                  ...prev,
-                  usefulLifeMonths: e.target.value,
-                }))
-              }
-            />
-            {selectedMethodCode === DEPRECIATION_METHOD_CODES.DecliningBalance && (
-              <Input
-                label="Declining Balance Factor"
-                type="number"
-                value={capitalizeForm.decliningBalanceFactor}
-                onChange={(e) =>
-                  setCapitalizeForm((prev) => ({
-                    ...prev,
-                    decliningBalanceFactor: e.target.value,
-                  }))
-                }
-                helperText="2 = double declining. Switches to straight line when that gives more."
-              />
-            )}
-            <Input
-              label="Depreciation Start Date"
-              type="date"
-              required
-              value={capitalizeForm.depreciationStartDate}
-              onChange={(e) =>
-                setCapitalizeForm((prev) => ({
-                  ...prev,
-                  depreciationStartDate: e.target.value,
-                }))
-              }
-              helperText="The period containing this date depreciates in full."
-            />
-            <Input
-              label="Opening Accumulated Depreciation"
-              type="number"
-              value={capitalizeForm.openingAccumulatedDepreciation}
-              onChange={(e) =>
-                setCapitalizeForm((prev) => ({
-                  ...prev,
-                  openingAccumulatedDepreciation: e.target.value,
-                }))
-              }
-              helperText="For an asset that arrives part-depreciated."
-            />
-          </div>
-
-          <TextArea
-            label="Notes"
-            value={capitalizeForm.notes}
-            onChange={(e) =>
-              setCapitalizeForm((prev) => ({ ...prev, notes: e.target.value }))
-            }
-            className="mt-4"
-          />
-
-          {selectedMethodCode === DEPRECIATION_METHOD_CODES.None && (
-            <p className="mt-3 rounded bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              Method <strong>None</strong> never depreciates — the asset is carried at cost
-              forever. This is the correct choice for land.
-            </p>
-          )}
-
-          <div className="mt-5 flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setCapitalizeOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={submitCapitalize} disabled={saving}>
-              {saving ? 'Capitalizing…' : 'Capitalize'}
-            </Button>
-          </div>
-        </div>
-      </Modal>
-
       {/* ---------------------------------------------------------------- schedule */}
-      <Modal isOpen={!!viewingBook} onClose={() => setViewingBook(null)} size="3xl">
-        <div className="p-5">
-          <h2 className="mb-4 text-lg font-semibold text-gray-800">
-            {viewingBook?.assetCode} — Depreciation Schedule
-          </h2>
-
-          <div className="mb-4 grid grid-cols-4 gap-4 rounded bg-gray-50 p-3">
-            <DetailField label="Cost" value={money(viewingBook?.cost, viewingBook?.currencyId)} />
-            <DetailField
-              label="Residual"
-              value={money(viewingBook?.residualValue, viewingBook?.currencyId)}
-            />
-            <DetailField
-              label="Accumulated"
-              value={money(viewingBook?.accumulatedDepreciation, viewingBook?.currencyId)}
-            />
-            <DetailField
-              label="Net Book Value"
-              value={money(viewingBook?.netBookValue, viewingBook?.currencyId)}
-            />
-            <DetailField label="Method" value={viewingBook?.depreciationMethodName} />
-            <DetailField label="Useful Life" value={`${viewingBook?.usefulLifeMonths ?? '—'} months`} />
-            <DetailField label="Start Date" value={formatDate(viewingBook?.depreciationStartDate)} />
-            <DetailField
-              label="Opening Accumulated"
-              value={money(viewingBook?.openingAccumulatedDepreciation, viewingBook?.currencyId)}
-            />
-          </div>
-
-          <div className="max-h-80 overflow-y-auto">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-gray-100 text-left text-xs text-gray-600">
-                <tr>
-                  <th className="px-3 py-2">Period</th>
-                  <th className="px-3 py-2 text-right">Charge</th>
-                  <th className="px-3 py-2 text-right">Cumulative</th>
-                  <th className="px-3 py-2 text-center">Posted</th>
-                </tr>
-              </thead>
-              <tbody>
-                {schedule.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-3 py-4 text-center text-gray-500">
-                      No schedule rows. A method of None never generates one, and a schedule
-                      stops where the seeded fiscal calendar ends.
-                    </td>
-                  </tr>
-                )}
-                {schedule.map((row) => (
-                  <tr
-                    key={`${row.fiscalYearCode}-${row.periodOrdinal}`}
-                    className="border-b border-gray-100"
-                  >
-                    <td className="px-3 py-2">
-                      {row.fiscalYearCode} · {row.periodOrdinal}
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      {money(row.amount, viewingBook?.currencyId)}
-                    </td>
-                    <td className="px-3 py-2 text-right text-gray-600">
-                      {money(row.cumulativeAmount, viewingBook?.currencyId)}
-                    </td>
-                    <td className="px-3 py-2 text-center">
-                      {row.isPosted ? (
-                        <span className="text-green-600">✓</span>
-                      ) : (
-                        <span className="text-gray-300">—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </Modal>
+      <ScheduleModal
+        book={viewingBook}
+        schedule={schedule}
+        onClose={() => setViewingBook(null)}
+      />
 
       {/* ---------------------------------------------------------------- revise */}
       <Modal isOpen={!!revising} onClose={() => setRevising(null)} size="lg">
@@ -1268,6 +947,23 @@ export default function DepreciationPage() {
         </div>
       </Modal>
 
+      {/* ------------------------------------------------- opening balance import */}
+      <OpeningBalanceImportModal
+        open={openingImportOpen}
+        onClose={() => setOpeningImportOpen(false)}
+        onApplied={loadBooks}
+      />
+
+      {/* ---------------------------------------------------------- nepal tax run */}
+      <TaxRunModal open={taxRunOpen} onClose={() => setTaxRunOpen(false)} />
+
+      {/* ------------------------------------------------- convention switch */}
+      <ConventionSwitchModal
+        book={switchingBook}
+        onClose={() => setSwitchingBook(null)}
+        onApplied={loadBooks}
+      />
+
       {/* ---------------------------------------------------------------- calculate */}
       <Modal isOpen={calculateOpen} onClose={() => setCalculateOpen(false)} size="lg">
         <div className="p-5">
@@ -1291,15 +987,92 @@ export default function DepreciationPage() {
                 ? 'No open periods — create a fiscal year first'
                 : 'Select an open period'
             }
+            disabled={!!calculateResult}
           />
+
+          {/* What the run is about to do. The basis is per-BOOK, so it is stated as the
+              rule rather than claimed as a single value for the whole run. */}
+          {selectedPeriod && !calculateResult && (
+            <div className="mt-4 rounded bg-gray-50 p-3">
+              <div className="grid grid-cols-3 gap-4">
+                <DetailField
+                  label="Period"
+                  value={`${selectedPeriod.fiscalYearCode} · ${selectedPeriod.monthName}`}
+                />
+                <DetailField
+                  label="Period Start"
+                  value={formatDate(selectedPeriod.startDate)}
+                />
+                <DetailField label="Period End" value={formatDate(selectedPeriod.endDate)} />
+              </div>
+              <p className="mt-3 text-xs text-gray-600">
+                Each book is measured by its own convention. Books on{' '}
+                <strong>Actual Calendar Days</strong> are depreciated using actual calendar
+                days — the start boundary is excluded and the period-end date is included.
+                Books on <strong>Full Month</strong> charge the whole period.
+              </p>
+            </div>
+          )}
+
+          {calculateFailure && (
+            <ReasonBanner
+              className="mt-4"
+              code={calculateFailure.code}
+              message={calculateFailure.message}
+              severity="error"
+            />
+          )}
+
+          {/* What the run actually did. */}
+          {calculateResult && (
+            <div className="mt-4 space-y-3">
+              <div className="grid grid-cols-4 gap-4 rounded bg-gray-50 p-3">
+                <DetailField label="Assets Calculated" value={calculateResult.assetCount} />
+                <DetailField label="Excluded" value={calculateResult.excludedAssetCount} />
+                <DetailField
+                  label="Total Depreciation"
+                  value={money(calculateResult.totalAmount, calculateResult.currencyId)}
+                />
+                <DetailField
+                  label="Warnings"
+                  value={calculateResult.exclusions?.length ?? 0}
+                />
+              </div>
+
+              {calculateResult.exclusions && calculateResult.exclusions.length > 0 && (
+                <ReasonBanner
+                  reasons={calculateResult.exclusions.map((exclusion) => ({
+                    code: exclusion.reasonCode,
+                    message: exclusion.message,
+                    subject: `${exclusion.assetCode} — ${exclusion.assetName}`,
+                  }))}
+                />
+              )}
+            </div>
+          )}
 
           <div className="mt-5 flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setCalculateOpen(false)}>
-              Cancel
+              {calculateResult ? 'Close' : 'Cancel'}
             </Button>
-            <Button onClick={submitCalculate} disabled={saving || !selectedPeriodId}>
-              {saving ? 'Calculating…' : 'Calculate'}
-            </Button>
+            {calculateResult ? (
+              <Button
+                onClick={() => {
+                  setCalculateOpen(false);
+                  setActiveTab('runs');
+                  openRunDetails(calculateResult);
+                }}
+              >
+                View Run Details
+              </Button>
+            ) : (
+              <Button
+                onClick={submitCalculate}
+                disabled={calculating || !selectedPeriodId}
+              >
+                {calculating ? 'Calculating…' : 'Calculate'}
+              </Button>
+            )}
           </div>
         </div>
       </Modal>
@@ -1311,18 +1084,45 @@ export default function DepreciationPage() {
             Run — {viewingRun?.fiscalYearCode} · {viewingRun?.monthName}
           </h2>
 
-          <div className="mb-4 grid grid-cols-4 gap-4 rounded bg-gray-50 p-3">
+          <div className="mb-4 grid grid-cols-5 gap-4 rounded bg-gray-50 p-3">
             <DetailField
               label="Status"
               value={viewingRun ? RUN_STATUS_LABELS[viewingRun.status] : '—'}
             />
             <DetailField label="Assets" value={viewingRun?.assetCount} />
+            <DetailField label="Excluded" value={viewingRun?.excludedAssetCount ?? 0} />
             <DetailField
               label="Total"
               value={money(viewingRun?.totalAmount, viewingRun?.currencyId)}
             />
             <DetailField label="Posted" value={formatDate(viewingRun?.postedOn)} />
+            <DetailField
+              label="Historical Catch-up"
+              value={money(viewingRun?.priorYearCatchUpTotal ?? 0, viewingRun?.currencyId)}
+            />
+            <DetailField
+              label="Current Fiscal Year"
+              value={money(viewingRun?.currentYearTotal ?? 0, viewingRun?.currencyId)}
+            />
           </div>
+
+          {/* Books the run considered and charged nothing for. Warnings, not failures. */}
+          {runExclusions.length > 0 && (
+            <div className="mb-3">
+              <p className="mb-1.5 text-xs font-medium text-gray-600">
+                Excluded assets ({runExclusions.length})
+              </p>
+              <div className="max-h-32 overflow-y-auto">
+                <ReasonBanner
+                  reasons={runExclusions.map((exclusion) => ({
+                    code: exclusion.reasonCode,
+                    message: exclusion.message,
+                    subject: `${exclusion.assetCode} — ${exclusion.assetName}`,
+                  }))}
+                />
+              </div>
+            </div>
+          )}
 
           {viewingRun?.reversalReason && (
             <p className="mb-3 rounded bg-red-50 px-3 py-2 text-xs text-red-800">
@@ -1335,15 +1135,19 @@ export default function DepreciationPage() {
               <thead className="sticky top-0 bg-gray-100 text-left text-xs text-gray-600">
                 <tr>
                   <th className="px-3 py-2">Asset</th>
+                  <th className="px-3 py-2">Convention</th>
+                  <th className="px-3 py-2 text-right">Days</th>
+                  <th className="px-3 py-2 text-right">Opening NBV</th>
                   <th className="px-3 py-2 text-right">Charge</th>
                   <th className="px-3 py-2 text-right">Accumulated After</th>
                   <th className="px-3 py-2 text-right">NBV After</th>
+                  <th className="px-3 py-2 text-right">Residual</th>
                 </tr>
               </thead>
               <tbody>
                 {runDetails.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-3 py-4 text-center text-gray-500">
+                    <td colSpan={8} className="px-3 py-4 text-center text-gray-500">
                       No lines in this run.
                     </td>
                   </tr>
@@ -1358,15 +1162,56 @@ export default function DepreciationPage() {
                           catch-up
                         </span>
                       )}
+                      <p className="mt-0.5 text-[11px] text-gray-400">
+                        <span
+                          className={`mr-1.5 rounded px-1 py-0.5 text-[10px] font-medium ${
+                            detail.startingMode === 'OpeningBalance'
+                              ? 'bg-blue-100 text-blue-700'
+                              : 'bg-gray-100 text-gray-600'
+                          }`}
+                        >
+                          {detail.startingMode === 'OpeningBalance'
+                            ? 'Opening balance'
+                            : 'Historical catch-up'}
+                        </span>
+                        In service {formatDate(detail.availableForUseDate)}
+                        {detail.lastDepreciationThroughDate
+                          ? ` · charged through ${formatDate(
+                              detail.lastDepreciationThroughDate
+                            )}`
+                          : ''}
+                      </p>
+                      {detail.priorYearCatchUpAmount > 0 && (
+                        <p className="mt-0.5 text-[11px] text-amber-700">
+                          {money(detail.priorYearCatchUpAmount, detail.currencyId)} prior-year
+                          catch-up · {money(detail.currentYearAmount, detail.currencyId)} this
+                          year
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-xs text-gray-600">
+                      {CONVENTION_LABELS[detail.depreciationConvention] ?? '—'}
+                    </td>
+                    <td className="px-3 py-2 text-right text-gray-600">
+                      {/* A whole-month book has no day count — the period IS the unit. */}
+                      {detail.chargedDays ?? (
+                        <span className="text-xs text-gray-400">Full period</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-right text-gray-600">
+                      {money(detail.netBookValueBefore, detail.currencyId)}
                     </td>
                     <td className="px-3 py-2 text-right">
-                      {money(detail.amount, viewingRun?.currencyId)}
+                      {money(detail.amount, detail.currencyId)}
                     </td>
                     <td className="px-3 py-2 text-right text-gray-600">
-                      {money(detail.closingAccumulated, viewingRun?.currencyId)}
+                      {money(detail.closingAccumulated, detail.currencyId)}
                     </td>
                     <td className="px-3 py-2 text-right text-gray-600">
-                      {money(detail.netBookValueAfter, viewingRun?.currencyId)}
+                      {money(detail.netBookValueAfter, detail.currencyId)}
+                    </td>
+                    <td className="px-3 py-2 text-right text-gray-600">
+                      {money(detail.residualValue, detail.currencyId)}
                     </td>
                   </tr>
                 ))}

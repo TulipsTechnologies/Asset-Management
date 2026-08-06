@@ -9,6 +9,8 @@ import TextArea from '@/components/UI/TextArea';
 import AssetDocumentsSection from './_components/AssetDocumentsSection';
 import ProfileHeader from '@/components/UI/ProfileHeader';
 import InfoCard, { InfoCardGrid, InfoField } from '@/components/UI/InfoCard';
+import AssetDepreciationSection from './_components/AssetDepreciationSection';
+import AssetTaxProfileSection from './_components/AssetTaxProfileSection';
 import { IAsset } from '@/interface/IAsset';
 import { IAssetAssignment } from '@/interface/IAssetAssignment';
 import {
@@ -461,6 +463,10 @@ const AssetDetailPage = () => {
               value={formatDate(asset.placedInServiceDate)}
             />
           </InfoCard>
+
+          <AssetDepreciationSection assetId={asset.id} />
+
+          <AssetTaxProfileSection assetId={asset.id} />
 
           <InfoCard title="Warranty & Insurance" icon="umbrella">
             <InfoField
