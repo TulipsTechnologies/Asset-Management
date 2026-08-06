@@ -41,7 +41,9 @@ export default function BackButton({ className = '' }: { className?: string }) {
       className={`inline-flex shrink-0 items-center gap-1 rounded-full border border-gray-200 py-1.5 pl-2.5 pr-3.5 text-sm text-gray-600 transition-colors hover:border-primarycolor/40 hover:text-primarycolor ${className}`}
     >
       <i className="icon icon-left text-[10px]" />
-      <span className="max-w-[160px] truncate">{target.label}</span>
+      {/* Just "Back" — the destination stays in the tooltip rather than making the
+          control's width jump about with the length of the page name. */}
+      <span>Back</span>
     </button>
   );
 }
