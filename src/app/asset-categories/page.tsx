@@ -34,6 +34,7 @@ import {
 } from '@/services/assetCategory.service';
 import { fetchDepreciationMethods } from '@/services/depreciation.service';
 import { IDepreciationMethod } from '@/interface/IDepreciation';
+import { DEPRECIATION_METHOD_CODES } from '@/enum/depreciationEnums';
 import { unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import useDebounce from '@/hooks/useDebounce';
@@ -144,6 +145,7 @@ const AssetCategoriesPage = () => {
     { key: 'name', label: 'Name', width: 220, type: 'string', name: 'name' },
     { key: 'parentAssetCategoryName', label: 'Parent', width: 180, type: 'string', name: 'parentAssetCategoryName' },
     { key: 'defaultDepreciationMethodName', label: 'Depreciation Default', width: 170, type: 'string', name: 'defaultDepreciationMethodName' },
+    { key: 'defaultResidualRate', label: 'Residual Rate (%)', width: 140, name: 'defaultResidualRate' },
     { key: 'assetCount', label: 'Assets', width: 80, name: 'assetCount' },
     { key: 'isActive', label: 'Active', width: 90, name: 'isActive' },
     {
@@ -392,6 +394,12 @@ const AssetCategoriesPage = () => {
     parentAssetCategoryName: category.parentAssetCategoryName || '—',
     defaultDepreciationMethodName:
       category.defaultDepreciationMethodName || '—',
+    defaultResidualRate:
+      category.defaultResidualRate != null ? (
+        <span className="tabular-nums">{category.defaultResidualRate}%</span>
+      ) : (
+        '—'
+      ),
     assetCount: category.assetCount || '—',
     isActive: category.isActive ? (
       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -573,8 +581,20 @@ const AssetCategoriesPage = () => {
             </div>
             <Select
               label="Default Method"
-              placeholder="None"
-              options={methods.map((m) => ({ value: m.id, label: m.name }))}
+              placeholder="No default"
+              options={methods
+                // Straight Line and Diminishing Balance only — the same two the
+                // capitalize form offers, so a category default can never prefill a
+                // method that form will not show. A category already carrying one of
+                // the retired methods keeps it selectable so editing does not silently
+                // clear it.
+                .filter(
+                  (m) =>
+                    m.code === DEPRECIATION_METHOD_CODES.StraightLine ||
+                    m.code === DEPRECIATION_METHOD_CODES.DecliningBalance ||
+                    m.id === form.defaultDepreciationMethodId
+                )
+                .map((m) => ({ value: m.id, label: m.name }))}
               value={form.defaultDepreciationMethodId}
               onChange={(e) =>
                 setForm((prev) => ({
@@ -632,57 +652,128 @@ const AssetCategoriesPage = () => {
       </Modal>
 
       {/* View details — read-only, reachable for every row */}
-      <Modal isOpen={viewing !== null} onClose={() => setViewing(null)} size="lg">
-        <div className="p-6">
-          <h2 className="text-lg font-semibold text-secondaryColor mb-1">
-            {viewing?.name}
-          </h2>
-          <p className="text-xs text-gray-400 mb-4 font-mono">
-            {viewing?.categoryCode}
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-            <DetailField label="Parent" value={viewing?.parentAssetCategoryName} />
-            <DetailField
-              label="Status"
-              value={viewing?.isActive ? 'Active' : 'Inactive'}
-            />
-            <DetailField
-              label="Depreciation Default"
-              value={viewing?.defaultDepreciationMethodName}
-            />
-            <DetailField
-              label="Useful Life"
-              value={
-                viewing?.defaultUsefulLifeMonths
-                  ? `${viewing.defaultUsefulLifeMonths} months`
-                  : null
-              }
-            />
-            <DetailField
-              label="Residual Rate"
-              value={
-                viewing?.defaultResidualRate != null
-                  ? `${viewing.defaultResidualRate}%`
-                  : null
-              }
-            />
-            <DetailField
-              label="Display Order"
-              value={String(viewing?.displayOrder ?? '')}
-            />
-            <DetailField
-              label="Assets Classified Here"
-              value={String(viewing?.assetCount ?? 0)}
-            />
-            <DetailField
-              label="Child Categories"
-              value={viewing?.hasChildren ? 'Yes' : 'None'}
-            />
-            <div className="md:col-span-2">
-              <DetailField label="Description" value={viewing?.description} />
+      <Modal isOpen={viewing !== null} onClose={() => setViewing(null)} size="2xl">
+        <div className="flex max-h-[85vh] flex-col">
+          {/* Identity band: what this category IS, and its standing at a glance. */}
+          <div className="shrink-0 border-b border-gray-100 px-6 pb-4 pr-14 pt-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="truncate text-lg font-semibold text-secondaryColor">
+                    {viewing?.name}
+                  </h2>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                      viewing?.isActive
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    {viewing?.isActive ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+                <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-400">
+                  <span className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-gray-600">
+                    {viewing?.categoryCode}
+                  </span>
+                  {viewing?.parentAssetCategoryName ? (
+                    <span>under {viewing.parentAssetCategoryName}</span>
+                  ) : (
+                    <span>top-level category</span>
+                  )}
+                </p>
+              </div>
             </div>
           </div>
-          <div className="flex justify-end gap-3 mt-6">
+
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-5">
+            {/* The two numbers that matter operationally. */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                  Assets classified here
+                </p>
+                <p className="mt-1 text-2xl font-bold leading-none tabular-nums text-secondaryColor">
+                  {viewing?.assetCount ?? 0}
+                </p>
+              </div>
+              <div className="rounded-xl border border-gray-100 bg-white px-4 py-3 shadow-sm">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                  Child categories
+                </p>
+                <p className="mt-1 text-2xl font-bold leading-none text-secondaryColor">
+                  {viewing?.hasChildren ? 'Yes' : 'None'}
+                </p>
+              </div>
+            </div>
+
+            <section>
+              <h3 className="mb-2 border-b border-gray-100 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                Depreciation defaults
+              </h3>
+              <p className="mb-3 text-xs text-gray-400">
+                Prefilled when an asset in this category is capitalized; the accountant
+                can still override each one per asset.
+              </p>
+              <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
+                <DetailField
+                  label="Method"
+                  value={viewing?.defaultDepreciationMethodName}
+                />
+                <DetailField
+                  label="Useful life"
+                  value={
+                    viewing?.defaultUsefulLifeMonths
+                      ? `${viewing.defaultUsefulLifeMonths} months`
+                      : null
+                  }
+                />
+                <DetailField
+                  label="Residual rate"
+                  value={
+                    viewing?.defaultResidualRate != null
+                      ? `${viewing.defaultResidualRate}%`
+                      : null
+                  }
+                />
+              </div>
+            </section>
+
+            <section>
+              <h3 className="mb-2 border-b border-gray-100 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                Classification
+              </h3>
+              <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
+                <DetailField
+                  label="Parent"
+                  value={viewing?.parentAssetCategoryName}
+                />
+                <DetailField
+                  label="Display order"
+                  value={
+                    viewing?.displayOrder != null ? String(viewing.displayOrder) : null
+                  }
+                />
+                <DetailField
+                  label="Status"
+                  value={viewing?.isActive ? 'Active' : 'Inactive'}
+                />
+              </div>
+            </section>
+
+            <section>
+              <h3 className="mb-2 border-b border-gray-100 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                Description
+              </h3>
+              <p className="text-sm leading-relaxed text-secondaryColor">
+                {viewing?.description || (
+                  <span className="text-gray-400">No description recorded.</span>
+                )}
+              </p>
+            </section>
+          </div>
+
+          <div className="flex shrink-0 justify-end gap-3 border-t border-gray-100 px-6 py-4">
             <Button variant="secondary" onClick={() => setViewing(null)}>
               Close
             </Button>
