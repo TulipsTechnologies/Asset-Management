@@ -39,6 +39,7 @@ import {
   fetchDepreciationRun,
   fetchDepreciationRuns,
   fetchFiscalPeriods,
+  fetchFiscalYears,
   fetchJournalProposal,
   fetchJournalProposals,
   fetchRunDetails,
@@ -315,9 +316,30 @@ export default function DepreciationPage() {
     setCalculateFailure(null);
     setCalculateOpen(true);
     try {
+      // Ask for the CURRENT fiscal year's periods, not "the first hundred open ones".
+      // Every period of every future year is open, so an unscoped page — returned newest
+      // first — was entirely years away from now and did not even contain the current
+      // year: 324 open periods, page size 100, current year nowhere in it.
+      const today = new Date().toISOString().slice(0, 10);
+      const years = (await fetchFiscalYears())?.data ?? [];
+      const currentYear =
+        years.find(
+          (y) => y.startDate.slice(0, 10) <= today && y.endDate.slice(0, 10) >= today
+        ) ??
+        // No year contains today (a gap in the calendar): use the latest one that has begun.
+        [...years]
+          .filter((y) => y.startDate.slice(0, 10) <= today)
+          .sort((a, b) => b.startDate.localeCompare(a.startDate))[0];
+
+      if (!currentYear) {
+        setOpenPeriods([]);
+        return;
+      }
+
       const response = await fetchFiscalPeriods({
         pageNumber: 1,
-        pageSize: 100,
+        pageSize: 12,
+        fiscalYearId: currentYear.id,
         status: FiscalPeriodStatusEnum.Open,
       });
       setOpenPeriods(unwrapPaged<IFiscalPeriod>(response).items);
@@ -741,6 +763,39 @@ export default function DepreciationPage() {
 
   const selectedPeriod = openPeriods.find((p) => p.id === selectedPeriodId);
 
+  /**
+   * Runnable periods: the CURRENT fiscal year's, oldest first, and none that has not begun.
+   *
+   * Every period of every future year is "open" — nothing has closed them — so an unfiltered
+   * list offered years away from now, newest first, which put the most wrong choice at the
+   * top. A run also cannot depreciate a period that has not started. Earlier unrun periods
+   * need no entry of their own: the run sweeps them in as flagged catch-up lines, which is
+   * what the note at the top of this dialog says.
+   */
+  const runnablePeriods = (() => {
+    if (openPeriods.length === 0) return [];
+    const today = new Date().toISOString().slice(0, 10);
+
+    const currentYearCode = openPeriods.find(
+      (p) => p.startDate.slice(0, 10) <= today && p.endDate.slice(0, 10) >= today
+    )?.fiscalYearCode;
+
+    // No period contains today (a calendar gap): fall back to the latest year that has
+    // started, so the dialog still offers the nearest real choice rather than the future.
+    const fallbackCode = [...openPeriods]
+      .filter((p) => p.startDate.slice(0, 10) <= today)
+      .sort((a, b) => b.startDate.localeCompare(a.startDate))[0]?.fiscalYearCode;
+
+    const yearCode = currentYearCode ?? fallbackCode;
+    if (!yearCode) return [];
+
+    return openPeriods
+      .filter((p) => p.fiscalYearCode === yearCode && p.startDate.slice(0, 10) <= today)
+      .sort((a, b) => a.periodOrdinal - b.periodOrdinal);
+  })();
+
+  const runFiscalYearCode = runnablePeriods[0]?.fiscalYearCode ?? null;
+
   // ---------------------------------------------------------------- render
 
   return (
@@ -978,14 +1033,21 @@ export default function DepreciationPage() {
             required
             value={selectedPeriodId}
             onChange={(e) => setSelectedPeriodId(e.target.value)}
-            options={openPeriods.map((p) => ({
-              label: `${p.fiscalYearCode} · ${p.monthName} (period ${p.periodOrdinal})`,
+            options={runnablePeriods.map((p) => ({
+              label: `${p.monthName} (period ${p.periodOrdinal})`,
               value: p.id,
             }))}
             placeholder={
               openPeriods.length === 0
                 ? 'No open periods — create a fiscal year first'
-                : 'Select an open period'
+                : runnablePeriods.length === 0
+                  ? 'No period of the current fiscal year has started yet'
+                  : 'Select a period'
+            }
+            helperText={
+              runFiscalYearCode
+                ? `Fiscal year ${runFiscalYearCode}. Later periods appear once they begin.`
+                : undefined
             }
             disabled={!!calculateResult}
           />
