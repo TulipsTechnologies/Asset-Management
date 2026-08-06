@@ -1,5 +1,5 @@
 import { requestApi } from './httpService';
-import { buildQuery } from '@/utils/serviceUtils';
+import { buildQuery, sortQuery } from '@/utils/serviceUtils';
 import { IPagedResponse, IResponse } from '@/interface/IGeneric';
 import {
   ICancelMaintenanceRequest,
@@ -28,6 +28,7 @@ export const getMaintenanceRequests = (
       buildQuery({
         PageNumber: filter.pageNumber,
         PageSize: filter.pageSize,
+        ...sortQuery(filter),
         Search: filter.search,
         Status: filter.status,
         RequestType: filter.requestType,
@@ -114,6 +115,7 @@ export const getWorkOrders = (
       buildQuery({
         PageNumber: filter.pageNumber,
         PageSize: filter.pageSize,
+        ...sortQuery(filter),
         Search: filter.search,
         Status: filter.status,
         WorkOrderType: filter.workOrderType,

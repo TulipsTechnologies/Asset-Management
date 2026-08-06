@@ -1,4 +1,5 @@
 import { IReasonDetail } from '@/interface/IGeneric';
+import { ISortFilter } from '@/utils/serviceUtils';
 
 export interface IAssetBook {
   id: string;
@@ -111,7 +112,7 @@ export interface IReviseEstimate {
   rowVersion: string;
 }
 
-export interface IAssetBookFilter {
+export interface IAssetBookFilter extends ISortFilter {
   pageNumber?: number;
   pageSize?: number;
   search?: string;
@@ -349,7 +350,7 @@ export interface IChangeBookConvention {
   reason?: string;
 }
 
-export interface IDepreciationRunFilter {
+export interface IDepreciationRunFilter extends ISortFilter {
   pageNumber?: number;
   pageSize?: number;
   fiscalYearCode?: string;
@@ -470,7 +471,7 @@ export interface IJournalProposal {
   rowVersion: string;
 }
 
-export interface IJournalProposalFilter {
+export interface IJournalProposalFilter extends ISortFilter {
   pageNumber?: number;
   pageSize?: number;
   sourceType?: number;

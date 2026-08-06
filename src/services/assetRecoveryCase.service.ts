@@ -1,5 +1,5 @@
 import { requestApi } from './httpService';
-import { buildQuery } from '@/utils/serviceUtils';
+import { buildQuery, sortQuery } from '@/utils/serviceUtils';
 import { IPagedResponse, IResponse } from '@/interface/IGeneric';
 import {
   IAssetRecoveryCase,
@@ -16,6 +16,7 @@ export const fetchAssetRecoveryCases = (
       buildQuery({
         PageNumber: filter.pageNumber,
         PageSize: filter.pageSize,
+        ...sortQuery(filter),
         Search: filter.search,
         Status: filter.status,
         EmployeeId: filter.employeeId,

@@ -15,6 +15,7 @@ import CustomMenuItem from '@/components/UI/CustomMenuItem';
 import Dropdown from '@/components/UI/Dropdown';
 import RowKebab from '@/components/UI/RowKebab';
 import Modal from '@/components/UI/Modal';
+import PageToolbar from '@/components/UI/PageToolbar';
 import Input from '@/components/UI/Input';
 import Select from '@/components/UI/Select';
 import TextArea from '@/components/UI/TextArea';
@@ -49,7 +50,11 @@ import {
 } from '@/services/assetAudit.service';
 import { fetchAssetLocations } from '@/services/assetLocation.service';
 import { fetchEmployees } from '@/services/employee.service';
-import { saveBlobResponse, unwrapPaged } from '@/utils/serviceUtils';
+import {
+  mergeTableFilters,
+  saveBlobResponse,
+  unwrapPaged,
+} from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import { ASSET_CONDITIONS, CustodyStatusEnum } from '@/enum/assetEnums';
 import {
@@ -365,29 +370,11 @@ const CampaignDetailPage = () => {
   }, [debouncedDiscSearch]);
 
   const updateResultFilters = (updates: Partial<ITableFilters>) => {
-    setResultFilters((prev) => ({
-      ...prev,
-      ...(updates.pageNumber !== undefined && {
-        pageNumber: Number(updates.pageNumber),
-      }),
-      ...(updates.pageSize !== undefined && {
-        pageSize: Number(updates.pageSize),
-        pageNumber: 1,
-      }),
-    }));
+    setResultFilters((prev) => mergeTableFilters(prev, updates));
   };
 
   const updateDiscFilters = (updates: Partial<ITableFilters>) => {
-    setDiscFilters((prev) => ({
-      ...prev,
-      ...(updates.pageNumber !== undefined && {
-        pageNumber: Number(updates.pageNumber),
-      }),
-      ...(updates.pageSize !== undefined && {
-        pageSize: Number(updates.pageSize),
-        pageNumber: 1,
-      }),
-    }));
+    setDiscFilters((prev) => mergeTableFilters(prev, updates));
   };
 
   /** Refreshes the campaign header/stat counts plus whichever tab is showing. */
@@ -777,13 +764,19 @@ const CampaignDetailPage = () => {
 
   // ---- Tables ----
 
+  // sortField names an AssetAuditResult ENTITY property. Item and Location print names
+  // joined from Asset and AssetLocation — the result row itself holds only their ids, so
+  // there is nothing the database could order those two by; both stay unsorted. The
+  // discrepancy and evidence figures are counted in the projection, likewise.
   const resultColumns: TTableColumn[] = [
     { key: 'item', label: 'Item', width: 190, name: 'item' },
-    { key: 'resultType', label: 'Result', width: 130, name: 'resultType' },
+    { key: 'resultType', label: 'Result', width: 130, name: 'resultType', sortField: 'ResultType' },
     { key: 'location', label: 'Location (found / expected)', width: 170, name: 'location' },
     { key: 'discrepancies', label: 'Discrepancies', width: 105, name: 'discrepancies' },
-    { key: 'verifiedOn', label: 'Verified', width: 95, name: 'verifiedOn' },
-    { key: 'applied', label: 'Applied', width: 110, name: 'applied' },
+    { key: 'verifiedOn', label: 'Verified', width: 95, name: 'verifiedOn', sortField: 'VerifiedOn' },
+    // Prints the applied date, or the skip reason where approval passed the row over —
+    // and orders by the date, which is what the column is called.
+    { key: 'applied', label: 'Applied', width: 110, name: 'applied', sortField: 'AppliedOn' },
     { key: 'evidence', label: 'Evidence', width: 80, name: 'evidence' },
     {
       key: 'actions',
@@ -887,12 +880,15 @@ const CampaignDetailPage = () => {
     ),
   }));
 
+  // sortField names an AssetAuditDiscrepancy ENTITY property. Asset shows a code and name
+  // joined from Asset (the row holds only AssetId), and Expected / Found is two
+  // independent strings in one cell with no one value to order it by — neither is sortable.
   const discColumns: TTableColumn[] = [
     { key: 'asset', label: 'Asset', width: 180, name: 'asset' },
-    { key: 'type', label: 'Type', width: 130, name: 'type' },
+    { key: 'type', label: 'Type', width: 130, name: 'type', sortField: 'DiscrepancyType' },
     { key: 'values', label: 'Expected / Found', width: 220, name: 'values' },
-    { key: 'status', label: 'Status', width: 110, name: 'status' },
-    { key: 'latestAction', label: 'Latest Action', width: 120, name: 'latestAction' },
+    { key: 'status', label: 'Status', width: 110, name: 'status', sortField: 'Status' },
+    { key: 'latestAction', label: 'Latest Action', width: 120, name: 'latestAction', sortField: 'LatestAction' },
     {
       key: 'actions',
       label: <i className="icon icon-actions text-[10px]" />,
@@ -1029,6 +1025,62 @@ const CampaignDetailPage = () => {
 
   return (
     <div className="px-4 mt-2 space-y-4">
+      <PageToolbar
+        className="mb-0"
+        actions={
+          <>
+            {campaign.status === AuditCampaignStatusEnum.Draft && (
+              <Button
+                variant="toolbar"
+                onClick={() =>
+                  runTransition(() =>
+                    startCampaign(campaign.id, campaign.rowVersion ?? '')
+                  )
+                }
+              >
+                <i className="icon icon-search text-xs" />
+                <span>Start Scanning</span>
+              </Button>
+            )}
+            {campaign.status === AuditCampaignStatusEnum.InProgress && (
+              <Button
+                variant="toolbar"
+                onClick={() =>
+                  runTransition(() =>
+                    submitCampaign(campaign.id, campaign.rowVersion ?? '')
+                  )
+                }
+              >
+                <i className="icon icon-upload text-xs" />
+                <span>Submit for Review</span>
+              </Button>
+            )}
+            {campaign.status === AuditCampaignStatusEnum.UnderReview && (
+              <Button variant="toolbar" onClick={() => setApproveOpen(true)}>
+                <i className="icon icon-check-circle text-xs" />
+                <span>Approve</span>
+              </Button>
+            )}
+            {[
+              AuditCampaignStatusEnum.Draft,
+              AuditCampaignStatusEnum.InProgress,
+              AuditCampaignStatusEnum.UnderReview,
+            ].includes(campaign.status) && (
+              <Button
+                variant="toolbarDanger"
+                onClick={() => {
+                  setCancelReason('');
+                  setCancelOpen(true);
+                }}
+              >
+                <i className="icon icon-close text-xs" />
+                <span>Cancel</span>
+              </Button>
+            )}
+          </>
+        }
+      />
+
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-y-2">
         <div>
@@ -1046,54 +1098,6 @@ const CampaignDetailPage = () => {
           <p className="text-xs text-gray-500 mt-0.5">Scopes: {scopesSummary}</p>
           {campaign.description && (
             <p className="text-xs text-gray-500 mt-0.5">{campaign.description}</p>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => router.push('/physical-verification')}
-            className="text-sm text-gray-500 hover:text-primarycolor"
-          >
-            <i className="icon icon-left text-xs mr-1" /> Back
-          </button>
-          {campaign.status === AuditCampaignStatusEnum.Draft && (
-            <Button
-              onClick={() =>
-                runTransition(() =>
-                  startCampaign(campaign.id, campaign.rowVersion ?? '')
-                )
-              }
-            >
-              Start Scanning
-            </Button>
-          )}
-          {campaign.status === AuditCampaignStatusEnum.InProgress && (
-            <Button
-              onClick={() =>
-                runTransition(() =>
-                  submitCampaign(campaign.id, campaign.rowVersion ?? '')
-                )
-              }
-            >
-              Submit for Review
-            </Button>
-          )}
-          {campaign.status === AuditCampaignStatusEnum.UnderReview && (
-            <Button onClick={() => setApproveOpen(true)}>Approve</Button>
-          )}
-          {[
-            AuditCampaignStatusEnum.Draft,
-            AuditCampaignStatusEnum.InProgress,
-            AuditCampaignStatusEnum.UnderReview,
-          ].includes(campaign.status) && (
-            <Button
-              variant="danger"
-              onClick={() => {
-                setCancelReason('');
-                setCancelOpen(true);
-              }}
-            >
-              Cancel
-            </Button>
           )}
         </div>
       </div>
@@ -1264,6 +1268,7 @@ const CampaignDetailPage = () => {
               once, so a reused instance would render the other tab's columns. */}
           <CustomTable
             key="verification-results-table"
+            showBack={false}
             columns={resultColumns}
             rows={resultRows}
             tableName="Verification Results"
@@ -1348,6 +1353,8 @@ const CampaignDetailPage = () => {
               </>
             }
             updateFilters={updateResultFilters}
+            sortBy={resultFilters.sortBy}
+            sortDesc={resultFilters.sortDesc}
           />
 
           <div className="mt-3">
@@ -1364,6 +1371,7 @@ const CampaignDetailPage = () => {
         <>
           <CustomTable
             key="verification-discrepancies-table"
+            showBack={false}
             columns={discColumns}
             rows={discRows}
             tableName="Verification Discrepancies"
@@ -1441,6 +1449,8 @@ const CampaignDetailPage = () => {
               </>
             }
             updateFilters={updateDiscFilters}
+            sortBy={discFilters.sortBy}
+            sortDesc={discFilters.sortDesc}
           />
 
           <div className="mt-3">

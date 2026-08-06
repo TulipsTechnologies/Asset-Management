@@ -25,7 +25,7 @@ import {
   closeAssetRecoveryCase,
   fetchAssetRecoveryCases,
 } from '@/services/assetRecoveryCase.service';
-import { unwrapPaged } from '@/utils/serviceUtils';
+import { mergeTableFilters, unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import {
   RECOVERY_CASE_STATUS_BADGE_CLASSES,
@@ -67,14 +67,18 @@ const RecoveryCasesTab = () => {
   // View modal
   const [viewing, setViewing] = useState<IAssetRecoveryCase | null>(null);
 
+  // sortField names an AssetRecoveryCase ENTITY property, so the server orders every
+  // case and returns page 1. Asset code, asset name and the employee are joined in from
+  // other tables — the case row holds only their ids — so they carry no sort control.
   const columns: TTableColumn[] = [
     { key: 'assetCode', label: 'Asset', width: 110, type: 'string', name: 'assetCode' },
     { key: 'assetName', label: 'Name', width: 150, type: 'string', name: 'assetName' },
     { key: 'employeeName', label: 'Employee', width: 160, type: 'string', name: 'employeeName' },
-    { key: 'description', label: 'Description', width: 220, type: 'string', name: 'description' },
-    { key: 'amount', label: 'Est. Amount', width: 110, name: 'amount' },
-    { key: 'status', label: 'Status', width: 90, name: 'status' },
-    { key: 'createdOn', label: 'Opened', width: 100, name: 'createdOn' },
+    { key: 'description', label: 'Description', width: 220, type: 'string', name: 'description', sortField: 'Description' },
+    // Formatted with its currency, but ordered by the stored decimal.
+    { key: 'amount', label: 'Est. Amount', width: 110, name: 'amount', sortField: 'EstimatedAmount' },
+    { key: 'status', label: 'Status', width: 90, name: 'status', sortField: 'Status' },
+    { key: 'createdOn', label: 'Opened', width: 100, name: 'createdOn', sortField: 'CreatedOn' },
     {
       key: 'actions',
       label: <i className="icon icon-actions text-[10px]" />,
@@ -118,16 +122,7 @@ const RecoveryCasesTab = () => {
   }, [debouncedSearch]);
 
   const updateFilters = (updates: Partial<ITableFilters>) => {
-    setFilters((prev) => ({
-      ...prev,
-      ...(updates.pageNumber !== undefined && {
-        pageNumber: Number(updates.pageNumber),
-      }),
-      ...(updates.pageSize !== undefined && {
-        pageSize: Number(updates.pageSize),
-        pageNumber: 1,
-      }),
-    }));
+    setFilters((prev) => mergeTableFilters(prev, updates));
   };
 
   const openResolve = (recoveryCase: IAssetRecoveryCase) => {

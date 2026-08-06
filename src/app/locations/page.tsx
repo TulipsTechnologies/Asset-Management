@@ -27,7 +27,7 @@ import RowKebab from '@/components/UI/RowKebab';
 import ConfirmationModal from '@/components/UI/ConfirmationModel';
 import BulkDeleteModal from '@/components/UI/BulkDeleteModal';
 import { IBulkResult, runBulkAction, summariseBulk } from '@/utils/bulkActions';
-import { unwrapPaged } from '@/utils/serviceUtils';
+import { mergeTableFilters, unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import useDebounce from '@/hooks/useDebounce';
 
@@ -65,13 +65,16 @@ const LocationsPage = () => {
   const [deleting, setDeleting] = useState<IAssetLocation | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // sortField names an AssetLocation ENTITY property, so the server orders the whole tree
+  // and hands back page 1. Parent is the joined parent row's name and Assets is a subquery
+  // count — neither is a stored column here, so neither offers a sort control.
   const columns: TTableColumn[] = [
-    { key: 'code', label: 'Code', width: 100, type: 'string', name: 'code' },
-    { key: 'name', label: 'Name', width: 200, type: 'string', name: 'name' },
+    { key: 'code', label: 'Code', width: 100, type: 'string', name: 'code', sortField: 'Code' },
+    { key: 'name', label: 'Name', width: 200, type: 'string', name: 'name', sortField: 'Name' },
     { key: 'parentAssetLocationName', label: 'Parent', width: 170, type: 'string', name: 'parentAssetLocationName' },
-    { key: 'address', label: 'Address', width: 220, type: 'string', name: 'address' },
+    { key: 'address', label: 'Address', width: 220, type: 'string', name: 'address', sortField: 'Address' },
     { key: 'assetCount', label: 'Assets', width: 80, name: 'assetCount' },
-    { key: 'isActive', label: 'Active', width: 80, name: 'isActive' },
+    { key: 'isActive', label: 'Active', width: 80, name: 'isActive', sortField: 'IsActive' },
     {
       key: 'actions',
       label: <i className="icon icon-actions text-[10px]" />,
@@ -115,16 +118,7 @@ const LocationsPage = () => {
   }, [debouncedSearch]);
 
   const updateFilters = (updates: Partial<ITableFilters>) => {
-    setFilters((prev) => ({
-      ...prev,
-      ...(updates.pageNumber !== undefined && {
-        pageNumber: Number(updates.pageNumber),
-      }),
-      ...(updates.pageSize !== undefined && {
-        pageSize: Number(updates.pageSize),
-        pageNumber: 1,
-      }),
-    }));
+    setFilters((prev) => mergeTableFilters(prev, updates));
   };
 
   const openCreate = () => {

@@ -1,5 +1,5 @@
 import { requestApi } from './httpService';
-import { buildQuery } from '@/utils/serviceUtils';
+import { buildQuery, sortQuery } from '@/utils/serviceUtils';
 import { IPagedResponse, IResponse } from '@/interface/IGeneric';
 import {
   IAsset,
@@ -20,6 +20,7 @@ import {
  * calendar or the analytics would quietly narrow them.
  */
 const assetFilterQuery = (filter: IAssetFilter) => ({
+  ...sortQuery(filter),
   Search: filter.search,
   AssetCategoryId: filter.assetCategoryId,
   LifecycleStatus: filter.lifecycleStatus,

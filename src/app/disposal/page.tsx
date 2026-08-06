@@ -46,7 +46,11 @@ import {
 } from '@/services/disposal.service';
 import { fetchAssets } from '@/services/asset.service';
 import { fetchEmployees } from '@/services/employee.service';
-import { saveBlobResponse, unwrapPaged } from '@/utils/serviceUtils';
+import {
+  mergeTableFilters,
+  saveBlobResponse,
+  unwrapPaged,
+} from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import {
   CUSTODY_LABELS,
@@ -338,13 +342,19 @@ const DisposalPage = () => {
   const [documentSaving, setDocumentSaving] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
+  // sortField names a DisposalRequest ENTITY property, so the server orders every request
+  // and hands back page 1. Asset and Requested By are joined in from the asset and the
+  // employee (the entity holds only their ids), and Proceeds prints the executed figure
+  // from the transaction row when there is one and the estimate otherwise — a choice made
+  // per row in the browser, which no single ORDER BY reproduces. None of the three offers
+  // a sort control. The badges sort by the enum stored behind them.
   const columns: TTableColumn[] = [
     { key: 'asset', label: 'Asset', width: 190, type: 'string', name: 'asset' },
-    { key: 'method', label: 'Method', width: 130, name: 'method' },
+    { key: 'method', label: 'Method', width: 130, name: 'method', sortField: 'DisposalMethod' },
     { key: 'proceeds', label: 'Proceeds', width: 120, name: 'proceeds' },
-    { key: 'status', label: 'Status', width: 145, name: 'status' },
+    { key: 'status', label: 'Status', width: 145, name: 'status', sortField: 'Status' },
     { key: 'requestedBy', label: 'Requested By', width: 150, name: 'requestedBy' },
-    { key: 'createdOn', label: 'Requested', width: 100, name: 'createdOn' },
+    { key: 'createdOn', label: 'Requested', width: 100, name: 'createdOn', sortField: 'CreatedOn' },
     {
       key: 'actions',
       label: <i className="icon icon-actions text-[10px]" />,
@@ -388,16 +398,7 @@ const DisposalPage = () => {
   }, [debouncedSearch]);
 
   const updateFilters = (updates: Partial<ITableFilters>) => {
-    setFilters((prev) => ({
-      ...prev,
-      ...(updates.pageNumber !== undefined && {
-        pageNumber: Number(updates.pageNumber),
-      }),
-      ...(updates.pageSize !== undefined && {
-        pageSize: Number(updates.pageSize),
-        pageNumber: 1,
-      }),
-    }));
+    setFilters((prev) => mergeTableFilters(prev, updates));
   };
 
   /**

@@ -29,7 +29,7 @@ import {
   initiateAssetReturn,
 } from '@/services/assetReturn.service';
 import { fetchAssetAssignments } from '@/services/assetAssignment.service';
-import { unwrapPaged } from '@/utils/serviceUtils';
+import { mergeTableFilters, unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import { ASSET_CONDITIONS } from '@/enum/assetEnums';
 import { AssignmentStatusEnum } from '@/enum/assignmentEnums';
@@ -169,13 +169,18 @@ const ReturnsPage = () => {
   // Detail modal (view-only)
   const [viewing, setViewing] = useState<IAssetReturn | null>(null);
 
+  // sortField names an AssetReturn ENTITY property, so the server orders every return
+  // and returns page 1. Asset code and name and the custodian are joined in from other
+  // tables, and Recovery is a count and a total summed over the case rows — none of
+  // those exist on the return row, so they carry no sort control.
   const columns: TTableColumn[] = [
     { key: 'assetCode', label: 'Asset', width: 110, type: 'string', name: 'assetCode' },
     { key: 'assetName', label: 'Name', width: 160, type: 'string', name: 'assetName' },
     { key: 'returnedBy', label: 'Returned By', width: 165, name: 'returnedBy' },
-    { key: 'returnDate', label: 'Return Date', width: 105, name: 'returnDate' },
-    { key: 'status', label: 'Status', width: 130, name: 'status' },
-    { key: 'outcome', label: 'Outcome', width: 120, name: 'outcome' },
+    { key: 'returnDate', label: 'Return Date', width: 105, name: 'returnDate', sortField: 'ReturnDate' },
+    { key: 'status', label: 'Status', width: 130, name: 'status', sortField: 'Status' },
+    // The badges print a label but order by the stored enum.
+    { key: 'outcome', label: 'Outcome', width: 120, name: 'outcome', sortField: 'Outcome' },
     { key: 'recovery', label: 'Recovery', width: 110, name: 'recovery' },
     {
       key: 'actions',
@@ -220,16 +225,7 @@ const ReturnsPage = () => {
   }, [debouncedSearch]);
 
   const updateFilters = (updates: Partial<ITableFilters>) => {
-    setFilters((prev) => ({
-      ...prev,
-      ...(updates.pageNumber !== undefined && {
-        pageNumber: Number(updates.pageNumber),
-      }),
-      ...(updates.pageSize !== undefined && {
-        pageSize: Number(updates.pageSize),
-        pageNumber: 1,
-      }),
-    }));
+    setFilters((prev) => mergeTableFilters(prev, updates));
   };
 
   // House pattern: after ANY failed workflow action, close the modal and

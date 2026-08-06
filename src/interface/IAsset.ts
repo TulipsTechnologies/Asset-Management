@@ -6,6 +6,7 @@ import {
   OwnershipTypeEnum,
   VerificationStatusEnum,
 } from '@/enum/assetEnums';
+import { ISortFilter } from '@/utils/serviceUtils';
 
 export interface IAssetListItem {
   id: string;
@@ -142,7 +143,7 @@ export interface IUpdateAsset {
   rowVersion: string;
 }
 
-export interface IAssetFilter {
+export interface IAssetFilter extends ISortFilter {
   pageNumber?: number;
   pageSize?: number;
   search?: string;

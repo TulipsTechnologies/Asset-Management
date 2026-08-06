@@ -1,4 +1,5 @@
 import { VendorTypeEnum } from '@/enum/vendorEnums';
+import { ISortFilter } from '@/utils/serviceUtils';
 
 export interface IVendor {
   id: string;
@@ -32,7 +33,7 @@ export interface IUpdateVendor extends IUpsertVendor {
   rowVersion: string;
 }
 
-export interface IVendorFilter {
+export interface IVendorFilter extends ISortFilter {
   pageNumber?: number;
   pageSize?: number;
   search?: string;

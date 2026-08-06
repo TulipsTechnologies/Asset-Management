@@ -3,6 +3,7 @@ import {
   ReturnOutcomeEnum,
   ReturnStatusEnum,
 } from '@/enum/returnEnums';
+import { ISortFilter } from '@/utils/serviceUtils';
 
 /** Recovery-case summary embedded on a return row. */
 export interface IReturnRecoveryCaseSummary {
@@ -73,7 +74,7 @@ export interface ICancelAssetReturn {
   rowVersion: string;
 }
 
-export interface IAssetReturnFilter {
+export interface IAssetReturnFilter extends ISortFilter {
   pageNumber?: number;
   pageSize?: number;
   search?: string;
@@ -113,7 +114,7 @@ export interface ICloseAssetRecoveryCase {
   rowVersion: string;
 }
 
-export interface IAssetRecoveryCaseFilter {
+export interface IAssetRecoveryCaseFilter extends ISortFilter {
   pageNumber?: number;
   pageSize?: number;
   search?: string;

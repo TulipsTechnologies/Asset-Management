@@ -34,7 +34,7 @@ import {
 import { fetchAssets } from '@/services/asset.service';
 import { fetchEmployees } from '@/services/employee.service';
 import { fetchAssetLocations } from '@/services/assetLocation.service';
-import { unwrapPaged } from '@/utils/serviceUtils';
+import { mergeTableFilters, unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import {
   ASSET_CONDITIONS,
@@ -99,12 +99,17 @@ const TransfersPage = () => {
   const [cancelReason, setCancelReason] = useState('');
   const [cancelSaving, setCancelSaving] = useState(false);
 
+  // sortField names an AssetTransfer ENTITY property, so the server orders the whole
+  // ledger and returns page 1. Asset code and name, the destination and both condition
+  // names are joined in from other tables — the transfer row holds only their ids — so
+  // the database cannot order by them and they carry no sort control.
   const columns: TTableColumn[] = [
     { key: 'assetCode', label: 'Asset', width: 120, type: 'string', name: 'assetCode' },
     { key: 'assetName', label: 'Name', width: 170, type: 'string', name: 'assetName' },
     { key: 'destination', label: 'Destination', width: 200, name: 'destination' },
-    { key: 'requestedOn', label: 'Requested', width: 105, name: 'requestedOn' },
-    { key: 'status', label: 'Status', width: 105, name: 'status' },
+    // "Requested" is the row's own CreatedOn — the request IS the row's creation.
+    { key: 'requestedOn', label: 'Requested', width: 105, name: 'requestedOn', sortField: 'CreatedOn' },
+    { key: 'status', label: 'Status', width: 105, name: 'status', sortField: 'Status' },
     { key: 'conditions', label: 'Condition (out → in)', width: 140, name: 'conditions' },
     {
       key: 'actions',
@@ -162,16 +167,7 @@ const TransfersPage = () => {
   }, [debouncedSearch]);
 
   const updateFilters = (updates: Partial<ITableFilters>) => {
-    setFilters((prev) => ({
-      ...prev,
-      ...(updates.pageNumber !== undefined && {
-        pageNumber: Number(updates.pageNumber),
-      }),
-      ...(updates.pageSize !== undefined && {
-        pageSize: Number(updates.pageSize),
-        pageNumber: 1,
-      }),
-    }));
+    setFilters((prev) => mergeTableFilters(prev, updates));
   };
 
   const openRequest = async () => {

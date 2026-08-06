@@ -1,5 +1,5 @@
 import { requestApi } from './httpService';
-import { buildQuery } from '@/utils/serviceUtils';
+import { buildQuery, sortQuery } from '@/utils/serviceUtils';
 import { IPagedResponse, IResponse } from '@/interface/IGeneric';
 import {
   IEmployee,
@@ -17,6 +17,7 @@ export const fetchEmployees = (
       buildQuery({
         PageNumber: filter.pageNumber,
         PageSize: filter.pageSize,
+        ...sortQuery(filter),
         Search: filter.search,
         IsActive: filter.isActive,
       }),

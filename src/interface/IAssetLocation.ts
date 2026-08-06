@@ -1,3 +1,5 @@
+import { ISortFilter } from '@/utils/serviceUtils';
+
 export interface IAssetLocation {
   id: string;
   name: string;
@@ -25,7 +27,7 @@ export interface IUpdateAssetLocation extends IUpsertAssetLocation {
   rowVersion: string;
 }
 
-export interface IAssetLocationFilter {
+export interface IAssetLocationFilter extends ISortFilter {
   pageNumber?: number;
   pageSize?: number;
   search?: string;

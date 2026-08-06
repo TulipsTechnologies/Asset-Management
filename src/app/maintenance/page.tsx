@@ -44,7 +44,7 @@ import {
 import { fetchAssetById, fetchAssets } from '@/services/asset.service';
 import { fetchEmployees } from '@/services/employee.service';
 import { fetchVendors } from '@/services/vendor.service';
-import { unwrapPaged } from '@/utils/serviceUtils';
+import { mergeTableFilters, unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import {
   ASSET_CONDITIONS,
@@ -350,13 +350,17 @@ const MaintenancePage = () => {
     null
   );
 
+  // sortField names a MaintenanceRequest ENTITY property, so the server orders the whole
+  // queue and hands back page 1. The Asset column has none: the entity holds only AssetId
+  // and the code and name are joined in from Asset, which the database cannot order by here.
+  // The three badge columns sort by the enum actually stored behind the badge.
   const requestColumns: TTableColumn[] = [
     { key: 'asset', label: 'Asset', width: 190, type: 'string', name: 'asset' },
-    { key: 'requestType', label: 'Type', width: 105, name: 'requestType' },
-    { key: 'priority', label: 'Priority', width: 90, name: 'priority' },
-    { key: 'status', label: 'Status', width: 100, name: 'status' },
-    { key: 'description', label: 'Description', width: 240, type: 'string', name: 'description' },
-    { key: 'createdOn', label: 'Reported', width: 100, name: 'createdOn' },
+    { key: 'requestType', label: 'Type', width: 105, name: 'requestType', sortField: 'RequestType' },
+    { key: 'priority', label: 'Priority', width: 90, name: 'priority', sortField: 'Priority' },
+    { key: 'status', label: 'Status', width: 100, name: 'status', sortField: 'Status' },
+    { key: 'description', label: 'Description', width: 240, type: 'string', name: 'description', sortField: 'Description' },
+    { key: 'createdOn', label: 'Reported', width: 100, name: 'createdOn', sortField: 'CreatedOn' },
     {
       key: 'actions',
       label: <i className="icon icon-actions text-[10px]" />,
@@ -366,13 +370,18 @@ const MaintenancePage = () => {
     },
   ];
 
+  // Same rule against the WorkOrder entity. Two columns carry more than one value and so
+  // order by the one their label leads with — Type before Priority, the start of the
+  // scheduled window before its end. Assigned To names an employee and a vendor joined in
+  // from their own tables (the entity holds only ids), and Cost is the sum of the three
+  // cost columns added up in the projection — neither exists to order by.
   const workOrderColumns: TTableColumn[] = [
     { key: 'asset', label: 'Asset', width: 180, type: 'string', name: 'asset' },
-    { key: 'title', label: 'Title', width: 200, type: 'string', name: 'title' },
-    { key: 'classification', label: 'Type / Priority', width: 150, name: 'classification' },
+    { key: 'title', label: 'Title', width: 200, type: 'string', name: 'title', sortField: 'Title' },
+    { key: 'classification', label: 'Type / Priority', width: 150, name: 'classification', sortField: 'WorkOrderType' },
     { key: 'owner', label: 'Assigned To', width: 160, name: 'owner' },
-    { key: 'scheduled', label: 'Scheduled', width: 150, name: 'scheduled' },
-    { key: 'status', label: 'Status', width: 105, name: 'status' },
+    { key: 'scheduled', label: 'Scheduled', width: 150, name: 'scheduled', sortField: 'ScheduledStartDate' },
+    { key: 'status', label: 'Status', width: 105, name: 'status', sortField: 'Status' },
     { key: 'cost', label: 'Cost', width: 110, name: 'cost' },
     {
       key: 'actions',
@@ -451,29 +460,11 @@ const MaintenancePage = () => {
   }, [debouncedWorkOrderSearch]);
 
   const updateRequestFilters = (updates: Partial<ITableFilters>) => {
-    setRequestFilters((prev) => ({
-      ...prev,
-      ...(updates.pageNumber !== undefined && {
-        pageNumber: Number(updates.pageNumber),
-      }),
-      ...(updates.pageSize !== undefined && {
-        pageSize: Number(updates.pageSize),
-        pageNumber: 1,
-      }),
-    }));
+    setRequestFilters((prev) => mergeTableFilters(prev, updates));
   };
 
   const updateWorkOrderFilters = (updates: Partial<ITableFilters>) => {
-    setWorkOrderFilters((prev) => ({
-      ...prev,
-      ...(updates.pageNumber !== undefined && {
-        pageNumber: Number(updates.pageNumber),
-      }),
-      ...(updates.pageSize !== undefined && {
-        pageSize: Number(updates.pageSize),
-        pageNumber: 1,
-      }),
-    }));
+    setWorkOrderFilters((prev) => mergeTableFilters(prev, updates));
   };
 
   const loadPickers = () => {
@@ -1139,6 +1130,8 @@ const MaintenancePage = () => {
               </>
             }
             updateFilters={updateRequestFilters}
+            sortBy={requestFilters.sortBy}
+            sortDesc={requestFilters.sortDesc}
           />
 
           <div className="mt-3">
@@ -1264,6 +1257,8 @@ const MaintenancePage = () => {
               </>
             }
             updateFilters={updateWorkOrderFilters}
+            sortBy={workOrderFilters.sortBy}
+            sortDesc={workOrderFilters.sortDesc}
           />
 
           <div className="mt-3">

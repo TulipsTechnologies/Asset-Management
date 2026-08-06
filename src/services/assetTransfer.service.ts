@@ -1,5 +1,5 @@
 import { requestApi } from './httpService';
-import { buildQuery } from '@/utils/serviceUtils';
+import { buildQuery, sortQuery } from '@/utils/serviceUtils';
 import { IPagedResponse, IResponse } from '@/interface/IGeneric';
 import {
   IAssetTransfer,
@@ -16,6 +16,7 @@ export const fetchAssetTransfers = (
       buildQuery({
         PageNumber: filter.pageNumber,
         PageSize: filter.pageSize,
+        ...sortQuery(filter),
         Search: filter.search,
         AssetId: filter.assetId,
         ToEmployeeId: filter.toEmployeeId,

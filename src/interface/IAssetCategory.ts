@@ -1,3 +1,5 @@
+import { ISortFilter } from '@/utils/serviceUtils';
+
 export interface IAssetCategory {
   id: string;
   categoryCode: string;
@@ -44,7 +46,7 @@ export interface IUpdateAssetCategory extends IUpsertAssetCategory {
   rowVersion: string;
 }
 
-export interface IAssetCategoryFilter {
+export interface IAssetCategoryFilter extends ISortFilter {
   pageNumber?: number;
   pageSize?: number;
   search?: string;

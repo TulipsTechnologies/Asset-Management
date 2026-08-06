@@ -37,7 +37,7 @@ import {
 import { fetchDepreciationMethods } from '@/services/depreciation.service';
 import { IDepreciationMethod } from '@/interface/IDepreciation';
 import { DEPRECIATION_METHOD_CODES } from '@/enum/depreciationEnums';
-import { unwrapPaged } from '@/utils/serviceUtils';
+import { mergeTableFilters, unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import useDebounce from '@/hooks/useDebounce';
 
@@ -148,14 +148,18 @@ const AssetCategoriesPage = () => {
   const [bulkRunning, setBulkRunning] = useState(false);
   const [bulkResult, setBulkResult] = useState<IBulkResult | null>(null);
 
+  // sortField names an AssetCategory ENTITY property, so the server orders the whole
+  // list and hands back page 1. Parent and Depreciation Default are joined in from
+  // another table and Assets is counted in the projection, so none of the three can be
+  // ordered by the database — they carry no sortField and offer no sort control.
   const columns: TTableColumn[] = [
-    { key: 'categoryCode', label: 'Code', width: 120, type: 'string', name: 'categoryCode' },
-    { key: 'name', label: 'Name', width: 220, type: 'string', name: 'name' },
+    { key: 'categoryCode', label: 'Code', width: 120, type: 'string', name: 'categoryCode', sortField: 'CategoryCode' },
+    { key: 'name', label: 'Name', width: 220, type: 'string', name: 'name', sortField: 'Name' },
     { key: 'parentAssetCategoryName', label: 'Parent', width: 180, type: 'string', name: 'parentAssetCategoryName' },
     { key: 'defaultDepreciationMethodName', label: 'Depreciation Default', width: 170, type: 'string', name: 'defaultDepreciationMethodName' },
-    { key: 'defaultResidualRate', label: 'Residual Rate (%)', width: 140, name: 'defaultResidualRate' },
+    { key: 'defaultResidualRate', label: 'Residual Rate (%)', width: 140, name: 'defaultResidualRate', sortField: 'DefaultResidualRate' },
     { key: 'assetCount', label: 'Assets', width: 80, name: 'assetCount' },
-    { key: 'isActive', label: 'Active', width: 90, name: 'isActive' },
+    { key: 'isActive', label: 'Active', width: 90, name: 'isActive', sortField: 'IsActive' },
     {
       key: 'actions',
       label: <i className="icon icon-actions text-[10px]" />,
@@ -406,16 +410,7 @@ const AssetCategoriesPage = () => {
   };
 
   const updateFilters = (updates: Partial<ITableFilters>) => {
-    setFilters((prev) => ({
-      ...prev,
-      ...(updates.pageNumber !== undefined && {
-        pageNumber: Number(updates.pageNumber),
-      }),
-      ...(updates.pageSize !== undefined && {
-        pageSize: Number(updates.pageSize),
-        pageNumber: 1,
-      }),
-    }));
+    setFilters((prev) => mergeTableFilters(prev, updates));
   };
 
   const rowData = categories.map((category) => ({

@@ -6,6 +6,7 @@ import {
   WorkOrderOutcomeEnum,
   WorkOrderStatusEnum,
 } from '@/enum/maintenanceEnums';
+import { ISortFilter } from '@/utils/serviceUtils';
 
 /** Work order raised from a request (id + status), newest first. */
 export interface IWorkOrderSummary {
@@ -70,7 +71,7 @@ export interface ICancelMaintenanceRequest {
   rowVersion: string;
 }
 
-export interface IMaintenanceRequestFilter {
+export interface IMaintenanceRequestFilter extends ISortFilter {
   pageNumber?: number;
   pageSize?: number;
   search?: string;
@@ -164,7 +165,7 @@ export interface ICancelWorkOrder {
   rowVersion: string;
 }
 
-export interface IWorkOrderFilter {
+export interface IWorkOrderFilter extends ISortFilter {
   pageNumber?: number;
   pageSize?: number;
   search?: string;

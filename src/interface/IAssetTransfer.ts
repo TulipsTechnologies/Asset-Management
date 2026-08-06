@@ -1,4 +1,5 @@
 import { TransferStatusEnum } from '@/enum/transferEnums';
+import { ISortFilter } from '@/utils/serviceUtils';
 
 export interface IAssetTransfer {
   id: string;
@@ -44,7 +45,7 @@ export interface ICreateAssetTransfer {
   notes?: string;
 }
 
-export interface IAssetTransferFilter {
+export interface IAssetTransferFilter extends ISortFilter {
   pageNumber?: number;
   pageSize?: number;
   search?: string;

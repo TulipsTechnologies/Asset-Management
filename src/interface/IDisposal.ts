@@ -4,6 +4,7 @@ import {
   DisposalMethodEnum,
   DisposalRequestStatusEnum,
 } from '@/enum/disposalEnums';
+import { ISortFilter } from '@/utils/serviceUtils';
 
 /**
  * The execution record — exactly one per executed request, and absent until
@@ -162,7 +163,7 @@ export interface IUploadDisposalDocument {
   file: File;
 }
 
-export interface IDisposalRequestFilter {
+export interface IDisposalRequestFilter extends ISortFilter {
   pageNumber?: number;
   pageSize?: number;
   search?: string;

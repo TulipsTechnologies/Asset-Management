@@ -21,12 +21,15 @@ import SearchBox from '@/components/SearchBox';
 import Pagination from '@/components/UI/Pagination';
 import {
   IAssetBook,
+  IAssetBookFilter,
   IDepreciationRun,
   IDepreciationExclusion,
   IDepreciationRunDetail,
+  IDepreciationRunFilter,
   IDepreciationSchedule,
   IFiscalPeriod,
   IJournalProposal,
+  IJournalProposalFilter,
 } from '@/interface/IDepreciation';
 import { IAssetListItem } from '@/interface/IAsset';
 import {
@@ -54,7 +57,7 @@ import ScheduleModal from './_components/ScheduleModal';
 import TaxRunModal from './_components/TaxRunModal';
 import OpeningBalanceImportModal from './_components/OpeningBalanceImportModal';
 import { NEPAL_TAX_CLASSES, TAX_ENTRY_PERIODS, TaxTreatmentEnum } from '@/interface/ITax';
-import { unwrapPaged } from '@/utils/serviceUtils';
+import { mergeTableFilters, unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import {
   AssetBookStatusEnum,
@@ -153,7 +156,7 @@ export default function DepreciationPage() {
   const [booksLoading, setBooksLoading] = useState(false);
   const [booksTotal, setBooksTotal] = useState(0);
   const [booksPageCount, setBooksPageCount] = useState(0);
-  const [bookFilters, setBookFilters] = useState<ITableFilters>({
+  const [bookFilters, setBookFilters] = useState<IAssetBookFilter>({
     pageNumber: 1,
     pageSize: DEFAULT_PAGE_SIZE,
   });
@@ -165,7 +168,7 @@ export default function DepreciationPage() {
   const [runsLoading, setRunsLoading] = useState(false);
   const [runsTotal, setRunsTotal] = useState(0);
   const [runsPageCount, setRunsPageCount] = useState(0);
-  const [runFilters, setRunFilters] = useState<ITableFilters>({
+  const [runFilters, setRunFilters] = useState<IDepreciationRunFilter>({
     pageNumber: 1,
     pageSize: DEFAULT_PAGE_SIZE,
   });
@@ -175,7 +178,7 @@ export default function DepreciationPage() {
   const [proposalsLoading, setProposalsLoading] = useState(false);
   const [proposalsTotal, setProposalsTotal] = useState(0);
   const [proposalsPageCount, setProposalsPageCount] = useState(0);
-  const [proposalFilters, setProposalFilters] = useState<ITableFilters>({
+  const [proposalFilters, setProposalFilters] = useState<IJournalProposalFilter>({
     pageNumber: 1,
     pageSize: DEFAULT_PAGE_SIZE,
   });
@@ -229,6 +232,8 @@ export default function DepreciationPage() {
       const response = await fetchAssetBooks({
         pageNumber: bookFilters.pageNumber,
         pageSize: bookFilters.pageSize,
+        sortBy: bookFilters.sortBy,
+        sortDesc: bookFilters.sortDesc,
         search: debouncedBookSearch || undefined,
       });
       const { items, rowCount, pageCount } = unwrapPaged<IAssetBook>(response);
@@ -240,7 +245,14 @@ export default function DepreciationPage() {
     } finally {
       setBooksLoading(false);
     }
-  }, [bookFilters.pageNumber, bookFilters.pageSize, debouncedBookSearch, addToast]);
+  }, [
+    bookFilters.pageNumber,
+    bookFilters.pageSize,
+    bookFilters.sortBy,
+    bookFilters.sortDesc,
+    debouncedBookSearch,
+    addToast,
+  ]);
 
   const loadRuns = useCallback(async () => {
     setRunsLoading(true);
@@ -248,6 +260,8 @@ export default function DepreciationPage() {
       const response = await fetchDepreciationRuns({
         pageNumber: runFilters.pageNumber,
         pageSize: runFilters.pageSize,
+        sortBy: runFilters.sortBy,
+        sortDesc: runFilters.sortDesc,
       });
       const { items, rowCount, pageCount } = unwrapPaged<IDepreciationRun>(response);
       setRuns(items);
@@ -258,7 +272,13 @@ export default function DepreciationPage() {
     } finally {
       setRunsLoading(false);
     }
-  }, [runFilters.pageNumber, runFilters.pageSize, addToast]);
+  }, [
+    runFilters.pageNumber,
+    runFilters.pageSize,
+    runFilters.sortBy,
+    runFilters.sortDesc,
+    addToast,
+  ]);
 
   const loadProposals = useCallback(async () => {
     setProposalsLoading(true);
@@ -266,6 +286,8 @@ export default function DepreciationPage() {
       const response = await fetchJournalProposals({
         pageNumber: proposalFilters.pageNumber,
         pageSize: proposalFilters.pageSize,
+        sortBy: proposalFilters.sortBy,
+        sortDesc: proposalFilters.sortDesc,
       });
       const { items, rowCount, pageCount } = unwrapPaged<IJournalProposal>(response);
       setProposals(items);
@@ -276,7 +298,27 @@ export default function DepreciationPage() {
     } finally {
       setProposalsLoading(false);
     }
-  }, [proposalFilters.pageNumber, proposalFilters.pageSize, addToast]);
+  }, [
+    proposalFilters.pageNumber,
+    proposalFilters.pageSize,
+    proposalFilters.sortBy,
+    proposalFilters.sortDesc,
+    addToast,
+  ]);
+
+  // ---------------------------------------------------------------- filter merges
+
+  // One per tab: each table pages and sorts its own list, and mergeTableFilters is what
+  // lets the sort CustomTable emits survive as far as the service (a hand-rolled merge
+  // that forwarded only paging is how the sort used to be dropped one layer early).
+  const updateBookFilters = (updates: Partial<ITableFilters>) =>
+    setBookFilters((prev) => mergeTableFilters(prev, updates));
+
+  const updateRunFilters = (updates: Partial<ITableFilters>) =>
+    setRunFilters((prev) => mergeTableFilters(prev, updates));
+
+  const updateProposalFilters = (updates: Partial<ITableFilters>) =>
+    setProposalFilters((prev) => mergeTableFilters(prev, updates));
 
   // Only the active tab fetches (returns precedent).
   useEffect(() => {
@@ -497,15 +539,34 @@ export default function DepreciationPage() {
 
   // ---------------------------------------------------------------- columns
 
+  // sortField names an AssetBook ENTITY property, so the database orders every book and
+  // hands back page 1. Asset, Category and Method are joined in from Asset / AssetCategory
+  // / DepreciationMethod, and Net Book Value is computed in the projection
+  // (Cost − Accumulated) — none of them is a column the database can order by, so they
+  // carry no sortField and correctly show no sort control.
   const bookColumns: TTableColumn[] = [
     { key: 'asset', label: 'Asset', width: 200, type: 'string', name: 'asset' },
     { key: 'category', label: 'Category', width: 140, type: 'string', name: 'category' },
-    { key: 'cost', label: 'Cost', width: 130, name: 'cost' },
-    { key: 'accumulated', label: 'Accumulated', width: 130, name: 'accumulated' },
+    // Formatted money, ordered by the stored decimal behind it.
+    { key: 'cost', label: 'Cost', width: 130, name: 'cost', sortField: 'Cost' },
+    {
+      key: 'accumulated',
+      label: 'Accumulated',
+      width: 130,
+      name: 'accumulated',
+      sortField: 'AccumulatedDepreciation',
+    },
     { key: 'nbv', label: 'Net Book Value', width: 140, name: 'nbv' },
     { key: 'method', label: 'Method', width: 130, name: 'method' },
-    { key: 'convention', label: 'Convention', width: 120, name: 'convention' },
-    { key: 'status', label: 'Status', width: 90, name: 'status' },
+    // Badges, ordered by the enums they render.
+    {
+      key: 'convention',
+      label: 'Convention',
+      width: 120,
+      name: 'convention',
+      sortField: 'DepreciationConvention',
+    },
+    { key: 'status', label: 'Status', width: 90, name: 'status', sortField: 'Status' },
     {
       key: 'actions',
       label: <i className="icon icon-actions text-[10px]" />,
@@ -515,14 +576,25 @@ export default function DepreciationPage() {
     },
   ];
 
+  // Period carries no sortField: the cell is fiscal year + month name + ordinal, and the
+  // month name is joined from FiscalPeriod. The one entity column behind it, FiscalYearCode,
+  // is identical on every row of a single year — a sort by it would visibly do nothing on
+  // the ordinary list. Chronology is what Run Date orders, and the server's default order
+  // (year then period, newest first) is what the table opens on.
   const runColumns: TTableColumn[] = [
     { key: 'period', label: 'Period', width: 160, type: 'string', name: 'period' },
-    { key: 'status', label: 'Status', width: 110, name: 'status' },
-    { key: 'assetCount', label: 'Assets', width: 80, name: 'assetCount' },
-    { key: 'excludedAssetCount', label: 'Excluded', width: 90, name: 'excludedAssetCount' },
-    { key: 'totalAmount', label: 'Total', width: 150, name: 'totalAmount' },
-    { key: 'runDate', label: 'Run Date', width: 110, name: 'runDate' },
-    { key: 'postedOn', label: 'Posted', width: 110, name: 'postedOn' },
+    { key: 'status', label: 'Status', width: 110, name: 'status', sortField: 'Status' },
+    { key: 'assetCount', label: 'Assets', width: 80, name: 'assetCount', sortField: 'AssetCount' },
+    {
+      key: 'excludedAssetCount',
+      label: 'Excluded',
+      width: 90,
+      name: 'excludedAssetCount',
+      sortField: 'ExcludedAssetCount',
+    },
+    { key: 'totalAmount', label: 'Total', width: 150, name: 'totalAmount', sortField: 'TotalAmount' },
+    { key: 'runDate', label: 'Run Date', width: 110, name: 'runDate', sortField: 'RunDate' },
+    { key: 'postedOn', label: 'Posted', width: 110, name: 'postedOn', sortField: 'PostedOn' },
     {
       key: 'actions',
       label: <i className="icon icon-actions text-[10px]" />,
@@ -532,13 +604,22 @@ export default function DepreciationPage() {
     },
   ];
 
+  // The outbox endpoint honours SortBy over the JournalProposal entity. Period is left
+  // unsortable for the same reason as the runs table: the cell is fiscal year AND ordinal,
+  // and neither alone orders what it shows. Date is the chronological handle.
   const proposalColumns: TTableColumn[] = [
-    { key: 'source', label: 'Source', width: 130, name: 'source' },
+    { key: 'source', label: 'Source', width: 130, name: 'source', sortField: 'SourceType' },
     { key: 'period', label: 'Period', width: 140, type: 'string', name: 'period' },
-    { key: 'debit', label: 'Debit', width: 140, name: 'debit' },
-    { key: 'credit', label: 'Credit', width: 140, name: 'credit' },
-    { key: 'status', label: 'Status', width: 110, name: 'status' },
-    { key: 'proposalDate', label: 'Date', width: 110, name: 'proposalDate' },
+    { key: 'debit', label: 'Debit', width: 140, name: 'debit', sortField: 'TotalDebit' },
+    { key: 'credit', label: 'Credit', width: 140, name: 'credit', sortField: 'TotalCredit' },
+    { key: 'status', label: 'Status', width: 110, name: 'status', sortField: 'Status' },
+    {
+      key: 'proposalDate',
+      label: 'Date',
+      width: 110,
+      name: 'proposalDate',
+      sortField: 'ProposalDate',
+    },
     {
       key: 'actions',
       label: <i className="icon icon-actions text-[10px]" />,
@@ -886,6 +967,9 @@ export default function DepreciationPage() {
             }
             isLoading={booksLoading}
             entityLabel="book"
+            updateFilters={updateBookFilters}
+            sortBy={bookFilters.sortBy}
+            sortDesc={bookFilters.sortDesc}
             tableHeaderLeft={
               <div className="flex items-center gap-2">
                 <Button onClick={openCapitalize}>
@@ -913,7 +997,7 @@ export default function DepreciationPage() {
             totalPages={booksPageCount}
             pageSize={bookFilters.pageSize ?? DEFAULT_PAGE_SIZE}
             totalCount={booksTotal}
-            updateFilters={(updates) => setBookFilters((prev) => ({ ...prev, ...updates }))}
+            updateFilters={updateBookFilters}
           />
         </>
       )}
@@ -934,6 +1018,9 @@ export default function DepreciationPage() {
             }
             isLoading={runsLoading}
             entityLabel="run"
+            updateFilters={updateRunFilters}
+            sortBy={runFilters.sortBy}
+            sortDesc={runFilters.sortDesc}
             tableHeaderLeft={
               <div className="flex items-center gap-2">
                 <Button onClick={openCalculate}>
@@ -952,7 +1039,7 @@ export default function DepreciationPage() {
             totalPages={runsPageCount}
             pageSize={runFilters.pageSize ?? DEFAULT_PAGE_SIZE}
             totalCount={runsTotal}
-            updateFilters={(updates) => setRunFilters((prev) => ({ ...prev, ...updates }))}
+            updateFilters={updateRunFilters}
           />
         </>
       )}
@@ -975,13 +1062,16 @@ export default function DepreciationPage() {
             }
             isLoading={proposalsLoading}
             entityLabel="proposal"
+            updateFilters={updateProposalFilters}
+            sortBy={proposalFilters.sortBy}
+            sortDesc={proposalFilters.sortDesc}
           />
           <Pagination
             pageNumber={proposalFilters.pageNumber ?? 1}
             totalPages={proposalsPageCount}
             pageSize={proposalFilters.pageSize ?? DEFAULT_PAGE_SIZE}
             totalCount={proposalsTotal}
-            updateFilters={(updates) => setProposalFilters((prev) => ({ ...prev, ...updates }))}
+            updateFilters={updateProposalFilters}
           />
         </>
       )}

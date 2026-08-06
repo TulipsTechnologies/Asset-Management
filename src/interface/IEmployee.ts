@@ -1,3 +1,5 @@
+import { ISortFilter } from '@/utils/serviceUtils';
+
 export interface IEmployee {
   id: string;
   hrmEmployeeId?: number | null;
@@ -27,7 +29,7 @@ export interface IUpdateEmployee extends IUpsertEmployee {
   rowVersion: string;
 }
 
-export interface IEmployeeFilter {
+export interface IEmployeeFilter extends ISortFilter {
   pageNumber?: number;
   pageSize?: number;
   search?: string;

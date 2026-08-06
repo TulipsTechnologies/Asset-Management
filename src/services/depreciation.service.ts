@@ -1,5 +1,5 @@
 import { requestApi } from './httpService';
-import { buildQuery } from '@/utils/serviceUtils';
+import { buildQuery, sortQuery } from '@/utils/serviceUtils';
 import { ICommandEnvelope, IPagedResponse, IResponse } from '@/interface/IGeneric';
 import {
   IAssetBook,
@@ -40,6 +40,7 @@ export const fetchAssetBooks = (
       buildQuery({
         PageNumber: filter.pageNumber,
         PageSize: filter.pageSize,
+        ...sortQuery(filter),
         Search: filter.search,
         AssetId: filter.assetId,
         AssetCategoryId: filter.assetCategoryId,
@@ -129,6 +130,7 @@ export const fetchDepreciationRuns = (
       buildQuery({
         PageNumber: filter.pageNumber,
         PageSize: filter.pageSize,
+        ...sortQuery(filter),
         FiscalYearCode: filter.fiscalYearCode,
         Status: filter.status,
         FiscalPeriodId: filter.fiscalPeriodId,
@@ -315,6 +317,7 @@ export const fetchJournalProposals = (
       buildQuery({
         PageNumber: filter.pageNumber,
         PageSize: filter.pageSize,
+        ...sortQuery(filter),
         SourceType: filter.sourceType,
         Status: filter.status,
         FiscalYearCode: filter.fiscalYearCode,

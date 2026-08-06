@@ -40,6 +40,10 @@ const CustomTable = ({
   updateFilters,
   selectable = true,
   showSerial = true,
+  showBack = true,
+  clientSort = false,
+  sortBy,
+  sortDesc,
   serialOffset = 0,
   getRowId,
   onSelectionChange,
@@ -63,10 +67,20 @@ const CustomTable = ({
   const prefsLoadedRef = useRef(false);
   const dirtyRef = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Seeded from the sort the PAGE is currently asking the server for, so a table that
+  // remounts — every tab switch and view switch does this — shows the order actually in
+  // effect. Without the seed the header reset to neutral while the rows stayed sorted,
+  // and the next click on that column started again at 'asc' instead of toggling.
   const [sortConfig, setSortConfig] = useState<{
     columnKey: string;
     direction: 'asc' | 'desc';
-  } | null>(null);
+  } | null>(() => {
+    if (!sortBy) return null;
+    const column = initialColumns.find((col) => col.sortField === sortBy);
+    return column
+      ? { columnKey: column.key, direction: sortDesc ? 'desc' : 'asc' }
+      : null;
+  });
   const containerRef = useRef<HTMLDivElement | null>(null);
   const tableRef = useRef<HTMLTableElement | null>(null);
   const manageColumnsButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -138,7 +152,17 @@ const CustomTable = ({
   }, [columns]);
 
   useEffect(() => {
-    setRows(initialRows);
+    // A client-sorted table re-applies its order to the rows that just arrived. Without
+    // this a filter change hands back default-ordered rows while the header still shows
+    // the arrow, so the control claims an order the body does not have. (Server-sorted
+    // tables need nothing here: the rows arrive already ordered.)
+    const sorted = clientSort && sortConfig
+      ? columns.find((col) => col.key === sortConfig.columnKey)
+      : undefined;
+    setRows(
+      sorted ? sortLocally(initialRows, sorted, sortConfig!.direction) : initialRows
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialRows]);
 
   // Saved layouts are either the legacy bare array or the versioned envelope. A layout
@@ -275,9 +299,65 @@ const CustomTable = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [columns]);
 
+  /**
+   * A column can be sorted two ways, and only two.
+   *
+   * On a server-paged table the database does it: the column names the entity field
+   * in `sortField`, the whole result set is ordered and page 1 comes back. On a table
+   * whose rows are all already here (`clientSort`), the browser does it over every row.
+   *
+   * A column that is neither is not sortable, and shows no control. It used to show
+   * one that reordered the 25 rows on screen — which looked like sorting 436 assets,
+   * and was then thrown away the moment the re-fetch landed.
+   */
+  const sortModeFor = (col?: TTableColumn): 'server' | 'client' | null => {
+    if (!col || col.isSortable === false) return null;
+    if (clientSort) return col.type ? 'client' : null;
+    // Without an updateFilters handler the request can never be made, so a page that
+    // declares sortField and forgets the handler shows no control rather than a dead one.
+    return col.sortField && updateFilters ? 'server' : null;
+  };
+
+  /** The comparable value behind a cell: custom cells carry it in `.value`. */
+  const sortValue = (row: RowWithFieldProps, col: TTableColumn) => {
+    const cell = row[col.key];
+    if (col.type === 'custom') return cell?.value;
+    return cell;
+  };
+
+  /** Orders a whole in-browser dataset by one column. */
+  const sortLocally = (
+    source: RowWithFieldProps[],
+    column: TTableColumn,
+    direction: 'asc' | 'desc'
+  ) =>
+    [...source].sort((a, b) => {
+      const valueA = sortValue(a, column);
+      const valueB = sortValue(b, column);
+
+      // Blanks sort last in both directions, so a column of mostly-empty cells
+      // still brings its filled ones to the top. Note 0 and '' are VALUES, not
+      // blanks — treating every falsy cell as a tie is why zeros never moved,
+      // and why a null inside a custom cell used to reach .toString() and throw.
+      const emptyA = valueA === null || valueA === undefined || valueA === '';
+      const emptyB = valueB === null || valueB === undefined || valueB === '';
+      if (emptyA || emptyB) return emptyA && emptyB ? 0 : emptyA ? 1 : -1;
+
+      const valueType =
+        column.type === 'custom'
+          ? (a[column.key]?.type ?? 'string')
+          : column.type;
+
+      if (valueType === 'number') return sortNumber(direction, valueA, valueB);
+      if (valueType === 'date' || valueType === 'datetime')
+        return sortDate(direction, valueA, valueB);
+      return sortString(direction, valueA, valueB);
+    });
+
   const handleSort = (columnKey: string) => {
     const column = columns.find((col) => col.key === columnKey);
-    if (!column || !column.type) return;
+    const mode = sortModeFor(column);
+    if (!column || !mode) return;
 
     const direction =
       sortConfig?.columnKey === columnKey && sortConfig.direction === 'asc'
@@ -285,57 +365,23 @@ const CustomTable = ({
         : 'asc';
 
     setSortConfig({ columnKey, direction });
-    updateFilters?.({
-      sortBy: columnKey,
-      desc: direction === 'desc',
-    });
 
-    setRows((prevRows) => {
-      const sortedRows = [...prevRows].sort((a, b) => {
-        const valueA = a[columnKey];
-        const valueB = b[columnKey];
-
-        if (!valueA || !valueB) return 0;
-
-        if (column.type === 'number') {
-          return sortNumber(direction, valueA, valueB);
-        }
-
-        if (column.type === 'date') {
-          return sortDate(direction, valueA, valueB);
-        }
-
-        if (column.type === 'string') {
-          return sortString(direction, valueA, valueB);
-        }
-
-        if (column.type === 'custom') {
-          const dataA = a[columnKey];
-          const dataB = b[columnKey];
-          const valueA = dataA.value;
-          const valueB = dataB.value;
-
-          if (dataA.type === 'string') {
-            return sortString(direction, valueA, valueB);
-          }
-          if (dataA.type === 'number') {
-            return sortNumber(direction, valueA, valueB);
-          }
-          if (dataA.type === 'date') {
-            return sortDate(direction, valueA, valueB);
-          }
-        }
-
-        return 0;
+    if (mode === 'server') {
+      // Back to page 1: page 5 of the old order is not page 5 of the new one.
+      updateFilters?.({
+        sortBy: column.sortField,
+        sortDesc: direction === 'desc',
+        pageNumber: 1,
       });
+      return;
+    }
 
-      return sortedRows;
-    });
+    setRows((prevRows) => sortLocally(prevRows, column, direction));
   };
 
   const getSortIcon = (columnKey: string) => {
     const column = columns.find((col) => col.key === columnKey);
-    if (!column || !column.type) return null;
+    if (!sortModeFor(column)) return null;
 
     return (
       <span className="text-base text-gray-400">
@@ -658,7 +704,7 @@ const CustomTable = ({
           {/* Leads the toolbar on every list, so the way back travels with the page rather
               than with the app header — which the host supplies once this module is mounted
               inside TulipsHRM. Renders nothing on a top-level page. */}
-          <BackButton />
+          {showBack && <BackButton />}
           {tableHeaderLeft}
         </div>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 md:gap-x-8">
@@ -855,10 +901,16 @@ const CustomTable = ({
                         <span className="flex items-center gap-x-2 whitespace-nowrap">
                           {renderHeaderField(col)}
                         </span>
-                        {col.type && col.isSortable !== false && (
-                          <span onClick={() => handleSort(col.key)}>
+                        {sortModeFor(col) && (
+                          <button
+                            type="button"
+                            aria-label={`Sort by ${
+                              typeof col.label === 'string' ? col.label : col.key
+                            }`}
+                            onClick={() => handleSort(col.key)}
+                          >
                             {getSortIcon(col.key)}
-                          </span>
+                          </button>
                         )}
                       </div>
                       <div

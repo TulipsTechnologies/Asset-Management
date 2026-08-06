@@ -42,7 +42,7 @@ import {
 } from '@/services/asset.service';
 import { fetchAssetCategories } from '@/services/assetCategory.service';
 import { fetchEmployees } from '@/services/employee.service';
-import { unwrapPaged } from '@/utils/serviceUtils';
+import { mergeTableFilters, unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import {
   CUSTODY_BADGE_CLASSES,
@@ -119,22 +119,27 @@ const AssetsPage = () => {
     if (stored) setView(stored);
   }, []);
 
+  // sortField names an Asset ENTITY property, so the server orders the whole register
+  // and hands back page 1. Columns without one (a joined name, a figure computed in the
+  // projection) cannot be ordered by the database and so offer no sort control.
   const columns: TTableColumn[] = [
-    { key: 'purchaseDate', label: 'Purchase Date', width: 120, type: 'date', name: 'purchaseDate' },
-    { key: 'assetCode', label: 'Code', width: 140, type: 'string', name: 'assetCode' },
-    { key: 'assetName', label: 'Asset Name', width: 190, type: 'string', name: 'assetName' },
+    { key: 'purchaseDate', label: 'Purchase Date', width: 120, type: 'date', name: 'purchaseDate', sortField: 'PurchaseDate' },
+    { key: 'assetCode', label: 'Code', width: 140, type: 'string', name: 'assetCode', sortField: 'AssetCode' },
+    { key: 'assetName', label: 'Asset Name', width: 190, type: 'string', name: 'assetName', sortField: 'AssetName' },
     { key: 'currentCustodianEmployeeName', label: 'Custodian', width: 150, type: 'string', name: 'currentCustodianEmployeeName' },
     { key: 'units', label: 'Units', width: 60, name: 'units' },
-    { key: 'netPrice', label: 'Net Price', width: 120, name: 'netPrice' },
-    { key: 'totalPrice', label: `Total (incl. ${VAT_RATE * 100}% VAT)`, width: 155, name: 'totalPrice' },
+    // Both money columns print a formatted string but order by the stored decimal —
+    // and the VAT-inclusive total is a fixed multiple of it, so it shares the field.
+    { key: 'netPrice', label: 'Net Price', width: 120, name: 'netPrice', sortField: 'PurchaseCost' },
+    { key: 'totalPrice', label: `Total (incl. ${VAT_RATE * 100}% VAT)`, width: 155, name: 'totalPrice', sortField: 'PurchaseCost' },
     { key: 'accumulatedDepreciation', label: 'Depreciation', width: 120, name: 'accumulatedDepreciation' },
     { key: 'netBookValue', label: 'Net Value', width: 120, name: 'netBookValue' },
     { key: 'assetLocationName', label: 'Location', width: 150, type: 'string', name: 'assetLocationName' },
-    { key: 'lifecycleStatus', label: 'Lifecycle', width: 110, name: 'lifecycleStatus' },
+    { key: 'lifecycleStatus', label: 'Lifecycle', width: 110, name: 'lifecycleStatus', sortField: 'LifecycleStatus' },
     // Off by default — the Columns control brings them back per user or company-wide.
     { key: 'assetCategoryName', label: 'Category', width: 150, type: 'string', name: 'assetCategoryName', visible: false },
-    { key: 'serialNumber', label: 'Serial No.', width: 140, type: 'string', name: 'serialNumber', visible: false },
-    { key: 'custodyStatus', label: 'Custody', width: 120, name: 'custodyStatus', visible: false },
+    { key: 'serialNumber', label: 'Serial No.', width: 140, type: 'string', name: 'serialNumber', visible: false, sortField: 'SerialNumber' },
+    { key: 'custodyStatus', label: 'Custody', width: 120, name: 'custodyStatus', visible: false, sortField: 'CustodyStatus' },
     { key: 'conditionName', label: 'Condition', width: 110, type: 'string', name: 'conditionName', visible: false },
     {
       key: 'actions',
@@ -203,16 +208,7 @@ const AssetsPage = () => {
   }, [debouncedSearch]);
 
   const updateFilters = (updates: Partial<ITableFilters>) => {
-    setFilters((prev) => ({
-      ...prev,
-      ...(updates.pageNumber !== undefined && {
-        pageNumber: Number(updates.pageNumber),
-      }),
-      ...(updates.pageSize !== undefined && {
-        pageSize: Number(updates.pageSize),
-        pageNumber: 1,
-      }),
-    }));
+    setFilters((prev) => mergeTableFilters(prev, updates));
   };
 
   /**
@@ -538,7 +534,7 @@ const AssetsPage = () => {
     <>
       <Button onClick={() => router.push('/assets/create')}>
         <i className="icon icon-plus text-xs"></i>
-        <span>Register Asset</span>
+        <span>Add Asset</span>
       </Button>
       <ViewSwitcher
         options={VIEW_OPTIONS}
@@ -574,6 +570,8 @@ const AssetsPage = () => {
           tableHeaderLeft={toolbarLeft}
           tableHeaderRight={filterControls}
           updateFilters={updateFilters}
+          sortBy={filters.sortBy}
+          sortDesc={filters.sortDesc}
           bulkActions={[
             {
               label: 'Activate',

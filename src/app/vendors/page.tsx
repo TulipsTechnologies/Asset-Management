@@ -25,7 +25,7 @@ import SearchBox from '@/components/SearchBox';
 import Pagination from '@/components/UI/Pagination';
 import { IVendor, IVendorFilter } from '@/interface/IVendor';
 import { createVendor, deleteVendor, fetchVendors, updateVendor } from '@/services/vendor.service';
-import { unwrapPaged } from '@/utils/serviceUtils';
+import { mergeTableFilters, unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import { VENDOR_TYPE_LABELS, VendorTypeEnum } from '@/enum/vendorEnums';
 import useDebounce from '@/hooks/useDebounce';
@@ -73,14 +73,17 @@ const VendorsPage = () => {
   const [editing, setEditing] = useState<IVendor | null>(null);
   const [deleting, setDeleting] = useState<IVendor | null>(null);
 
+  // sortField names a Vendor ENTITY property, so the server orders the whole vendor list
+  // and hands back page 1. Assets has none: the count is a subquery evaluated in the
+  // projection, not a stored column, so the database cannot order by it.
   const columns: TTableColumn[] = [
-    { key: 'name', label: 'Name', width: 190, type: 'string', name: 'name' },
-    { key: 'vendorType', label: 'Type', width: 130, name: 'vendorType' },
-    { key: 'contactPerson', label: 'Contact', width: 150, type: 'string', name: 'contactPerson' },
-    { key: 'phone', label: 'Phone', width: 120, type: 'string', name: 'phone' },
-    { key: 'email', label: 'Email', width: 180, type: 'string', name: 'email' },
+    { key: 'name', label: 'Name', width: 190, type: 'string', name: 'name', sortField: 'Name' },
+    { key: 'vendorType', label: 'Type', width: 130, name: 'vendorType', sortField: 'VendorType' },
+    { key: 'contactPerson', label: 'Contact', width: 150, type: 'string', name: 'contactPerson', sortField: 'ContactPerson' },
+    { key: 'phone', label: 'Phone', width: 120, type: 'string', name: 'phone', sortField: 'Phone' },
+    { key: 'email', label: 'Email', width: 180, type: 'string', name: 'email', sortField: 'Email' },
     { key: 'assetCount', label: 'Assets', width: 80, name: 'assetCount' },
-    { key: 'isActive', label: 'Active', width: 80, name: 'isActive' },
+    { key: 'isActive', label: 'Active', width: 80, name: 'isActive', sortField: 'IsActive' },
     {
       key: 'actions',
       label: <i className="icon icon-actions text-[10px]" />,
@@ -124,16 +127,7 @@ const VendorsPage = () => {
   }, [debouncedSearch]);
 
   const updateFilters = (updates: Partial<ITableFilters>) => {
-    setFilters((prev) => ({
-      ...prev,
-      ...(updates.pageNumber !== undefined && {
-        pageNumber: Number(updates.pageNumber),
-      }),
-      ...(updates.pageSize !== undefined && {
-        pageSize: Number(updates.pageSize),
-        pageNumber: 1,
-      }),
-    }));
+    setFilters((prev) => mergeTableFilters(prev, updates));
   };
 
   const openCreate = () => {

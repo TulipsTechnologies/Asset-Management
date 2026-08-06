@@ -1,5 +1,5 @@
 import { requestApi } from './httpService';
-import { buildQuery } from '@/utils/serviceUtils';
+import { buildQuery, sortQuery } from '@/utils/serviceUtils';
 import { IPagedResponse, IResponse } from '@/interface/IGeneric';
 import {
   IAssetAuditCampaign,
@@ -26,6 +26,7 @@ export const getCampaigns = (
       buildQuery({
         PageNumber: filter.pageNumber,
         PageSize: filter.pageSize,
+        ...sortQuery(filter),
         Search: filter.search,
         Status: filter.status,
         FromDate: filter.fromDate,
@@ -117,6 +118,7 @@ export const getResults = (
       buildQuery({
         PageNumber: filter.pageNumber,
         PageSize: filter.pageSize,
+        ...sortQuery(filter),
         Search: filter.search,
         ResultType: filter.resultType,
         HasOpenDiscrepancies: filter.hasOpenDiscrepancies,
@@ -172,6 +174,7 @@ export const getDiscrepancies = (
       buildQuery({
         PageNumber: filter.pageNumber,
         PageSize: filter.pageSize,
+        ...sortQuery(filter),
         Search: filter.search,
         Status: filter.status,
         DiscrepancyType: filter.discrepancyType,

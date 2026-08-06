@@ -14,6 +14,62 @@ export const unwrapPaged = <T>(res: IPagedResponse<T>): IPagedData<T> => {
   };
 };
 
+/** The sort a list page carries, as CustomTable emits it. */
+export interface ISortFilter {
+  /** Entity property the API orders by — the column's `sortField`. */
+  sortBy?: string;
+  sortDesc?: boolean;
+}
+
+/**
+ * The sort, in the shape the API binds.
+ *
+ * `PaginationFilter.SortBy` is a `List<SortModel>` of `{Name, Desc}`, so it only binds
+ * from indexed keys. A flat `sortBy=assetCode` binds to nothing at all and the server
+ * quietly returns its default order — which is exactly what every list here used to do.
+ *
+ * Spread it into buildQuery alongside the page's own filters.
+ */
+export const sortQuery = (filter: ISortFilter) =>
+  filter.sortBy
+    ? {
+        'SortBy[0].Name': filter.sortBy,
+        'SortBy[0].Desc': filter.sortDesc ? 'true' : 'false',
+      }
+    : {};
+
+/**
+ * Merges what CustomTable emits — paging and sort — into a page's filter state.
+ *
+ * Each list page used to hand-roll this and forward only pageNumber/pageSize, so the
+ * sort was thrown away one layer before the service's own whitelist would have thrown
+ * it away anyway. One helper so a new page cannot quietly omit it again.
+ */
+export const mergeTableFilters = <
+  T extends ISortFilter & { pageNumber?: number; pageSize?: number },
+>(
+  prev: T,
+  updates: {
+    pageNumber?: unknown;
+    pageSize?: unknown;
+    sortBy?: unknown;
+    sortDesc?: unknown;
+  }
+): T => ({
+  ...prev,
+  ...(updates.pageNumber !== undefined && {
+    pageNumber: Number(updates.pageNumber),
+  }),
+  ...(updates.pageSize !== undefined && {
+    pageSize: Number(updates.pageSize),
+    pageNumber: 1,
+  }),
+  ...(updates.sortBy !== undefined && {
+    sortBy: String(updates.sortBy),
+    sortDesc: !!updates.sortDesc,
+  }),
+});
+
 /** Builds a query string, skipping null/undefined/empty values. */
 export const buildQuery = (
   params: Record<string, string | number | boolean | null | undefined>

@@ -1,4 +1,5 @@
 import { AssigneeTypeEnum, AssignmentStatusEnum } from '@/enum/assignmentEnums';
+import { ISortFilter } from '@/utils/serviceUtils';
 
 export interface IAssetAssignment {
   id: string;
@@ -42,7 +43,7 @@ export interface IReturnAssetAssignment {
   rowVersion?: string | null;
 }
 
-export interface IAssetAssignmentFilter {
+export interface IAssetAssignmentFilter extends ISortFilter {
   pageNumber?: number;
   pageSize?: number;
   search?: string;

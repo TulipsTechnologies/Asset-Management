@@ -27,7 +27,7 @@ import RowKebab from '@/components/UI/RowKebab';
 import ConfirmationModal from '@/components/UI/ConfirmationModel';
 import BulkDeleteModal from '@/components/UI/BulkDeleteModal';
 import { IBulkResult, runBulkAction, summariseBulk } from '@/utils/bulkActions';
-import { unwrapPaged } from '@/utils/serviceUtils';
+import { mergeTableFilters, unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import useDebounce from '@/hooks/useDebounce';
 
@@ -78,14 +78,17 @@ const EmployeesPage = () => {
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
+  // sortField names an Employee ENTITY property, so the server orders the whole register
+  // and hands back page 1. Assets Held has none: it counts open assignments in the
+  // projection, so there is no stored column for the database to order by.
   const columns: TTableColumn[] = [
-    { key: 'employeeCode', label: 'Code', width: 100, type: 'string', name: 'employeeCode' },
-    { key: 'fullName', label: 'Name', width: 190, type: 'string', name: 'fullName' },
-    { key: 'department', label: 'Department', width: 140, type: 'string', name: 'department' },
-    { key: 'designation', label: 'Designation', width: 160, type: 'string', name: 'designation' },
-    { key: 'email', label: 'Email', width: 190, type: 'string', name: 'email' },
+    { key: 'employeeCode', label: 'Code', width: 100, type: 'string', name: 'employeeCode', sortField: 'EmployeeCode' },
+    { key: 'fullName', label: 'Name', width: 190, type: 'string', name: 'fullName', sortField: 'FullName' },
+    { key: 'department', label: 'Department', width: 140, type: 'string', name: 'department', sortField: 'Department' },
+    { key: 'designation', label: 'Designation', width: 160, type: 'string', name: 'designation', sortField: 'Designation' },
+    { key: 'email', label: 'Email', width: 190, type: 'string', name: 'email', sortField: 'Email' },
     { key: 'openAssignmentCount', label: 'Assets Held', width: 100, name: 'openAssignmentCount' },
-    { key: 'isActive', label: 'Active', width: 80, name: 'isActive' },
+    { key: 'isActive', label: 'Active', width: 80, name: 'isActive', sortField: 'IsActive' },
     {
       key: 'actions',
       label: <i className="icon icon-actions text-[10px]" />,
@@ -129,16 +132,7 @@ const EmployeesPage = () => {
   }, [debouncedSearch]);
 
   const updateFilters = (updates: Partial<ITableFilters>) => {
-    setFilters((prev) => ({
-      ...prev,
-      ...(updates.pageNumber !== undefined && {
-        pageNumber: Number(updates.pageNumber),
-      }),
-      ...(updates.pageSize !== undefined && {
-        pageSize: Number(updates.pageSize),
-        pageNumber: 1,
-      }),
-    }));
+    setFilters((prev) => mergeTableFilters(prev, updates));
   };
 
   const openEdit = (employee: IEmployee) => {

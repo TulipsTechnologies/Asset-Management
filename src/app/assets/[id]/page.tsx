@@ -8,6 +8,7 @@ import Modal from '@/components/UI/Modal';
 import TextArea from '@/components/UI/TextArea';
 import AssetDocumentsSection from './_components/AssetDocumentsSection';
 import ProfileHeader from '@/components/UI/ProfileHeader';
+import PageToolbar from '@/components/UI/PageToolbar';
 import InfoCard, { InfoCardGrid, InfoField } from '@/components/UI/InfoCard';
 import AssetDepreciationSection from './_components/AssetDepreciationSection';
 import AssetTaxProfileSection from './_components/AssetTaxProfileSection';
@@ -236,6 +237,68 @@ const AssetDetailPage = () => {
 
   return (
     <div className="px-4 sm:px-6 py-5">
+      <PageToolbar
+        actions={
+          <>
+            {asset.lifecycleStatus !== LifecycleStatusEnum.Disposed && (
+              <Button
+                variant="toolbar"
+                onClick={() => router.push(`/assets/${asset.id}/edit`)}
+              >
+                <i className="icon icon-edit text-xs"></i>
+                <span>Edit</span>
+              </Button>
+            )}
+            {(asset.lifecycleStatus === LifecycleStatusEnum.Draft ||
+              asset.lifecycleStatus === LifecycleStatusEnum.Retired) && (
+              <Button
+                variant="toolbar"
+                onClick={handleActivate}
+                disabled={activating}
+              >
+                <i className="icon icon-check-circle text-xs"></i>
+                <span>{activating ? 'Activating…' : 'Activate'}</span>
+              </Button>
+            )}
+            {asset.operationalStatus === OperationalStatusEnum.Quarantined && (
+              <Button
+                variant="toolbar"
+                onClick={() => {
+                  setHoldReason('');
+                  setHoldAction('release');
+                }}
+              >
+                <i className="icon icon-unlock text-xs"></i>
+                <span>Release</span>
+              </Button>
+            )}
+            {asset.operationalStatus === OperationalStatusEnum.OutOfService && (
+              <Button
+                variant="toolbar"
+                onClick={() => {
+                  setHoldReason('');
+                  setHoldAction('recommission');
+                }}
+              >
+                <i className="icon icon-redo text-xs"></i>
+                <span>Recommission</span>
+              </Button>
+            )}
+            {asset.lifecycleStatus === LifecycleStatusEnum.Active && (
+              <Button
+                variant="toolbarDanger"
+                onClick={() => {
+                  setRetireReason('');
+                  setRetireOpen(true);
+                }}
+              >
+                <i className="icon icon-lock text-xs"></i>
+                <span>Retire</span>
+              </Button>
+            )}
+          </>
+        }
+      />
       <ProfileHeader
         fallback={<i className="icon icon-briefcase text-2xl"></i>}
         title={asset.assetCode}
@@ -278,62 +341,6 @@ const AssetDetailPage = () => {
               <p className="text-sm italic text-gray-400">Not recorded</p>
             )}
           </div>
-        }
-        actions={
-          <>
-            {asset.lifecycleStatus !== LifecycleStatusEnum.Disposed && (
-              <Button
-                variant="outline"
-                onClick={() => router.push(`/assets/${asset.id}/edit`)}
-              >
-                <i className="icon icon-edit text-xs"></i>
-                <span>Edit</span>
-              </Button>
-            )}
-            {(asset.lifecycleStatus === LifecycleStatusEnum.Draft ||
-              asset.lifecycleStatus === LifecycleStatusEnum.Retired) && (
-              <Button onClick={handleActivate} disabled={activating}>
-                {activating ? 'Activating…' : 'Activate'}
-              </Button>
-            )}
-            {asset.operationalStatus === OperationalStatusEnum.Quarantined && (
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setHoldReason('');
-                  setHoldAction('release');
-                }}
-              >
-                Release
-              </Button>
-            )}
-            {asset.operationalStatus === OperationalStatusEnum.OutOfService && (
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setHoldReason('');
-                  setHoldAction('recommission');
-                }}
-              >
-                Recommission
-              </Button>
-            )}
-            {asset.lifecycleStatus === LifecycleStatusEnum.Active && (
-              <Button
-                variant="danger"
-                onClick={() => {
-                  setRetireReason('');
-                  setRetireOpen(true);
-                }}
-              >
-                Retire
-              </Button>
-            )}
-            <Button variant="outline" onClick={() => router.push('/assets')}>
-              <i className="icon icon-left text-xs"></i>
-              <span>Back</span>
-            </Button>
-          </>
         }
       />
 

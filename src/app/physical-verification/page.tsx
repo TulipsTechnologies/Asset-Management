@@ -38,7 +38,7 @@ import {
 import { fetchAssetCategories } from '@/services/assetCategory.service';
 import { fetchAssetLocations } from '@/services/assetLocation.service';
 import { fetchEmployees } from '@/services/employee.service';
-import { unwrapPaged } from '@/utils/serviceUtils';
+import { mergeTableFilters, unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import {
   AUDIT_CAMPAIGN_STATUS_BADGE_CLASSES,
@@ -131,13 +131,17 @@ const PhysicalVerificationPage = () => {
   // Approve confirm
   const [approving, setApproving] = useState<IAssetAuditCampaign | null>(null);
 
+  // sortField names an AssetAuditCampaign ENTITY property, so the server orders every
+  // campaign and hands back page 1. Progress and Discrepancies are counts computed in
+  // the projection — no stored column to order by, so they offer no sort control.
   const columns: TTableColumn[] = [
-    { key: 'name', label: 'Campaign', width: 200, type: 'string', name: 'name' },
-    { key: 'status', label: 'Status', width: 115, name: 'status' },
+    { key: 'name', label: 'Campaign', width: 200, type: 'string', name: 'name', sortField: 'Name' },
+    { key: 'status', label: 'Status', width: 115, name: 'status', sortField: 'Status' },
     { key: 'progress', label: 'Progress', width: 120, name: 'progress' },
     { key: 'discrepancies', label: 'Discrepancies', width: 110, name: 'discrepancies' },
-    { key: 'scheduled', label: 'Scheduled', width: 160, name: 'scheduled' },
-    { key: 'createdOn', label: 'Created', width: 100, name: 'createdOn' },
+    // A window prints as "from → to" but orders by where it opens, as any diary does.
+    { key: 'scheduled', label: 'Scheduled', width: 160, name: 'scheduled', sortField: 'ScheduledFrom' },
+    { key: 'createdOn', label: 'Created', width: 100, name: 'createdOn', sortField: 'CreatedOn' },
     {
       key: 'actions',
       label: <i className="icon icon-actions text-[10px]" />,
@@ -181,16 +185,7 @@ const PhysicalVerificationPage = () => {
   }, [debouncedSearch]);
 
   const updateFilters = (updates: Partial<ITableFilters>) => {
-    setFilters((prev) => ({
-      ...prev,
-      ...(updates.pageNumber !== undefined && {
-        pageNumber: Number(updates.pageNumber),
-      }),
-      ...(updates.pageSize !== undefined && {
-        pageSize: Number(updates.pageSize),
-        pageNumber: 1,
-      }),
-    }));
+    setFilters((prev) => mergeTableFilters(prev, updates));
   };
 
   const loadPickers = () => {

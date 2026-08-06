@@ -388,7 +388,7 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold text-secondaryColor">
-            {isEdit ? `Edit Asset — ${asset.assetCode}` : 'Register Asset'}
+            {isEdit ? `Edit Asset — ${asset.assetCode}` : 'Add Asset'}
           </h1>
           <p className="mt-0.5 text-xs text-gray-500">
             {isEdit
@@ -653,10 +653,10 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
               {saving
                 ? isEdit
                   ? 'Saving…'
-                  : 'Registering…'
+                  : 'Adding…'
                 : isEdit
                   ? 'Save Changes'
-                  : 'Register Asset'}
+                  : 'Add Asset'}
             </Button>
           </div>
         </div>
@@ -705,7 +705,7 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
               {ready ? (
                 <p className="flex items-center gap-2 py-1 text-sm text-primarycolor">
                   <i className="icon icon-check-circle text-xs" />
-                  Ready to {isEdit ? 'save' : 'register'}.
+                  Ready to {isEdit ? 'save' : 'add'}.
                 </p>
               ) : (
                 <ul className="space-y-1.5 py-0.5">

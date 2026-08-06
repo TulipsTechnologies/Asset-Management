@@ -6,6 +6,7 @@ import {
   ReconciliationActionEnum,
 } from '@/enum/auditEnums';
 import { CustodyStatusEnum, LifecycleStatusEnum } from '@/enum/assetEnums';
+import { ISortFilter } from '@/utils/serviceUtils';
 
 export interface IAuditScope {
   scopeType: AuditScopeTypeEnum;
@@ -196,7 +197,7 @@ export interface IReconcileAssetAuditDiscrepancy {
   rowVersion: string;
 }
 
-export interface IAssetAuditCampaignFilter {
+export interface IAssetAuditCampaignFilter extends ISortFilter {
   pageNumber?: number;
   pageSize?: number;
   search?: string;
@@ -205,7 +206,7 @@ export interface IAssetAuditCampaignFilter {
   toDate?: string;
 }
 
-export interface IAssetAuditResultFilter {
+export interface IAssetAuditResultFilter extends ISortFilter {
   pageNumber?: number;
   pageSize?: number;
   search?: string;
@@ -213,7 +214,7 @@ export interface IAssetAuditResultFilter {
   hasOpenDiscrepancies?: boolean;
 }
 
-export interface IAssetAuditDiscrepancyFilter {
+export interface IAssetAuditDiscrepancyFilter extends ISortFilter {
   pageNumber?: number;
   pageSize?: number;
   search?: string;

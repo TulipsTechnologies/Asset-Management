@@ -38,9 +38,9 @@ export default function BackButton({ className = '' }: { className?: string }) {
       type="button"
       onClick={() => router.push(target.url)}
       title={`Back to ${target.label}`}
-      className={`inline-flex shrink-0 items-center gap-1 rounded-full border border-gray-200 py-1.5 pl-2.5 pr-3.5 text-sm text-gray-600 transition-colors hover:border-primarycolor/40 hover:text-primarycolor ${className}`}
+      className={`inline-flex shrink-0 items-center gap-2 py-1.5 pr-2 text-sm font-medium text-secondaryColor transition-colors hover:text-primarycolor ${className}`}
     >
-      <i className="icon icon-left text-[10px]" />
+      <i className="icon icon-left text-[11px]" />
       {/* Just "Back" — the destination stays in the tooltip rather than making the
           control's width jump about with the length of the page name. */}
       <span>Back</span>

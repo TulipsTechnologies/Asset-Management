@@ -30,7 +30,7 @@ import {
   returnAsset,
 } from '@/services/assetAssignment.service';
 import { fetchEmployees } from '@/services/employee.service';
-import { unwrapPaged } from '@/utils/serviceUtils';
+import { mergeTableFilters, unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import { ASSET_CONDITIONS } from '@/enum/assetEnums';
 import {
@@ -95,14 +95,19 @@ const AssignmentsPage = () => {
   const [returnNotes, setReturnNotes] = useState('');
   const [returnSaving, setReturnSaving] = useState(false);
 
+  // sortField names an AssetAssignment ENTITY property, so the server orders the whole
+  // list and hands back page 1. The custody record itself holds only ids for the asset,
+  // the custodian and the condition — those three columns are joined in from their own
+  // tables, cannot be ordered by the database, and so offer no sort control.
   const columns: TTableColumn[] = [
     { key: 'assetCode', label: 'Asset', width: 130, type: 'string', name: 'assetCode' },
     { key: 'assetName', label: 'Name', width: 190, type: 'string', name: 'assetName' },
     { key: 'employeeName', label: 'Custodian', width: 170, type: 'string', name: 'employeeName' },
-    { key: 'assignmentDate', label: 'Assigned', width: 110, name: 'assignmentDate' },
-    { key: 'expectedReturnDate', label: 'Expected Return', width: 130, name: 'expectedReturnDate' },
+    { key: 'assignmentDate', label: 'Assigned', width: 110, name: 'assignmentDate', sortField: 'AssignmentDate' },
+    { key: 'expectedReturnDate', label: 'Expected Return', width: 130, name: 'expectedReturnDate', sortField: 'ExpectedReturnDate' },
     { key: 'conditionAtIssueName', label: 'Condition @ Issue', width: 130, type: 'string', name: 'conditionAtIssueName' },
-    { key: 'status', label: 'Status', width: 100, name: 'status' },
+    // The badge prints a label but orders by the stored enum.
+    { key: 'status', label: 'Status', width: 100, name: 'status', sortField: 'Status' },
     {
       key: 'actions',
       label: <i className="icon icon-actions text-[10px]" />,
@@ -169,16 +174,7 @@ const AssignmentsPage = () => {
   }, [debouncedSearch]);
 
   const updateFilters = (updates: Partial<ITableFilters>) => {
-    setFilters((prev) => ({
-      ...prev,
-      ...(updates.pageNumber !== undefined && {
-        pageNumber: Number(updates.pageNumber),
-      }),
-      ...(updates.pageSize !== undefined && {
-        pageSize: Number(updates.pageSize),
-        pageNumber: 1,
-      }),
-    }));
+    setFilters((prev) => mergeTableFilters(prev, updates));
   };
 
   const openReturn = (assignment: IAssetAssignment) => {
@@ -416,6 +412,8 @@ const AssignmentsPage = () => {
             tableHeaderLeft={toolbarLeft}
             tableHeaderRight={filterControls}
             updateFilters={updateFilters}
+            sortBy={filters.sortBy}
+            sortDesc={filters.sortDesc}
           />
 
           <div className="mt-3">

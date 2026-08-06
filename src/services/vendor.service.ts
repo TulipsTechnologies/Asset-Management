@@ -1,5 +1,5 @@
 import { requestApi } from './httpService';
-import { buildQuery } from '@/utils/serviceUtils';
+import { buildQuery, sortQuery } from '@/utils/serviceUtils';
 import { IPagedResponse, IResponse } from '@/interface/IGeneric';
 import { IUpdateVendor, IUpsertVendor, IVendor, IVendorFilter } from '@/interface/IVendor';
 
@@ -12,6 +12,7 @@ export const fetchVendors = (
       buildQuery({
         PageNumber: filter.pageNumber,
         PageSize: filter.pageSize,
+        ...sortQuery(filter),
         Search: filter.search,
         VendorType: filter.vendorType,
         IsActive: filter.isActive,

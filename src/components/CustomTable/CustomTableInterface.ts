@@ -29,6 +29,20 @@ export type TTableColumn = {
   invisible?: boolean;
   hidden?: boolean;
   type?: TColumnTypes;
+  /**
+   * The name the SERVER sorts by: a property of the entity behind this list, in the
+   * entity's own casing (`AssetCode`, not `assetCode` — though the API matches
+   * case-insensitively). Setting it is what makes the column sortable: the whole
+   * result set is ordered by the database and page 1 is re-fetched.
+   *
+   * Leave it unset for a column the server cannot order by — anything computed in
+   * the projection or joined in from another table. Such a column shows no sort
+   * control at all, because a control that reorders only the rows already on screen
+   * is worse than none: it looks like it sorted the table and it did not.
+   *
+   * Ignored on a `clientSort` table, where every row is already in the browser.
+   */
+  sortField?: string;
   isSortable?: boolean;
   locked?: boolean;
   canReposition?: boolean;
@@ -80,6 +94,26 @@ export type CustomTableProps = {
   selectable?: boolean;
   /** Show the leading SN serial-number column (default true). */
   showSerial?: boolean;
+  /**
+   * Show the Back control at the head of the toolbar (default true). Set false
+   * for a table embedded in a page that already carries its own Back, so the
+   * two do not stack.
+   */
+  showBack?: boolean;
+  /**
+   * This table holds its whole dataset in the browser (no server paging), so a
+   * column may be sorted here without asking the server. Server-paged tables must
+   * leave this off and declare `sortField` per column instead — sorting one page
+   * of many in the browser reorders a slice and calls it the table.
+   */
+  clientSort?: boolean;
+  /**
+   * The sort the page is currently requesting (its `filters.sortBy`/`sortDesc`). Pass
+   * them so the header indicator survives a remount — tab and view switches destroy this
+   * component while the page's filter state, and therefore the server's order, live on.
+   */
+  sortBy?: string;
+  sortDesc?: boolean;
   /** Serial offset so SN respects server paging: (pageNumber - 1) * pageSize. */
   serialOffset?: number;
   /** Resolve a stable id for a row (defaults to row.id, then row index). */

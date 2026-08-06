@@ -1,5 +1,5 @@
 import { requestApi } from './httpService';
-import { buildQuery } from '@/utils/serviceUtils';
+import { buildQuery, sortQuery } from '@/utils/serviceUtils';
 import { IPagedResponse, IResponse } from '@/interface/IGeneric';
 import {
   IAssetAssignment,
@@ -19,6 +19,7 @@ import {
  * Paging is excluded — only the list pages.
  */
 const assignmentFilterQuery = (filter: IAssetAssignmentFilter) => ({
+  ...sortQuery(filter),
   Search: filter.search,
   AssetId: filter.assetId,
   EmployeeId: filter.employeeId,

@@ -171,6 +171,13 @@ export default function ReportsPage() {
    */
   const run = () => (output === 'excel' ? exportXlsx() : load());
 
+  /** What a raw value should be compared as, so a column sorts by value not by label. */
+  const cellType = (value: unknown): 'number' | 'date' | 'string' => {
+    if (typeof value === 'number') return 'number';
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value)) return 'date';
+    return 'string';
+  };
+
   // Columns derive from the first row — the backend shape is the contract.
   const columns: TTableColumn[] = useMemo(() => {
     if (rows.length === 0) return [];
@@ -181,14 +188,26 @@ export default function ReportsPage() {
         label: humanize(key),
         width: 140,
         name: key,
-        type: 'string' as const,
+        type: 'custom' as const,
       }));
   }, [rows]);
 
+  // Every cell keeps its RAW value beside the text it prints. A report column used to
+  // hold only the formatted string, so sorting money compared "1,234.50" with "999.00"
+  // as words and put the larger first, and dates ordered by their printed month.
   const displayRows = rows.map((row) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const formatted: Record<string, any> = {};
-    for (const [key, value] of Object.entries(row)) formatted[key] = formatCell(value);
+    for (const [key, value] of Object.entries(row)) {
+      formatted[key] =
+        key === 'id'
+          ? value
+          : {
+              value: value === '' ? null : value,
+              content: formatCell(value),
+              type: cellType(value),
+            };
+    }
     return formatted;
   });
 
@@ -335,6 +354,10 @@ export default function ReportsPage() {
             }
             isLoading={loading}
             entityLabel="row"
+            // A report that came back whole can be ordered here. A paged one cannot:
+            // its endpoint ignores a sort request, and reordering the page on screen
+            // would present one slice of the rows as if it were the report.
+            clientSort={!selected.isPaginated}
           />
 
           {moneyTotals.length > 0 && (
