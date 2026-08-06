@@ -997,7 +997,7 @@ export default function CapitalizeForm() {
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold text-secondaryColor">
-            {isEdit ? `Depreciation Setup — ${book?.assetCode}` : 'Depreciation Setup'}
+            {isEdit ? `Edit Depreciation — ${book?.assetCode}` : 'Add Depreciation'}
           </h1>
           <p className="mt-0.5 text-xs text-gray-500">
             Sets how this asset depreciates and creates its book — the authoritative cost
@@ -1432,10 +1432,10 @@ export default function CapitalizeForm() {
               {saving
                 ? isEdit
                   ? 'Saving…'
-                  : 'Capitalizing…'
+                  : 'Adding…'
                 : isEdit
                   ? 'Save Changes'
-                  : 'Capitalize Asset'}
+                  : 'Add Depreciation'}
             </Button>
           </div>
         </div>
@@ -1503,7 +1503,7 @@ export default function CapitalizeForm() {
               {eligible ? (
                 <p className="flex items-center gap-2 py-1 text-sm text-primarycolor">
                   <i className="icon icon-check-circle text-xs" />
-                  Ready to {isEdit ? 'save' : 'capitalize'}.
+                  Ready to {isEdit ? 'save' : 'add'}.
                 </p>
               ) : (
                 <ul className="space-y-1.5 py-0.5">

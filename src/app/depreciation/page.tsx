@@ -797,7 +797,7 @@ export default function DepreciationPage() {
               <div className="flex items-center gap-2">
                 <Button onClick={openCapitalize}>
                   <i className="icon icon-plus text-xs"></i>
-                  <span>Capitalize Asset</span>
+                  <span>Add Depreciation</span>
                 </Button>
                 <Button variant="secondary" onClick={() => setOpeningImportOpen(true)}>
                   <i className="icon icon-import text-xs"></i>
