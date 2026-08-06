@@ -1,4 +1,9 @@
+'use client';
+
 import Link from 'next/link';
+import { useEffect } from 'react';
+import { usePathname } from 'next/navigation';
+import { LAST_HUB_STORAGE_KEY } from '@/utils/navigation';
 
 export interface IHubCard {
   label: string;
@@ -29,7 +34,15 @@ const ModuleHub = ({
   title: string;
   description: string;
   sections: IHubSection[];
-}) => (
+}) => {
+  // Record the hub being used, so a page it leads to knows where to send you back —
+  // Categories, for one, is offered by two different hubs.
+  const pathname = usePathname();
+  useEffect(() => {
+    if (pathname) sessionStorage.setItem(LAST_HUB_STORAGE_KEY, pathname);
+  }, [pathname]);
+
+  return (
   <div className="px-4 sm:px-6 py-6">
     <h1 className="text-xl font-semibold text-secondaryColor">{title}</h1>
     <p className="text-sm text-gray-500 mt-1">{description}</p>
@@ -76,6 +89,7 @@ const ModuleHub = ({
       </section>
     ))}
   </div>
-);
+  );
+};
 
 export default ModuleHub;
