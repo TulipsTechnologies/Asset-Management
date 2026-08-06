@@ -2,6 +2,7 @@
 
 import CustomMenuItem from '@/components/UI/CustomMenuItem';
 import Dropdown from '@/components/UI/Dropdown';
+import RowKebab from '@/components/UI/RowKebab';
 import { IAssetListItem } from '@/interface/IAsset';
 
 /**
@@ -83,11 +84,7 @@ export const AssetActionsMenu = ({
   return (
     <div className={`flex gap-x-2 relative ${className}`}>
       <Dropdown
-        buttonChildren={
-          <div className="bg-white/80 px-1.5 py-2 rounded-sm hover:bg-primarycolor hover:text-white">
-            <i className="icon icon-elipsis-v text-sm"></i>
-          </div>
-        }
+        buttonChildren={<RowKebab />}
       >
         {usable.map((action, index) => (
           <CustomMenuItem

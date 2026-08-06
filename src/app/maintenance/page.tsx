@@ -12,6 +12,7 @@ import {
 } from '@/components/CustomTable/CustomTableInterface';
 import CustomMenuItem from '@/components/UI/CustomMenuItem';
 import Dropdown from '@/components/UI/Dropdown';
+import RowKebab from '@/components/UI/RowKebab';
 import Modal from '@/components/UI/Modal';
 import Input from '@/components/UI/Input';
 import Select from '@/components/UI/Select';
@@ -845,11 +846,7 @@ const MaintenancePage = () => {
     actions: (
       <div className="flex gap-x-2 relative bg-white px-4 py-2 -m-2">
         <Dropdown
-          buttonChildren={
-            <div className="bg-white/80 px-1.5 py-2 rounded-sm hover:bg-primarycolor hover:text-white">
-              <i className="icon icon-elipsis-v text-sm"></i>
-            </div>
-          }
+          buttonChildren={<RowKebab />}
         >
           {[
             {
@@ -929,11 +926,7 @@ const MaintenancePage = () => {
     actions: (
       <div className="flex gap-x-2 relative bg-white px-4 py-2 -m-2">
         <Dropdown
-          buttonChildren={
-            <div className="bg-white/80 px-1.5 py-2 rounded-sm hover:bg-primarycolor hover:text-white">
-              <i className="icon icon-elipsis-v text-sm"></i>
-            </div>
-          }
+          buttonChildren={<RowKebab />}
         >
           {[
             {

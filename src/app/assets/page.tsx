@@ -67,7 +67,7 @@ const VIEW_VALUES = ['table', 'card', 'calendar', 'analytics'] as const;
 const VIEW_STORAGE_KEY = 'assets.viewMode';
 
 const VIEW_OPTIONS: IViewOption<TAssetView>[] = [
-  // Rows, not columns: Manage Columns sits inches away in the same toolbar and owns the
+  // Rows, not columns: the Columns control sits inches away in the same toolbar and owns the
   // three-cols glyph, so sharing it made the two controls look like the same control.
   { value: 'table', label: 'Table', iconName: 'menu', title: 'Compare assets column by column' },
   { value: 'card', label: 'Cards', iconName: 'modules', title: 'Browse assets one tile at a time' },
@@ -131,7 +131,7 @@ const AssetsPage = () => {
     { key: 'netBookValue', label: 'Net Value', width: 120, name: 'netBookValue' },
     { key: 'assetLocationName', label: 'Location', width: 150, type: 'string', name: 'assetLocationName' },
     { key: 'lifecycleStatus', label: 'Lifecycle', width: 110, name: 'lifecycleStatus' },
-    // Off by default — Manage Columns brings them back per user or company-wide.
+    // Off by default — the Columns control brings them back per user or company-wide.
     { key: 'assetCategoryName', label: 'Category', width: 150, type: 'string', name: 'assetCategoryName', visible: false },
     { key: 'serialNumber', label: 'Serial No.', width: 140, type: 'string', name: 'serialNumber', visible: false },
     { key: 'custodyStatus', label: 'Custody', width: 120, name: 'custodyStatus', visible: false },
@@ -546,7 +546,7 @@ const AssetsPage = () => {
     <div className="px-4 mt-2">
       {/*
        * The same toolbar, placed twice. In Table view it is handed to CustomTable's own
-       * header so Manage Columns — which only means anything to a table — sits on the same
+       * header so the Columns control — which only means anything to a table — sits on the same
        * row as everything else instead of on a line of its own underneath. Every other view
        * renders it standalone, since there are no columns to manage there.
        */}

@@ -23,6 +23,7 @@ import {
 } from '@/services/employee.service';
 import CustomMenuItem from '@/components/UI/CustomMenuItem';
 import Dropdown from '@/components/UI/Dropdown';
+import RowKebab from '@/components/UI/RowKebab';
 import ConfirmationModal from '@/components/UI/ConfirmationModel';
 import { unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
@@ -258,7 +259,8 @@ const EmployeesPage = () => {
     actions: (
       <div className="flex justify-center">
         <Dropdown
-          buttonChildren={<i className="icon icon-actions text-[10px]" />}
+          ariaLabel="Row actions"
+          buttonChildren={<RowKebab />}
           position="fixed"
         >
           <CustomMenuItem

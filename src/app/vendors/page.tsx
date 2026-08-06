@@ -12,6 +12,7 @@ import {
 import CustomCheckbox from '@/components/UI/CustomCheckBox';
 import CustomMenuItem from '@/components/UI/CustomMenuItem';
 import Dropdown from '@/components/UI/Dropdown';
+import RowKebab from '@/components/UI/RowKebab';
 import ConfirmationModal from '@/components/UI/ConfirmationModel';
 import FilterPanel from '@/components/UI/FilterPanel';
 import Modal from '@/components/UI/Modal';
@@ -260,7 +261,8 @@ const VendorsPage = () => {
     actions: (
       <div className="flex justify-center">
         <Dropdown
-          buttonChildren={<i className="icon icon-actions text-[10px]" />}
+          ariaLabel="Row actions"
+          buttonChildren={<RowKebab />}
           position="fixed"
         >
           <CustomMenuItem
