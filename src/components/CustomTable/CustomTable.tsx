@@ -666,7 +666,7 @@ const CustomTable = ({
             className="text-sm flex items-center justify-start gap-x-2 font-medium whitespace-nowrap"
           >
             <i className="icon icon-three-cols text-gray-500 text-base" />{' '}
-            Manage Columns
+            Columns
           </button>
           {tableHeaderRight}
         </div>

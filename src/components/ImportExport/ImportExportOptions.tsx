@@ -196,7 +196,7 @@ const ImportExportOptions = ({
         buttonChildren={
           // A div, not <Button>: Dropdown wraps this in its own <button>, and
           // nested buttons are invalid HTML (hydration error). Styled like the
-          // sibling Manage Columns control.
+          // sibling Columns control.
           <div className="text-sm flex items-center gap-x-2 font-medium whitespace-nowrap">
             <i className="icon icon-dials text-gray-500 text-base" />
             <span>Options</span>
