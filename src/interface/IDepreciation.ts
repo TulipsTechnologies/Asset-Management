@@ -243,8 +243,22 @@ export interface IProjectAssetDepreciation {
   openingAccumulated?: number;
 }
 
+export interface IDepreciationProjectionMonth {
+  periodOrdinal: number;
+  /** Configured fiscal month name (e.g. Shrawan); null on the synthetic fallback. */
+  monthName?: string | null;
+  from: string;
+  to: string;
+  charge: number;
+  accumulatedAtEnd: number;
+  closingNetBookValue: number;
+  elapsed: boolean;
+}
+
 export interface IDepreciationProjectionYear {
   yearNumber: number;
+  /** The configured fiscal year this row is (e.g. "2073/74"); null on the fallback. */
+  fiscalYearCode?: string | null;
   from: string;
   to: string;
   months: number;
@@ -254,6 +268,8 @@ export interface IDepreciationProjectionYear {
   closingNetBookValue: number;
   elapsed: boolean;
   isCurrent: boolean;
+  /** The year's monthly periods — the expandable detail under the year row. */
+  periods: IDepreciationProjectionMonth[];
 }
 
 /** What an asset bought years ago is worth today. Writes nothing. */
@@ -274,6 +290,14 @@ export interface IDepreciationProjection {
   netBookValueToDate: number;
   currentYearCharge: number;
   fullyDepreciated: boolean;
+  /** True when rows are the company's configured fiscal years and the cutover is set. */
+  isFiscalAligned: boolean;
+  /** History through the last fully-ended fiscal year — what the cutover saves. */
+  lastClosedFiscalYearCode?: string | null;
+  cutoverThroughDate?: string | null;
+  accumulatedThroughCutover?: number | null;
+  netBookValueAtCutover?: number | null;
+  currentFiscalYearCode?: string | null;
   years: IDepreciationProjectionYear[];
   notes: string[];
 }

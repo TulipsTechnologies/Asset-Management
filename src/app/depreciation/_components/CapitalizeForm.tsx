@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/components/Providers/ToastProvider';
 import Button from '@/components/UI/Button';
@@ -229,6 +229,8 @@ export default function CapitalizeForm() {
   // that saves the book — "show me 10 years" must never quietly become the accounting life.
   const [forecastYears, setForecastYears] = useState(10);
   const [historyOpen, setHistoryOpen] = useState(false);
+  /** Fiscal-year rows whose monthly periods are expanded in the year-by-year modal. */
+  const [expandedYears, setExpandedYears] = useState<Set<number>>(new Set());
   // "historical": no opening balance — the register recomputes the past itself (catch-up).
   // "opening": the prior system's figures are adopted and never recomputed.
   const [startMode, setStartMode] = useState<'historical' | 'opening'>('historical');
@@ -1392,8 +1394,10 @@ export default function CapitalizeForm() {
                       </label>
                     )}
                     <p className="mt-0.5 text-[11px] text-gray-500">
-                      Runs the depreciation engine from {form.depreciationStartDate || 'the start date'} to
-                      today, for the years the fiscal calendar does not cover.
+                      Runs the depreciation engine from{' '}
+                      {form.depreciationStartDate || 'the start date'} to today, aligned to the
+                      configured fiscal calendar where it reaches the start date (twelve-month
+                      blocks otherwise).
                     </p>
 
                     {projection ? (
@@ -1402,6 +1406,12 @@ export default function CapitalizeForm() {
                           label={`Depreciated over ${projection.elapsedMonths} months`}
                           value={money(projection.accumulatedToDate, currency)}
                         />
+                        {projection.isFiscalAligned && projection.lastClosedFiscalYearCode && (
+                          <Row
+                            label={`History through ${projection.lastClosedFiscalYearCode}`}
+                            value={money(projection.accumulatedThroughCutover ?? 0, currency)}
+                          />
+                        )}
                         <Row
                           label="Value left today"
                           value={money(projection.netBookValueToDate, currency)}
@@ -1409,7 +1419,11 @@ export default function CapitalizeForm() {
                           highlight
                         />
                         <Row
-                          label="This year's charge"
+                          label={
+                            projection.currentFiscalYearCode
+                              ? `${projection.currentFiscalYearCode} charge`
+                              : "This year's charge"
+                          }
                           value={money(projection.currentYearCharge, currency)}
                           muted
                         />
@@ -1417,7 +1431,10 @@ export default function CapitalizeForm() {
                           variant="secondary"
                           size="small"
                           className="mt-2 w-full"
-                          onClick={() => setHistoryOpen(true)}
+                          onClick={() => {
+                            setExpandedYears(new Set());
+                            setHistoryOpen(true);
+                          }}
                         >
                           View year by year
                         </Button>
@@ -1426,11 +1443,34 @@ export default function CapitalizeForm() {
                           size="small"
                           className="mt-1.5 w-full"
                           onClick={() => {
+                            // Fiscal cutover: save the triple — opening accumulated,
+                            // opening NBV, and the through-date — so the posted schedule
+                            // starts at the current fiscal year with nothing recharged.
+                            // The anniversary fallback keeps the value-as-of-today figure.
+                            const fiscal =
+                              projection.isFiscalAligned &&
+                              projection.accumulatedThroughCutover != null;
                             set({
                               openingAccumulatedDepreciation: String(
-                                projection.accumulatedToDate
+                                fiscal
+                                  ? projection.accumulatedThroughCutover
+                                  : projection.accumulatedToDate
                               ),
+                              ...(fiscal && projection.netBookValueAtCutover != null
+                                ? {
+                                    openingNetBookValue: String(
+                                      projection.netBookValueAtCutover
+                                    ),
+                                  }
+                                : {}),
+                              ...(fiscal && projection.cutoverThroughDate
+                                ? {
+                                    lastDepreciationThroughDate:
+                                      projection.cutoverThroughDate.slice(0, 10),
+                                  }
+                                : {}),
                             });
+                            setStartMode('opening');
                             setProjection(null);
                           }}
                         >
@@ -1506,9 +1546,20 @@ export default function CapitalizeForm() {
             Depreciation year by year
           </h2>
           <p className="mb-4 text-xs text-gray-500">
-            Every year from {projection?.depreciationStartDate?.slice(0, 10)} to the end of the
-            asset&apos;s life, computed by the same engine that posts the books. Years already
-            elapsed are the history; the rest is what is still to come.
+            {projection?.isFiscalAligned ? (
+              <>
+                Every fiscal year from {projection?.depreciationStartDate?.slice(0, 10)} to the
+                end of the asset&apos;s life, computed by the same engine that posts the books
+                over the company&apos;s configured fiscal calendar. Click a year to see its
+                monthly periods.
+              </>
+            ) : (
+              <>
+                Every year from {projection?.depreciationStartDate?.slice(0, 10)} to the end of
+                the asset&apos;s life, computed by the same engine that posts the books. Years
+                already elapsed are the history; the rest is what is still to come.
+              </>
+            )}
           </p>
 
           {projection && (
@@ -1527,6 +1578,14 @@ export default function CapitalizeForm() {
                   label="Value left today"
                   value={money(projection.netBookValueToDate, currency)}
                 />
+                {projection.isFiscalAligned && projection.lastClosedFiscalYearCode && (
+                  <DetailField
+                    label="History through"
+                    value={`${projection.lastClosedFiscalYearCode} · ended ${
+                      projection.cutoverThroughDate?.slice(0, 10) ?? ''
+                    }`}
+                  />
+                )}
               </div>
 
               <div className="max-h-96 overflow-y-auto">
@@ -1542,41 +1601,98 @@ export default function CapitalizeForm() {
                     </tr>
                   </thead>
                   <tbody>
-                    {projection.years.map((year) => (
-                      <tr
-                        key={year.yearNumber}
-                        className={`border-b border-gray-100 ${
-                          year.isCurrent ? 'bg-primarycolor/5' : year.elapsed ? '' : 'opacity-60'
-                        }`}
-                      >
-                        <td className="px-3 py-2 font-medium">
-                          {year.yearNumber}
-                          {year.isCurrent && (
-                            <span className="ml-2 rounded bg-primarycolor/10 px-1.5 py-0.5 text-[10px] font-medium text-primarycolor">
-                              current
-                            </span>
-                          )}
-                          {!year.elapsed && !year.isCurrent && (
-                            <span className="ml-2 text-[10px] text-gray-400">future</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 text-xs text-gray-500">
-                          {year.from.slice(0, 10)} → {year.to.slice(0, 10)}
-                        </td>
-                        <td className="px-3 py-2 text-right text-gray-600">
-                          {money(year.openingNetBookValue, currency)}
-                        </td>
-                        <td className="px-3 py-2 text-right font-medium">
-                          {money(year.charge, currency)}
-                        </td>
-                        <td className="px-3 py-2 text-right text-gray-600">
-                          {money(year.accumulatedAtEnd, currency)}
-                        </td>
-                        <td className="px-3 py-2 text-right text-gray-600">
-                          {money(year.closingNetBookValue, currency)}
-                        </td>
-                      </tr>
-                    ))}
+                    {projection.years.map((year) => {
+                      const expandable = year.periods.length > 0;
+                      const expanded = expandable && expandedYears.has(year.yearNumber);
+                      return (
+                        <Fragment key={year.yearNumber}>
+                          <tr
+                            className={`border-b border-gray-100 ${
+                              year.isCurrent
+                                ? 'bg-primarycolor/5'
+                                : year.elapsed
+                                ? ''
+                                : 'opacity-60'
+                            } ${expandable ? 'cursor-pointer hover:bg-gray-50' : ''}`}
+                            onClick={() => {
+                              if (!expandable) return;
+                              setExpandedYears((current) => {
+                                const next = new Set(current);
+                                if (next.has(year.yearNumber)) next.delete(year.yearNumber);
+                                else next.add(year.yearNumber);
+                                return next;
+                              });
+                            }}
+                            aria-expanded={expandable ? expanded : undefined}
+                          >
+                            <td className="px-3 py-2 font-medium">
+                              <span className="inline-flex items-center gap-1.5">
+                                {expandable && (
+                                  <span
+                                    className={`inline-block text-[9px] text-gray-400 transition-transform ${
+                                      expanded ? 'rotate-90' : ''
+                                    }`}
+                                    aria-hidden
+                                  >
+                                    ▶
+                                  </span>
+                                )}
+                                {year.fiscalYearCode ?? year.yearNumber}
+                              </span>
+                              {year.isCurrent && (
+                                <span className="ml-2 rounded bg-primarycolor/10 px-1.5 py-0.5 text-[10px] font-medium text-primarycolor">
+                                  current
+                                </span>
+                              )}
+                              {!year.elapsed && !year.isCurrent && (
+                                <span className="ml-2 text-[10px] text-gray-400">future</span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 text-xs text-gray-500">
+                              {year.from.slice(0, 10)} → {year.to.slice(0, 10)}
+                            </td>
+                            <td className="px-3 py-2 text-right text-gray-600">
+                              {money(year.openingNetBookValue, currency)}
+                            </td>
+                            <td className="px-3 py-2 text-right font-medium">
+                              {money(year.charge, currency)}
+                            </td>
+                            <td className="px-3 py-2 text-right text-gray-600">
+                              {money(year.accumulatedAtEnd, currency)}
+                            </td>
+                            <td className="px-3 py-2 text-right text-gray-600">
+                              {money(year.closingNetBookValue, currency)}
+                            </td>
+                          </tr>
+                          {expanded &&
+                            year.periods.map((month) => (
+                              <tr
+                                key={`${year.yearNumber}-${month.periodOrdinal}-${month.from}`}
+                                className="border-b border-gray-50 bg-gray-50/60 text-xs"
+                              >
+                                <td className="py-1.5 pl-9 pr-3 text-gray-500">
+                                  {month.monthName ?? `Month ${month.periodOrdinal}`}
+                                </td>
+                                <td className="px-3 py-1.5 text-gray-400">
+                                  {month.from.slice(0, 10)} → {month.to.slice(0, 10)}
+                                </td>
+                                <td className="px-3 py-1.5 text-right text-gray-500">
+                                  {money(month.closingNetBookValue + month.charge, currency)}
+                                </td>
+                                <td className="px-3 py-1.5 text-right text-gray-600">
+                                  {money(month.charge, currency)}
+                                </td>
+                                <td className="px-3 py-1.5 text-right text-gray-500">
+                                  {money(month.accumulatedAtEnd, currency)}
+                                </td>
+                                <td className="px-3 py-1.5 text-right text-gray-500">
+                                  {money(month.closingNetBookValue, currency)}
+                                </td>
+                              </tr>
+                            ))}
+                        </Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
