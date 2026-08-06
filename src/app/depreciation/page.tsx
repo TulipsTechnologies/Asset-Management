@@ -85,6 +85,44 @@ const money = (amount?: number | null, currency?: string | null) =>
         maximumFractionDigits: 2,
       })}${currency ? ` ${currency.trim()}` : ''}`;
 
+/** Money for dense table cells: the column header carries the currency, not every row. */
+const amount = (value?: number | null) =>
+  value == null
+    ? '—'
+    : value.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+
+/** A figure in the run's summary band. `hero` marks the one people open this for. */
+const RunStat = ({
+  label,
+  value,
+  foot,
+  hero,
+}: {
+  label: string;
+  value: React.ReactNode;
+  foot?: string | null;
+  hero?: boolean;
+}) => (
+  <div
+    className={`rounded-xl border px-4 py-3 ${
+      hero ? 'border-primarycolor/30 bg-primarycolor/5' : 'border-gray-100 bg-white shadow-sm'
+    }`}
+  >
+    <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{label}</p>
+    <p
+      className={`mt-1 tabular-nums leading-tight ${
+        hero ? 'text-2xl font-bold text-primarycolor' : 'text-lg font-semibold text-gray-800'
+      }`}
+    >
+      {value}
+    </p>
+    {foot ? <p className="mt-1 truncate text-[11px] text-gray-400">{foot}</p> : null}
+  </div>
+);
+
 const Badge = ({ label, classes }: { label: string; classes: string }) => (
   <span className={`rounded px-2 py-0.5 text-xs font-medium ${classes}`}>
     {label}
@@ -1140,37 +1178,60 @@ export default function DepreciationPage() {
       </Modal>
 
       {/* ---------------------------------------------------------------- run details */}
-      <Modal isOpen={!!viewingRun} onClose={() => setViewingRun(null)} size="3xl">
-        <div className="p-5">
-          <h2 className="mb-4 text-lg font-semibold text-gray-800">
-            Run — {viewingRun?.fiscalYearCode} · {viewingRun?.monthName}
-          </h2>
+      <Modal isOpen={!!viewingRun} onClose={() => setViewingRun(null)} size="6xl">
+        {/* Header, summary and notices hold still; only the lines scroll, so the column
+            headings stay with the figures they name. */}
+        <div className="flex max-h-[86vh] flex-col">
+          <div className="shrink-0 border-b border-gray-100 px-6 pb-4 pr-14 pt-5">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-lg font-semibold text-gray-800">
+                Depreciation Run — {viewingRun?.fiscalYearCode} · {viewingRun?.monthName}
+              </h2>
+              {viewingRun && (
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                    RUN_STATUS_BADGE_CLASSES[viewingRun.status] ?? 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  {RUN_STATUS_LABELS[viewingRun.status]}
+                </span>
+              )}
+            </div>
+            <p className="mt-0.5 text-xs text-gray-500">
+              {viewingRun?.assetCount ?? 0} asset
+              {(viewingRun?.assetCount ?? 0) === 1 ? '' : 's'} charged
+              {(viewingRun?.excludedAssetCount ?? 0) > 0
+                ? `, ${viewingRun?.excludedAssetCount} excluded`
+                : ''}
+              {viewingRun?.postedOn
+                ? ` · posted ${formatDate(viewingRun.postedOn)}`
+                : ' · not posted'}
+            </p>
+          </div>
 
-          <div className="mb-4 grid grid-cols-5 gap-4 rounded bg-gray-50 p-3">
-            <DetailField
-              label="Status"
-              value={viewingRun ? RUN_STATUS_LABELS[viewingRun.status] : '—'}
-            />
-            <DetailField label="Assets" value={viewingRun?.assetCount} />
-            <DetailField label="Excluded" value={viewingRun?.excludedAssetCount ?? 0} />
-            <DetailField
-              label="Total"
-              value={money(viewingRun?.totalAmount, viewingRun?.currencyId)}
-            />
-            <DetailField label="Posted" value={formatDate(viewingRun?.postedOn)} />
-            <DetailField
-              label="Historical Catch-up"
-              value={money(viewingRun?.priorYearCatchUpTotal ?? 0, viewingRun?.currencyId)}
-            />
-            <DetailField
-              label="Current Fiscal Year"
-              value={money(viewingRun?.currentYearTotal ?? 0, viewingRun?.currencyId)}
-            />
+          <div className="shrink-0 px-6 pt-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <RunStat
+                hero
+                label="Total charged"
+                value={money(viewingRun?.totalAmount, viewingRun?.currencyId)}
+              />
+              <RunStat
+                label="Current fiscal year"
+                value={money(viewingRun?.currentYearTotal ?? 0, viewingRun?.currencyId)}
+                foot={`${viewingRun?.fiscalYearCode ?? ''} · ${viewingRun?.monthName ?? ''}`}
+              />
+              <RunStat
+                label="Historical catch-up"
+                value={money(viewingRun?.priorYearCatchUpTotal ?? 0, viewingRun?.currencyId)}
+                foot="Owed from earlier periods never run"
+              />
+            </div>
           </div>
 
           {/* Books the run considered and charged nothing for. Warnings, not failures. */}
           {runExclusions.length > 0 && (
-            <div className="mb-3">
+            <div className="shrink-0 px-6 pt-4">
               <p className="mb-1.5 text-xs font-medium text-gray-600">
                 Excluded assets ({runExclusions.length})
               </p>
@@ -1187,46 +1248,54 @@ export default function DepreciationPage() {
           )}
 
           {viewingRun?.reversalReason && (
-            <p className="mb-3 rounded bg-red-50 px-3 py-2 text-xs text-red-800">
+            <p className="mx-6 mt-4 shrink-0 rounded bg-red-50 px-3 py-2 text-xs text-red-800">
               Reversed: {viewingRun.reversalReason}
             </p>
           )}
 
-          <div className="max-h-80 overflow-y-auto">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-gray-100 text-left text-xs text-gray-600">
-                <tr>
-                  <th className="px-3 py-2">Asset</th>
-                  <th className="px-3 py-2">Convention</th>
-                  <th className="px-3 py-2 text-right">Days</th>
-                  <th className="px-3 py-2 text-right">Opening NBV</th>
-                  <th className="px-3 py-2 text-right">Charge</th>
-                  <th className="px-3 py-2 text-right">Accumulated After</th>
-                  <th className="px-3 py-2 text-right">NBV After</th>
-                  <th className="px-3 py-2 text-right">Residual</th>
+          {/* Narrow screens scroll this table sideways rather than crushing the figures —
+              a squeezed money column is unreadable, a scrolled one is merely narrow. */}
+          <div className="min-h-0 flex-1 overflow-auto px-6 pb-5 pt-4">
+            <table className="w-full min-w-[900px] border-separate border-spacing-0 text-sm">
+              <thead className="sticky top-0 z-10">
+                <tr className="bg-gray-100 text-left text-[11px] uppercase tracking-wide text-gray-600">
+                  <th scope="col" className="rounded-l-lg py-2.5 pl-4 pr-3 font-semibold">
+                    Asset
+                  </th>
+                  <th scope="col" className="px-3 py-2.5 font-semibold">Basis</th>
+                  <th scope="col" className="px-3 py-2.5 text-right font-semibold">
+                    Opening NBV
+                  </th>
+                  <th scope="col" className="px-3 py-2.5 text-right font-semibold">Charge</th>
+                  <th scope="col" className="px-3 py-2.5 text-right font-semibold">
+                    Accumulated after
+                  </th>
+                  <th scope="col" className="px-3 py-2.5 text-right font-semibold">
+                    NBV after
+                  </th>
+                  <th scope="col" className="rounded-r-lg px-4 py-2.5 text-right font-semibold">
+                    Residual
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {runDetails.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-3 py-4 text-center text-gray-500">
+                    <td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-500">
                       No lines in this run.
                     </td>
                   </tr>
                 )}
                 {runDetails.map((detail) => (
-                  <tr key={detail.id} className="border-b border-gray-100">
-                    <td className="px-3 py-2">
-                      <span className="font-medium">{detail.assetCode}</span>
-                      <span className="ml-2 text-xs text-gray-500">{detail.assetName}</span>
-                      {detail.isCatchUp && (
-                        <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
-                          catch-up
-                        </span>
-                      )}
-                      <p className="mt-0.5 text-[11px] text-gray-400">
+                  <tr
+                    key={detail.id}
+                    className="border-b border-gray-100 align-top transition-colors hover:bg-gray-50"
+                  >
+                    <td className="py-2.5 pl-4 pr-3">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span className="font-medium text-gray-800">{detail.assetCode}</span>
                         <span
-                          className={`mr-1.5 rounded px-1 py-0.5 text-[10px] font-medium ${
+                          className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
                             detail.startingMode === 'OpeningBalance'
                               ? 'bg-blue-100 text-blue-700'
                               : 'bg-gray-100 text-gray-600'
@@ -1236,6 +1305,16 @@ export default function DepreciationPage() {
                             ? 'Opening balance'
                             : 'Historical catch-up'}
                         </span>
+                        {detail.isCatchUp && (
+                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                            catch-up
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-0.5 truncate text-xs text-gray-500">
+                        {detail.assetName}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-gray-400">
                         In service {formatDate(detail.availableForUseDate)}
                         {detail.lastDepreciationThroughDate
                           ? ` · charged through ${formatDate(
@@ -1244,40 +1323,63 @@ export default function DepreciationPage() {
                           : ''}
                       </p>
                       {detail.priorYearCatchUpAmount > 0 && (
-                        <p className="mt-0.5 text-[11px] text-amber-700">
-                          {money(detail.priorYearCatchUpAmount, detail.currencyId)} prior-year
-                          catch-up · {money(detail.currentYearAmount, detail.currencyId)} this
-                          year
+                        <p className="mt-1 text-[11px] text-amber-700">
+                          {amount(detail.priorYearCatchUpAmount)} prior-year ·{' '}
+                          {amount(detail.currentYearAmount)} this year
                         </p>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-xs text-gray-600">
+                    <td className="px-3 py-2.5 text-xs text-gray-600">
                       {CONVENTION_LABELS[detail.depreciationConvention] ?? '—'}
+                      <span className="mt-0.5 block text-[11px] text-gray-400">
+                        {/* A whole-month book has no day count — the period IS the unit. */}
+                        {detail.chargedDays != null
+                          ? `${detail.chargedDays} day${detail.chargedDays === 1 ? '' : 's'}`
+                          : 'Full period'}
+                      </span>
                     </td>
-                    <td className="px-3 py-2 text-right text-gray-600">
-                      {/* A whole-month book has no day count — the period IS the unit. */}
-                      {detail.chargedDays ?? (
-                        <span className="text-xs text-gray-400">Full period</span>
-                      )}
+                    <td className="px-3 py-2.5 text-right tabular-nums text-gray-600">
+                      {amount(detail.netBookValueBefore)}
                     </td>
-                    <td className="px-3 py-2 text-right text-gray-600">
-                      {money(detail.netBookValueBefore, detail.currencyId)}
+                    <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-gray-800">
+                      {amount(detail.amount)}
                     </td>
-                    <td className="px-3 py-2 text-right">
-                      {money(detail.amount, detail.currencyId)}
+                    <td className="px-3 py-2.5 text-right tabular-nums text-gray-600">
+                      {amount(detail.closingAccumulated)}
                     </td>
-                    <td className="px-3 py-2 text-right text-gray-600">
-                      {money(detail.closingAccumulated, detail.currencyId)}
+                    <td className="px-3 py-2.5 text-right tabular-nums text-gray-600">
+                      {amount(detail.netBookValueAfter)}
                     </td>
-                    <td className="px-3 py-2 text-right text-gray-600">
-                      {money(detail.netBookValueAfter, detail.currencyId)}
-                    </td>
-                    <td className="px-3 py-2 text-right text-gray-600">
-                      {money(detail.residualValue, detail.currencyId)}
+                    <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">
+                      {amount(detail.residualValue)}
                     </td>
                   </tr>
                 ))}
               </tbody>
+
+              {runDetails.length > 0 && (
+                <tfoot className="sticky bottom-0">
+                  <tr className="bg-gray-100 text-sm font-semibold text-gray-800">
+                    <td className="rounded-l-lg py-2.5 pl-4 pr-3">
+                      Total{viewingRun?.currencyId ? ` (${viewingRun.currencyId.trim()})` : ''}
+                    </td>
+                    <td className="px-3 py-2.5 text-xs font-normal text-gray-500">
+                      {runDetails.length} line{runDetails.length === 1 ? '' : 's'}
+                    </td>
+                    <td className="px-3 py-2.5" />
+                    <td className="px-3 py-2.5 text-right tabular-nums">
+                      {amount(runDetails.reduce((sum, d) => sum + d.amount, 0))}
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">
+                      {amount(runDetails.reduce((sum, d) => sum + d.closingAccumulated, 0))}
+                    </td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">
+                      {amount(runDetails.reduce((sum, d) => sum + d.netBookValueAfter, 0))}
+                    </td>
+                    <td className="rounded-r-lg px-4 py-2.5" />
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
         </div>
