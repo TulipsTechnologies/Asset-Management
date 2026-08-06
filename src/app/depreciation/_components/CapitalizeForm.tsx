@@ -231,6 +231,9 @@ export default function CapitalizeForm() {
   const [historyOpen, setHistoryOpen] = useState(false);
   /** Fiscal-year rows whose monthly periods are expanded in the year-by-year modal. */
   const [expandedYears, setExpandedYears] = useState<Set<number>>(new Set());
+  /** Fingerprint of the inputs the current projection was computed from — a mismatch
+      means the figures on screen no longer describe the form. */
+  const [projectedInputs, setProjectedInputs] = useState<string | null>(null);
   // "historical": no opening balance — the register recomputes the past itself (catch-up).
   // "opening": the prior system's figures are adopted and never recomputed.
   const [startMode, setStartMode] = useState<'historical' | 'opening'>('historical');
@@ -574,6 +577,18 @@ export default function CapitalizeForm() {
    * periods for the years the fiscal calendar never covered. Nothing is computed here, and
    * nothing is written there.
    */
+  /** The inputs the projection depends on, as one comparable string. */
+  const projectionFingerprint = [
+    form.depreciationMethodId,
+    cost,
+    residual,
+    lifeMonths,
+    namedRatePct,
+    form.depreciationStartDate,
+    forecastYears,
+  ].join('|');
+  const projectionStale = projection != null && projectedInputs !== projectionFingerprint;
+
   const runProjection = async () => {
     if (projecting) return;
     const projectionReady =
@@ -603,8 +618,10 @@ export default function CapitalizeForm() {
         depreciationStartDate: form.depreciationStartDate,
       });
 
-      if (response?.success && response.data) setProjection(response.data);
-      else
+      if (response?.success && response.data) {
+        setProjection(response.data);
+        setProjectedInputs(projectionFingerprint);
+      } else
         setFailure({
           code: response?.reasonCode,
           message: response?.message || 'Could not work out the value to date.',
@@ -880,9 +897,108 @@ export default function CapitalizeForm() {
               required
               value={form.depreciationMethodId}
               onChange={(e) => set({ depreciationMethodId: e.target.value })}
-              options={methods.map((m) => ({ label: m.name, value: m.id }))}
+              options={methods
+                // Straight Line and Diminishing Balance are the two methods offered here.
+                // None and Written-Down Value are hidden (this form submits the crossover
+                // off, so Diminishing Balance already never reaches zero) — but a book that
+                // already carries one of them must keep its method visible on edit.
+                .filter(
+                  (m) =>
+                    m.code === DEPRECIATION_METHOD_CODES.StraightLine ||
+                    m.code === DEPRECIATION_METHOD_CODES.DecliningBalance ||
+                    m.id === form.depreciationMethodId
+                )
+                .map((m) => ({ label: m.name, value: m.id }))}
               placeholder="Select a method"
             />
+
+            {/* Nepal IRD tax classification — up front on purpose: the class both files
+                the TAX book and can seed the accounting rate below, so it is the natural
+                second decision after the method. Skipping it still capitalizes. */}
+            <div
+              className={`md:col-span-2 rounded-lg border p-3.5 ${
+                taxOn
+                  ? 'border-primarycolor/40 bg-primarycolor/[0.04]'
+                  : 'border-gray-200 bg-gray-50/50'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xs font-semibold uppercase tracking-wide text-primarycolor">
+                    Nepal IRD Tax Details
+                  </h2>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    {isEdit
+                      ? 'The classification entered at capitalization. Saving updates it.'
+                      : 'Classify now so the tax pool starts with this asset — a second, independent book. Skip it and the asset still capitalizes.'}
+                  </p>
+                </div>
+                <ToggleSwitch checked={taxOn} onChange={() => setTaxOn((on) => !on)} />
+              </div>
+
+              {taxOn && (
+                <div className="mt-3 grid gap-x-6 gap-y-4 md:grid-cols-2">
+                  <Select
+                    label="IRD Class"
+                    value={form.irdClassCode}
+                    onChange={(e) => {
+                      const classCode = e.target.value;
+                      const classRate = NEPAL_CLASS_RATE_PCT[classCode];
+                      // Choosing the class is the explicit act that may seed the internal
+                      // rate — but only into an EMPTY field. A rate the operator already
+                      // typed is theirs; the adopt button below handles that case.
+                      if (isRateBased && classRate != null && !form.annualRatePercent)
+                        set({ irdClassCode: classCode, annualRatePercent: String(classRate) });
+                      else set({ irdClassCode: classCode });
+                    }}
+                    options={NEPAL_TAX_CLASSES}
+                    placeholder="Not classified"
+                    helperText={
+                      form.irdClassCode
+                        ? `IRD pool rate: ${
+                            NEPAL_CLASS_RATES[form.irdClassCode] ?? '—'
+                          } — used by the TAX book. The internal accounting rate in Cost Basis stays separate unless you adopt it.`
+                        : undefined
+                    }
+                  />
+                  <Input
+                    label="Tax Entry Year"
+                    value={form.taxEntryYearCode}
+                    onChange={(e) => set({ taxEntryYearCode: e.target.value })}
+                    placeholder="2083/84"
+                    helperText="Bikram Sambat, as 2083/84."
+                  />
+                  <Select
+                    label="Tax Entry Period"
+                    value={form.taxEntryPeriodOrdinal}
+                    onChange={(e) => set({ taxEntryPeriodOrdinal: e.target.value })}
+                    options={TAX_ENTRY_PERIODS}
+                    helperText="Decides how much of the cost enters the pool this year."
+                  />
+                  {isRateBased &&
+                    NEPAL_CLASS_RATE_PCT[form.irdClassCode] != null &&
+                    Number(form.annualRatePercent || 0) !==
+                      NEPAL_CLASS_RATE_PCT[form.irdClassCode] && (
+                      <div className="self-end">
+                        <Button
+                          variant="secondary"
+                          size="small"
+                          onClick={() =>
+                            set({
+                              annualRatePercent: String(
+                                NEPAL_CLASS_RATE_PCT[form.irdClassCode]
+                              ),
+                            })
+                          }
+                        >
+                          Use {NEPAL_CLASS_RATE_PCT[form.irdClassCode]}% (class{' '}
+                          {form.irdClassCode}) as the accounting rate too
+                        </Button>
+                      </div>
+                    )}
+                </div>
+              )}
+            </div>
 
             <GroupLabel hint="What the asset is carried at, and what will never be depreciated away.">
               Cost Basis
@@ -926,7 +1042,7 @@ export default function CapitalizeForm() {
                       )}% from factor ${form.decliningBalanceFactor} over ${lifeYears.toFixed(
                         1
                       )} years. Enter a rate here only to move it onto the named-rate setup.`
-                    : 'Your own accounting rate — e.g. 20% for vehicles. This is independent of the Nepal IRD tax rate below. Each month charges on the current book value, so the amount falls every period.'
+                    : 'Your own accounting rate — e.g. 20% for vehicles. This is independent of the Nepal IRD tax rate above. Each month charges on the current book value, so the amount falls every period.'
                 }
               />
             )}
@@ -1087,88 +1203,6 @@ export default function CapitalizeForm() {
                 fiscal calendar to reach back to the start date — the panel on the right
                 offers to create the missing years.
               </p>
-            )}
-
-            {(
-              <>
-                <div className="md:col-span-2 mt-2 flex items-center justify-between">
-                  <div>
-                    <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                      Nepal IRD Tax Details
-                    </h2>
-                    <p className="mt-0.5 text-xs text-gray-400">
-                      {isEdit
-                        ? 'The classification entered at capitalization. Saving updates it.'
-                        : 'A second, independent book. Skip it and the asset still capitalizes.'}
-                    </p>
-                  </div>
-                  <ToggleSwitch checked={taxOn} onChange={() => setTaxOn((on) => !on)} />
-                </div>
-                <div className="md:col-span-2 -mt-2 border-b border-gray-100" />
-
-                {taxOn && (
-                  <>
-                    <Select
-                      label="IRD Class"
-                      value={form.irdClassCode}
-                      onChange={(e) => {
-                        const classCode = e.target.value;
-                        const classRate = NEPAL_CLASS_RATE_PCT[classCode];
-                        // Choosing the class is the explicit act that may seed the internal
-                        // rate — but only into an EMPTY field. A rate the operator already
-                        // typed is theirs; the adopt button below handles that case.
-                        if (isRateBased && classRate != null && !form.annualRatePercent)
-                          set({ irdClassCode: classCode, annualRatePercent: String(classRate) });
-                        else set({ irdClassCode: classCode });
-                      }}
-                      options={NEPAL_TAX_CLASSES}
-                      placeholder="Not classified"
-                      helperText={
-                        form.irdClassCode
-                          ? `IRD pool rate: ${
-                              NEPAL_CLASS_RATES[form.irdClassCode] ?? '—'
-                            } — used by the TAX book. The internal accounting rate above stays separate unless you adopt it.`
-                          : undefined
-                      }
-                    />
-                    {isRateBased &&
-                      NEPAL_CLASS_RATE_PCT[form.irdClassCode] != null &&
-                      Number(form.annualRatePercent || 0) !==
-                        NEPAL_CLASS_RATE_PCT[form.irdClassCode] && (
-                        <div className="md:col-span-1 -mt-1">
-                          <Button
-                            variant="secondary"
-                            size="small"
-                            onClick={() =>
-                              set({
-                                annualRatePercent: String(
-                                  NEPAL_CLASS_RATE_PCT[form.irdClassCode]
-                                ),
-                              })
-                            }
-                          >
-                            Use {NEPAL_CLASS_RATE_PCT[form.irdClassCode]}% (class{' '}
-                            {form.irdClassCode}) as the accounting rate too
-                          </Button>
-                        </div>
-                      )}
-                    <Input
-                      label="Tax Entry Year"
-                      value={form.taxEntryYearCode}
-                      onChange={(e) => set({ taxEntryYearCode: e.target.value })}
-                      placeholder="2083/84"
-                      helperText="Bikram Sambat, as 2083/84."
-                    />
-                    <Select
-                      label="Tax Entry Period"
-                      value={form.taxEntryPeriodOrdinal}
-                      onChange={(e) => set({ taxEntryPeriodOrdinal: e.target.value })}
-                      options={TAX_ENTRY_PERIODS}
-                      helperText="Decides how much of the cost enters the pool this year."
-                    />
-                  </>
-                )}
-              </>
             )}
 
             <GroupLabel>Notes</GroupLabel>
@@ -1340,11 +1374,12 @@ export default function CapitalizeForm() {
                 </>
               ) : (
                 <p className="py-2 text-sm text-gray-500">
-                  Diminishing balance at {annualRatePct > 0 ? `${annualRatePct.toFixed(1)}%` : 'the rate'}{' '}
-                  a year charges each month on that month&apos;s opening book value, so the
-                  amount falls every period — but it is bound by the useful life and switches
-                  to straight line once that charges more, finishing at the residual. For a
-                  rate that never reaches zero, choose <strong>Written-Down Value</strong>.
+                  Diminishing balance at{' '}
+                  {annualRatePct > 0 ? `${annualRatePct.toFixed(1)}%` : 'the rate'} a year
+                  charges each month on that month&apos;s opening book value, so the amount
+                  falls every period and the value never quite reaches zero — whatever the
+                  rate has not consumed stays on the book. A useful life only caps how far
+                  the schedule is written.
                 </p>
               )}
 
@@ -1402,31 +1437,57 @@ export default function CapitalizeForm() {
 
                     {projection ? (
                       <div className="mt-2">
-                        <Row
-                          label={`Depreciated over ${projection.elapsedMonths} months`}
-                          value={money(projection.accumulatedToDate, currency)}
-                        />
-                        {projection.isFiscalAligned && projection.lastClosedFiscalYearCode && (
-                          <Row
-                            label={`History through ${projection.lastClosedFiscalYearCode}`}
-                            value={money(projection.accumulatedThroughCutover ?? 0, currency)}
-                          />
+                        {projectionStale && (
+                          <div className="mb-2 flex items-center justify-between gap-2 rounded border border-amber-200 bg-amber-50 px-2 py-1.5">
+                            <p className="text-[11px] text-amber-800">
+                              The inputs changed — these figures describe the previous ones.
+                            </p>
+                            <Button
+                              variant="secondary"
+                              size="small"
+                              onClick={runProjection}
+                              disabled={projecting}
+                            >
+                              {projecting ? '…' : 'Recalculate'}
+                            </Button>
+                          </div>
                         )}
-                        <Row
-                          label="Value left today"
-                          value={money(projection.netBookValueToDate, currency)}
-                          divider
-                          highlight
-                        />
-                        <Row
-                          label={
-                            projection.currentFiscalYearCode
-                              ? `${projection.currentFiscalYearCode} charge`
-                              : "This year's charge"
-                          }
-                          value={money(projection.currentYearCharge, currency)}
-                          muted
-                        />
+
+                        <div
+                          className={`rounded-lg bg-gray-50 p-3 text-center ${
+                            projectionStale ? 'opacity-50' : ''
+                          }`}
+                        >
+                          <p className="text-[11px] uppercase tracking-wide text-gray-400">
+                            Value left today
+                          </p>
+                          <p className="mt-0.5 text-xl font-semibold text-primarycolor">
+                            {money(projection.netBookValueToDate, currency)}
+                          </p>
+                          <p className="mt-0.5 text-[11px] text-gray-500">
+                            after {money(projection.accumulatedToDate, currency)} over{' '}
+                            {projection.elapsedMonths} months
+                          </p>
+                          {projection.isFiscalAligned &&
+                            projection.lastClosedFiscalYearCode && (
+                              <p className="mt-1.5 inline-block rounded-full bg-primarycolor/10 px-2 py-0.5 text-[10px] font-medium text-primarycolor">
+                                History complete through {projection.lastClosedFiscalYearCode}
+                              </p>
+                            )}
+                        </div>
+
+                        <div className={projectionStale ? 'opacity-50' : ''}>
+                          <Row
+                            label={
+                              projection.currentFiscalYearCode
+                                ? `${projection.currentFiscalYearCode} charge`
+                                : "This year's charge"
+                            }
+                            value={money(projection.currentYearCharge, currency)}
+                            muted
+                          />
+                        </div>
+
                         <Button
                           variant="secondary"
                           size="small"
@@ -1439,9 +1500,9 @@ export default function CapitalizeForm() {
                           View year by year
                         </Button>
                         <Button
-                          variant="secondary"
                           size="small"
                           className="mt-1.5 w-full"
+                          disabled={projectionStale}
                           onClick={() => {
                             // Fiscal cutover: save the triple — opening accumulated,
                             // opening NBV, and the through-date — so the posted schedule
@@ -1474,12 +1535,23 @@ export default function CapitalizeForm() {
                             setProjection(null);
                           }}
                         >
-                          Use as opening accumulated
+                          Use as opening balance
                         </Button>
+                        <p className="mt-1 text-center text-[10px] leading-snug text-gray-400">
+                          {projection.isFiscalAligned && projection.cutoverThroughDate
+                            ? `Fills the Opening Balance fields with the history through ${
+                                projection.lastClosedFiscalYearCode
+                              } (ended ${projection.cutoverThroughDate.slice(
+                                0,
+                                10
+                              )}) — only ${
+                                projection.currentFiscalYearCode ?? 'the current year'
+                              } onward remains to post.`
+                            : 'Fills Opening Accumulated Depreciation with the value to date.'}
+                        </p>
                       </div>
                     ) : (
                       <Button
-                        variant="secondary"
                         size="small"
                         className="mt-2 w-full"
                         onClick={runProjection}
@@ -1588,6 +1660,26 @@ export default function CapitalizeForm() {
                 )}
               </div>
 
+              {projection.years.some((y) => y.periods.length > 0) && (
+                <div className="mb-1.5 flex justify-end">
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-primarycolor hover:underline"
+                    onClick={() =>
+                      setExpandedYears((current) =>
+                        current.size === projection.years.length
+                          ? new Set()
+                          : new Set(projection.years.map((y) => y.yearNumber))
+                      )
+                    }
+                  >
+                    {expandedYears.size === projection.years.length
+                      ? 'Collapse all months'
+                      : 'Expand all months'}
+                  </button>
+                </div>
+              )}
+
               <div className="max-h-96 overflow-y-auto">
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 bg-gray-100 text-left text-xs text-gray-600">
@@ -1694,6 +1786,32 @@ export default function CapitalizeForm() {
                       );
                     })}
                   </tbody>
+                  <tfoot className="sticky bottom-0 border-t border-gray-200 bg-gray-50 text-xs font-medium text-gray-700">
+                    <tr>
+                      <td className="px-3 py-2" colSpan={3}>
+                        Total — {projection.years.reduce((n, y) => n + y.months, 0)} months
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {money(
+                          projection.years.reduce((sum, y) => sum + y.charge, 0),
+                          currency
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {money(
+                          projection.years[projection.years.length - 1]?.accumulatedAtEnd ?? 0,
+                          currency
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {money(
+                          projection.years[projection.years.length - 1]?.closingNetBookValue ??
+                            projection.cost,
+                          currency
+                        )}
+                      </td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
 
