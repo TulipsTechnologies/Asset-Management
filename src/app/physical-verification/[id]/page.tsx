@@ -798,7 +798,13 @@ const CampaignDetailPage = () => {
     id: result.id,
     item: result.assetId ? (
       <div>
-        <span className="font-medium text-primarycolor">{result.assetCode}</span>
+        <button
+          type="button"
+          className="font-medium text-primarycolor hover:underline"
+          onClick={() => router.push(`/assets/${result.assetId}`)}
+        >
+          {result.assetCode}
+        </button>
         <span className="ml-2">{result.assetName}</span>
         {result.isAdHoc && (
           <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700">
@@ -909,9 +915,13 @@ const CampaignDetailPage = () => {
     id: discrepancy.id,
     asset: discrepancy.assetId ? (
       <div>
-        <span className="font-medium text-primarycolor">
+        <button
+          type="button"
+          className="font-medium text-primarycolor hover:underline"
+          onClick={() => router.push(`/assets/${discrepancy.assetId}`)}
+        >
           {discrepancy.assetCode}
-        </span>
+        </button>
         <span className="ml-2">{discrepancy.assetName}</span>
       </div>
     ) : (

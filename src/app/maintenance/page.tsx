@@ -829,7 +829,8 @@ const MaintenancePage = () => {
           {assetCode}
         </button>
       ) : (
-        <div className="font-medium text-primarycolor">{assetCode}</div>
+        // No id to open — so it is not coloured either. Green means clickable.
+        <div className="font-medium text-gray-700">{assetCode}</div>
       )}
       <div className="text-xs text-gray-400">{assetName}</div>
     </div>

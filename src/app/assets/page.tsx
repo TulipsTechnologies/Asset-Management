@@ -346,8 +346,15 @@ const AssetsPage = () => {
   const rowData = useMemo(() => assets.map((asset) => ({
     id: asset.id,
     purchaseDate: shortDate(asset.purchaseDate),
+    // The code reads as a link, so it is one — it opens the asset it names.
     assetCode: (
-      <span className="font-medium text-primarycolor">{asset.assetCode}</span>
+      <button
+        type="button"
+        className="font-medium text-primarycolor hover:underline"
+        onClick={() => router.push(`/assets/${asset.id}`)}
+      >
+        {asset.assetCode}
+      </button>
     ),
     assetName: asset.assetName,
     // Named only while someone actually holds it: an unassigned asset has no custodian,
