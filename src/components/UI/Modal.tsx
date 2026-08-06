@@ -1,4 +1,4 @@
-import { FC, ReactNode, useEffect } from "react";
+import { FC, ReactNode, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
 interface ModalProps {
@@ -26,6 +26,8 @@ const Modal: FC<ModalProps> = ({
   size,
   showCloseBtn = true,
 }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -33,14 +35,25 @@ const Modal: FC<ModalProps> = ({
       }
     };
 
+    let focusTimer: ReturnType<typeof setTimeout> | undefined;
     if (isOpen) {
       document.body.style.overflow = "hidden";
       window.addEventListener("keydown", handleKeyDown);
+      // Move focus into the dialog (WCAG 2.4.3): otherwise keyboard users are left
+      // behind the overlay, tabbing through the page underneath. A short timeout rather
+      // than one animation frame — the portal's children mount a beat after isOpen flips,
+      // and focusing a node that is not yet in the tree silently does nothing.
+      focusTimer = setTimeout(() => {
+        if (!dialogRef.current) return;
+        if (!dialogRef.current.contains(document.activeElement))
+          dialogRef.current.focus();
+      }, 50);
     } else {
       document.body.style.overflow = "auto";
     }
 
     return () => {
+      if (focusTimer) clearTimeout(focusTimer);
       document.body.style.overflow = "auto";
       window.removeEventListener("keydown", handleKeyDown);
     };
@@ -82,6 +95,10 @@ const Modal: FC<ModalProps> = ({
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        tabIndex={-1}
+        ref={dialogRef}
         className={`bg-white text-black rounded-lg shadow-lg relative z-[10000] max-h-[85vh] sm:max-h-[90vh] overflow-y-auto w-full sm:w-[95vw] ${getWidthClass()} min-w-0 sm:min-w-[320px]`}
         onClick={(e) => e.stopPropagation()}
       >

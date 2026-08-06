@@ -1,5 +1,5 @@
 "use client";
-import { forwardRef, InputHTMLAttributes, ReactNode, useState } from "react";
+import { forwardRef, InputHTMLAttributes, useId, ReactNode, useState } from "react";
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -35,6 +35,10 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
     const [showPassword, setShowPassword] = useState(false);
     const isPasswordType = type === "password";
 
+    // A label that names its control for assistive tech, not only visually (WCAG 1.3.1).
+    const generatedId = useId();
+    const inputId = props.id ?? generatedId;
+
     const togglePasswordVisibility = () => {
       setShowPassword((prev) => !prev);
     };
@@ -43,7 +47,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
       <div className={`flex flex-col ${className}`}>
         {label && (
           <label
-            htmlFor={props.id}
+            htmlFor={inputId}
             className="block text-sm font-medium text-gray-500"
           >
             {label}
@@ -60,6 +64,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           <input
             ref={ref}
             {...props}
+          id={inputId}
             type={isPasswordType && showPassword ? "text" : type}
             className={`w-full px-0 py-2 pr-10 border-b text-base bg-transparent ${inputClass} ${
               error ? "border-red-500" : "border-gray-300"
@@ -99,7 +104,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
 
         {!error && helperText && (
-          <p className="text-gray-400 text-xs mt-1 italic">{helperText}</p>
+          <p className="text-gray-500 text-xs mt-1 italic">{helperText}</p>
         )}
       </div>
     );

@@ -25,9 +25,18 @@ const CustomMenuItem: FC<CustomMenuItemProps> = ({
 
   return (
     <div
+      role="menuitem"
+      tabIndex={0}
       onClick={(e) => {
         e.stopPropagation();
         onClick();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          e.stopPropagation();
+          onClick();
+        }
       }}
       className={`flex items-center py-3 px-3 cursor-pointer ${
         isDanger ? 'hover:bg-red-50' : 'hover:bg-gray-50'

@@ -11,6 +11,8 @@ import { createPortal } from "react-dom";
 interface DropdownProps {
   children: React.ReactNode;
   buttonChildren: React.ReactNode;
+  /** Accessible name for an icon-only trigger (WCAG 4.1.2). */
+  ariaLabel?: string;
   containerClassName?: string;
   onClose?: () => void;
   position?: "fixed" | "absolute";
@@ -26,6 +28,7 @@ const Dropdown = forwardRef<DropdownRef, DropdownProps>(
       children,
       buttonChildren,
       containerClassName,
+      ariaLabel = 'Actions',
       onClose = () => { },
       // Row-action kebab menus live inside the table's overflow:auto scroll
       // container. Absolute positioning traps + clips the popover there, so it
@@ -290,6 +293,9 @@ const Dropdown = forwardRef<DropdownRef, DropdownProps>(
       <div ref={wrapperRef} className="relative">
         <button
           type="button"
+          aria-label={ariaLabel}
+          aria-haspopup="menu"
+          aria-expanded={isOpen}
           ref={buttonRef}
           onClick={(e) => {
             e.stopPropagation();
@@ -305,6 +311,7 @@ const Dropdown = forwardRef<DropdownRef, DropdownProps>(
             <div
               ref={dropdownRef}
               style={dropdownStyle}
+              role="menu"
               className={`bg-white shadow-lg border rounded-md z-[9999] min-w-[200px] ${containerClassName}`}
             >
               {children}
