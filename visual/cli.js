@@ -95,7 +95,15 @@ function buildCaptureUnits(scenarioSet, scenarioFilter) {
 }
 
 async function resolveCompanyAndPlan(api, options) {
-  const environment = await api.environment();
+  // /environment is discovery, and it lives on the SystemTest controller behind
+  // ManageSystemTest — a permission the visual operator deliberately does not hold
+  // (§12.7 grants it exactly View + Run). When the company is already named there is
+  // nothing to discover, so the call is skipped rather than the account widened. The
+  // registration gate is unaffected: /visual/scenarios and the results ingest
+  // re-verify it server-side, which is where the boundary actually is.
+  const environment = options.companyIdOverride
+    ? { provisionedCompanies: [] }
+    : await api.environment();
   const candidates = companyCandidates(environment, options.companyIdOverride);
   if (candidates.length === 0) {
     throw new ApiError(
@@ -225,7 +233,7 @@ async function main() {
   log.info(`visual runner — level ${options.level}, policy ${options.reviewPolicy}, platform ${platform}`);
 
   // 1. Login through the API (§12.8) — never the sign-in form.
-  const login = await api.login(options.user, options.password);
+  const login = await api.login(options.user, options.password, options.companyIdOverride);
   log.info('authenticated against the API');
 
   // 2. §12.9: refuse dev servers; record BUILD_ID.

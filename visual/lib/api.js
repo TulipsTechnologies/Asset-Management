@@ -81,11 +81,28 @@ class ApiClient {
     return envelope.data !== undefined ? envelope.data : envelope;
   }
 
-  /** POST /api/AppUsers/Login {userName, password} → data.token (§12.8). */
-  async login(userName, password) {
-    const data = await this.requestJson('POST', '/AppUsers/Login', { userName, password });
+  /**
+   * POST /api/AppUsers/Login {companyId?, userName, password} → data.token (§12.8).
+   *
+   * companyId is REQUIRED for a company user, which is what the visual operator is
+   * (§12.7 forbids superadmin). The company cannot be discovered first — reading
+   * /environment needs the very token this call returns — so the tenant is supplied
+   * up front from VISUAL_COMPANY_ID, and the refusal below says so rather than
+   * reporting the server's "no token" as an authentication failure.
+   */
+  async login(userName, password, companyId = null) {
+    const body = companyId ? { companyId, userName, password } : { userName, password };
+    const data = await this.requestJson('POST', '/AppUsers/Login', body);
     if (!data || !data.token) {
-      throw new ApiError('Login succeeded but no token was returned.', {
+      const remarks = (data && data.remarks) || '';
+      if (!companyId && /tenant company must be selected/i.test(remarks)) {
+        throw new ApiError(
+          'This account is a company user, so its tenant must be named at sign-in. ' +
+            'Set VISUAL_COMPANY_ID to the registered test/demo company id.',
+          { reasonCode: 'VISUAL_COMPANY_ID_REQUIRED' }
+        );
+      }
+      throw new ApiError(remarks || 'Login succeeded but no token was returned.', {
         reasonCode: 'VISUAL_AUTH_FAILED',
       });
     }
