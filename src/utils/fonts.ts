@@ -24,3 +24,16 @@ export const CustomIcons = localFont({
   style: 'normal',
   display: 'swap',
 });
+
+/**
+ * The icomoon set shipped inside @tulipstechnologies/common. The shared
+ * DashboardSidebar/Header render icons as `<i className="icon icon-{name}" />`
+ * and reference glyphs this module's own font does not carry, so both faces are
+ * loaded and stacked in `styles/icon-font-stack.scss`.
+ */
+export const CommonIcons = localFont({
+  src: '../../node_modules/@tulipstechnologies/common/dist/assets/fonts/icomoon.woff',
+  variable: '--CommonIcons',
+  style: 'normal',
+  display: 'swap',
+});

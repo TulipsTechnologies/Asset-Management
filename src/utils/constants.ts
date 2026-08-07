@@ -38,6 +38,14 @@ export const getBaseUrl = (): string => {
 const DEV_API_GATEWAY = 'https://webdev.tulipshrm.com:4433';
 
 /**
+ * Base for the HRM hub menu API that feeds the shared sidebar
+ * (`useSidebarMenus` -> `GET {base}/users/menus/{userMode}`). Same host as
+ * `getBaseUrl()`, with a literal fallback for the server pass where `window`
+ * does not exist yet.
+ */
+export const getMenusApiBaseUrl = (): string => getBaseUrl() || DEV_API_GATEWAY;
+
+/**
  * Base for AssetManagement API calls.
  * - Deployed: same-origin; `server.js` proxies `/asset-management/api/*`.
  * - Localhost with `NEXT_PUBLIC_ASSET_API_URL` set: same-origin so the

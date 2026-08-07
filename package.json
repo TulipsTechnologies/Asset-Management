@@ -14,7 +14,7 @@
     "@hello-pangea/dnd": "^18.0.1",
     "@microsoft/signalr": "^10.0.0",
     "@reduxjs/toolkit": "^2.5.1",
-    "@tulipstechnologies/common": "file:vendor/tulipstechnologies-common-1.10.25.tgz",
+    "@tulipstechnologies/common": "file:vendor/tulipstechnologies-common-1.10.45.tgz",
     "@types/js-cookie": "^3.0.6",
     "@types/jsonwebtoken": "^9.0.8",
     "date-fns": "^4.1.0",

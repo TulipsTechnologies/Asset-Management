@@ -1,20 +1,24 @@
 'use client';
 import { ReactNode } from 'react';
-import { DashboardCtxProvider } from './Contexts/DashboardContext';
-import DashboardContents from './_components/DashboardContents';
 import { usePathname } from 'next/navigation';
+import { DashboardCtxProvider } from '@tulipstechnologies/common/dist/contexts/DashboardContext';
+import { MaintenanceModeProvider } from '@tulipstechnologies/common';
+import DashboardContents from './_components/DashboardContents';
 
 const DashboardLayout = ({ children }: { children: ReactNode }) => {
   const pathname = usePathname();
 
-  // Driver GPS pages are public (link-token auth) and render without the
-  // admin shell — a driver on a phone has no login or sidebar permissions.
-  if (pathname === '/404' || pathname.startsWith('/transport/tracking')) {
+  if (pathname === '/404') {
     return <>{children}</>;
   }
+  // Both providers are required by the shared chrome: DashboardSidebar throws
+  // without DashboardCtxProvider and calls useMaintenanceMode() on every route
+  // change.
   return (
     <DashboardCtxProvider>
-      <DashboardContents>{children}</DashboardContents>
+      <MaintenanceModeProvider>
+        <DashboardContents>{children}</DashboardContents>
+      </MaintenanceModeProvider>
     </DashboardCtxProvider>
   );
 };

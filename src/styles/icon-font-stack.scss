@@ -1,0 +1,6 @@
+// The local icomoon face wins; the one shipped with @tulipstechnologies/common
+// fills in the glyphs the shared sidebar/header use that it does not carry.
+[class^='icon-'],
+[class*=' icon-'] {
+  font-family: var(--CustomIcons), var(--CommonIcons) !important;
+}

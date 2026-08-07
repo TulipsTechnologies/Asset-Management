@@ -10,6 +10,13 @@ import {
 } from 'react';
 import { useRouter } from 'next/navigation';
 import Cookies from 'js-cookie';
+import { useCompanyLogo } from '@tulipstechnologies/common';
+import {
+  getCurrentUser,
+  fetchEmployeeProfileImage,
+} from '@tulipstechnologies/common/dist/services/auth.service';
+import { resolveAdminView } from '@tulipstechnologies/common/dist/utils/adminViewStorage';
+import type { IAdminUserData } from '@tulipstechnologies/common/dist/interface/IAdminUser';
 
 import { parseJwt } from '@/services/auth.service';
 import {
@@ -20,16 +27,35 @@ import {
 } from '@/services/assetToken';
 import { requestApi } from '@/services/httpService';
 import { IUser } from '@/interface/IUser';
+import { HubPermission } from '@/enum/hubPermissions';
 import { fetchUserPermissionsList } from '@/utils/helpers';
 import { useAppDispatch } from '@/store';
-import { setAuthToken, setCurrentUser } from '@/store/slice/AuthSlice';
+import {
+  setAuthToken,
+  setCurrentUser,
+  setAdminView,
+  setProfileImage,
+  setCompanyLogo,
+} from '@/store/slice/AuthSlice';
 import { getBaseUrl, isDevAuthBypass } from '@/utils/constants';
 
 interface AuthContextProps {
   user: IUser | null;
   token: string | null;
   logout: () => void;
+  /**
+   * This module's permission ids, decoded from the `AssetAuthToken`. Everything
+   * that gates an asset screen or action reads these.
+   */
   userPermissions: number[];
+  /**
+   * HRM hub permission ids, decoded from the `AuthToken` cookie. Consumed only
+   * by the shared `@tulipstechnologies/common` chrome (admin-view toggle, menu
+   * fetch, settings menu, billing banner), which speaks the hub's id space —
+   * where `AdminMode = 67` collides with nothing this module defines today but
+   * means something entirely different from asset id 67. Never mix the two.
+   */
+  hubPermissions: number[];
 }
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
@@ -37,10 +63,12 @@ const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const { fetchCompanyLogo, companyLogo } = useCompanyLogo();
 
   const [user, setUser] = useState<IUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [userPermissions, setUserPermissions] = useState<number[]>([]);
+  const [hubPermissions, setHubPermissions] = useState<number[]>([]);
   const [bootstrapping, setBootstrapping] = useState<boolean>(true);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
 
@@ -80,6 +108,40 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
         process.env.NEXT_PUBLIC_LOGOUT_URL
       }?redirect=${encodeURIComponent(window.location.href)}`
     );
+  };
+
+  /**
+   * Loads the full HRM hub user (name, roles, company, employee id) plus the
+   * profile image and company logo, so the shared Header/Sidebar renders the
+   * same way it does in the other modules. The common services resolve the hub
+   * API URL and bearer token from the shared `AuthToken` cookie themselves.
+   *
+   * Fire-and-forget: nothing here gates the module, so a hub hiccup must not
+   * delay bootstrap or block asset pages from rendering.
+   */
+  const loadCurrentUser = async () => {
+    try {
+      const res = await getCurrentUser();
+      if (!res?.success || !res?.data) return;
+
+      const adminUser = res.data as IAdminUserData;
+      dispatch(setCurrentUser(adminUser));
+
+      if (adminUser.employeeId) {
+        try {
+          const imgRes = await fetchEmployeeProfileImage(adminUser.employeeId);
+          dispatch(setProfileImage(imgRes?.success ? imgRes.data : null));
+        } catch {
+          dispatch(setProfileImage(null));
+        }
+      }
+
+      if (adminUser.company?.id) {
+        void fetchCompanyLogo(adminUser.company.id);
+      }
+    } catch (error) {
+      console.error('Failed to load current user', error);
+    }
   };
 
   /**
@@ -131,9 +193,20 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
       setToken(cookieToken);
       dispatch(setAuthToken(cookieToken));
 
+      // Hub-scoped permissions, for the shared chrome only. Resolved before the
+      // token exchange so the sidebar knows which view to open in.
+      const resolvedHubPermissions = fetchUserPermissionsList(cookieToken);
+      setHubPermissions(resolvedHubPermissions);
+      dispatch(
+        setAdminView(
+          resolveAdminView(
+            resolvedHubPermissions.includes(HubPermission.AdminMode)
+          )
+        )
+      );
+
       const resolvedUser = buildUserFromToken(cookieToken, cookieUser);
       setUser(resolvedUser);
-      dispatch(setCurrentUser(resolvedUser));
 
       // Exchange the HRM AuthToken for the asset-module token before any page
       // mounts and fires asset API calls.
@@ -164,6 +237,7 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
         await resolveActiveCompanyIfAbsent();
       }
 
+      void loadCurrentUser();
       setBootstrapping(false);
     };
 
@@ -171,12 +245,22 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (companyLogo) {
+      dispatch(setCompanyLogo(companyLogo));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyLogo]);
+
   const logout = () => {
     setUser(null);
     setToken(null);
     setUserPermissions([]);
+    setHubPermissions([]);
     dispatch(setAuthToken(null));
     dispatch(setCurrentUser(null));
+    dispatch(setProfileImage(null));
+    dispatch(setCompanyLogo(null));
     Cookies.remove('AuthToken');
     Cookies.remove('user');
     clearAssetToken();
@@ -200,6 +284,7 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
         token,
         logout,
         userPermissions,
+        hubPermissions,
       }}
     >
       {bootstrapping ? (

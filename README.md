@@ -64,19 +64,44 @@ with `NEXT_PUBLIC_ENV=development`, where the middleware routes to
 
 The common component library is consumed as an npm package, but this repo does
 not require registry access to install: the package is vendored as a tarball
-(`vendor/tulipstechnologies-common-1.10.25.tgz`) and referenced via a `file:`
+(`vendor/tulipstechnologies-common-1.10.45.tgz`) and referenced via a `file:`
 dependency in `package.json`. To switch to the GitHub Packages registry,
 change the dependency to a semver range and export `NPM_TOKEN` (see `.npmrc`).
 
-`legacy-peer-deps=true` is set because common@1.10.25 declares peer react ^18
+`legacy-peer-deps=true` is set because common declares peer react ^18
 while this app runs react 19 — the same combination the employee module runs
-in production.
+in production. **The "version" in `package.json` is a filename**, so `npm update`
+and `npm outdated` will never bump it; upgrading means bumping and building in
+`common-module`, then swapping the tarball here and reinstalling.
+
+The app shell comes from this package. `src/components/Layout/DashboardLayout/`
+composes `DashboardCtxProvider` + `MaintenanceModeProvider` around the shared
+`DashboardSidebar` and `Header`, the same way the vehicle-management and
+leave-management modules do. Three things are easy to get wrong when editing it:
+
+- **`basePath`, `urlPrefix`, and the `MODULE_PREFIX` constants must agree** —
+  `next.config.ts`, both `urlPrefix` props in `DashboardContents.tsx`, and
+  `BASE_PATH` in `src/utils/constants.ts` (used by `sidebarActivePath.ts` and
+  `assetFallbackMenus.ts`).
+- **Two opposite URL conventions.** Menu URLs in `src/utils/assetFallbackMenus.ts`
+  are basePath-**prefixed**; the `IStaticMenu` URLs in `src/utils/staticMenus.ts`
+  are basePath-**less**, because `usePathname()` strips it. Getting this backwards
+  silently kills active-highlighting or blanks the page title.
+- **Two disjoint permission sets.** `useAuth().userPermissions` are this module's
+  ids from the `AssetAuthToken` and gate asset screens; `useAuth().hubPermissions`
+  are HRM hub ids from the `AuthToken` and are what the shared chrome expects
+  (`AdminMode = 67`, see `src/enum/hubPermissions.ts`). They are never
+  interchangeable.
+
+The sidebar renders no menu entries until `currentUser` is loaded — that is the
+shared component's own behaviour. `AuthContext` populates it via the hub's
+`getCurrentUser()`.
 
 ## What's implemented (module Phase 1 scope)
 
 | Area | Status |
 |---|---|
-| App shell (sidebar, header, auth, 403, coming-soon) | ✅ adapted from the module template |
+| App shell (sidebar, header, auth, 403, coming-soon) | ✅ shared `DashboardSidebar`/`Header` from `@tulipstechnologies/common` |
 | Dashboard (asset counts + quick actions) | ✅ |
 | Assets — list (search, category/status filters, paging) | ✅ `GET /api/Assets` |
 | Assets — register (code generated server-side, immutable) | ✅ `POST /api/Assets` |
