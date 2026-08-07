@@ -21,6 +21,7 @@ import {
 } from '@/enum/systemTestEnums';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import {
+  ISystemTestCallerCompany,
   ISystemTestEnvironment,
   ISystemTestModule,
   ISystemTestProvisionedCompany,
@@ -100,7 +101,7 @@ const DemoContent = () => {
    * sends on every request, then a full reload so every mounted page refetches inside
    * the new company. No backend change involved (§5).
    */
-  const openCompany = (company: ISystemTestProvisionedCompany) => {
+  const openCompany = (company: ISystemTestProvisionedCompany | ISystemTestCallerCompany) => {
     cookies.set('ActiveCompanyId', company.companyId);
     window.location.href = '/dashboard';
   };
@@ -164,6 +165,7 @@ const DemoContent = () => {
   };
 
   const provisioned = environment?.provisionedCompanies ?? [];
+  const callerCompanies = environment?.callerCompanies ?? [];
 
   return (
     <div className="px-4 sm:px-6 py-6 max-w-5xl">
@@ -262,6 +264,61 @@ const DemoContent = () => {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Your companies — the way BACK to the main company after switching into a
+            test/demo tenant. Same cookie-switch mechanics as the buttons above. */}
+        {callerCompanies.length > 0 && (
+          <div className="mt-5">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Your companies
+            </h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Every company you are a member of — use it to switch back to your main
+              company after working inside a test or demo tenant.
+            </p>
+            <ul className="mt-2 divide-y divide-gray-50 rounded-lg border border-gray-100">
+              {callerCompanies.map((company) => {
+                const isCurrent = company.companyId.toLowerCase() === activeId;
+                return (
+                  <li
+                    key={company.companyId}
+                    className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-medium text-secondaryColor">
+                        {company.companyName}
+                      </span>
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                          company.purpose != null
+                            ? PURPOSE_BADGE[company.purpose]
+                            : 'bg-gray-100 text-gray-600'
+                        }`}
+                      >
+                        {company.purpose != null
+                          ? COMPANY_PURPOSE_LABELS[company.purpose]
+                          : 'Main Company'}
+                      </span>
+                      {isCurrent && (
+                        <span className="rounded-full bg-primarycolor/10 px-2 py-0.5 text-[10px] font-medium text-primarycolor">
+                          Current
+                        </span>
+                      )}
+                    </div>
+                    <Button
+                      variant="toolbar"
+                      onClick={() => openCompany(company)}
+                      disabled={isCurrent}
+                    >
+                      <i className="icon icon-right text-[10px]" />
+                      <span>Open</span>
+                    </Button>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
         )}
       </section>

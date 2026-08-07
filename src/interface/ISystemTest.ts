@@ -80,10 +80,20 @@ export interface ISystemTestProvisionedCompany {
   purpose: SystemTestCompanyPurposeEnum;
 }
 
+/** One company the calling user is a member of — the way BACK to their main company. */
+export interface ISystemTestCallerCompany {
+  companyId: string;
+  companyName: string;
+  /** The framework registration purpose; null/undefined = a real (main) company. */
+  purpose?: SystemTestCompanyPurposeEnum | null;
+}
+
 export interface ISystemTestEnvironment {
   /** The CURRENT company's registration, if any. */
   currentCompanyPurpose?: SystemTestCompanyPurposeEnum | null;
   provisionedCompanies: ISystemTestProvisionedCompany[];
+  /** The caller's live memberships, real companies first (purpose null = main company). */
+  callerCompanies: ISystemTestCallerCompany[];
   /** The current company's Running run, if one is in progress. */
   runningRunId?: string | null;
 }
