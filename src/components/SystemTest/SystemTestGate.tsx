@@ -9,11 +9,23 @@ import { useUserPermissions } from '@/hooks/useUserPermissions';
  * Every /system-test page sits behind ManageSystemTest — the same fence the backend
  * controller stacks on the whole section. Without it the page routes to /403 rather
  * than rendering controls whose every call would be refused.
+ *
+ * The visual review page overrides `permissions`: VisualRegressionController carries
+ * METHOD-level permissions precisely so a reviewer holding ViewVisualRegression does
+ * not need the destructive ManageSystemTest (visual design §12.2) — the page's fence
+ * must match the controller's, or the UI locks out people the API would serve.
+ * OR semantics across the list, mirroring the backend's [AuthorizeUser].
  */
-export default function SystemTestGate({ children }: { children: ReactNode }) {
+export default function SystemTestGate({
+  children,
+  permissions = [Permission.ManageSystemTest],
+}: {
+  children: ReactNode;
+  permissions?: Permission[];
+}) {
   const router = useRouter();
   const { ready, can } = useUserPermissions();
-  const allowed = can(Permission.ManageSystemTest);
+  const allowed = can(...permissions);
 
   useEffect(() => {
     if (ready && !allowed) router.replace('/403');

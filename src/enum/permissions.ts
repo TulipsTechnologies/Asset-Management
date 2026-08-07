@@ -29,6 +29,14 @@ export enum Permission {
   ResetCompanyData = 47,
   /** §12.15: pinned to 56 — the backend enum appends it after ReviewTaxDepreciation (55). */
   ManageSystemTest = 56,
+
+  // Visual Regression framework (visual design §5, appended 57–60). Deliberately
+  // separate from ManageSystemTest: the VisualRegressionController carries these at
+  // method level so reviewers do not need the destructive framework permission.
+  ViewVisualRegression = 57,
+  RunVisualRegression = 58,
+  ApproveVisualBaseline = 59,
+  ManageVisualExceptions = 60,
 }
 
 /** OR semantics, TotalAccess short-circuits — mirrors the backend check. */

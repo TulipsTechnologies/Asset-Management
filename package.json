@@ -6,7 +6,9 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "visual": "node visual/cli.js",
+    "visual:selftest": "node visual/selftest/selftest.js"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
@@ -35,6 +37,9 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "pixelmatch": "5.3.0",
+    "playwright": "1.50.1",
+    "pngjs": "7.0.0",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
     "typescript": "^5"
