@@ -62,3 +62,25 @@ One-time: `npx playwright install chromium`.
 
 Exit codes: 0 pass/minor/new, 1 any Broken, functional failure or (under `strict`)
 ReviewRequired, 2 bad arguments.
+
+## One-time operator setup
+
+The runner needs a dedicated company user — never superadmin (§12.7). It must be able to
+READ every surface it photographs, and nothing more; the runner's own no-mutation guard
+(§12.15) is the second fence. Create it once per environment:
+
+1. A role in the registered framework company (`POST /api/Roles/Companies`).
+2. Grant it exactly these permission ids (`POST /api/Roles/PermissionsForRole`):
+   `27` ViewAssets, `28` ViewAllAssets, `39` ViewDepreciation, `44` ViewAssetReports,
+   `45` ManageAssetSettings, `56` ManageSystemTest, `57` ViewVisualRegression,
+   `58` RunVisualRegression.
+   `ManageAssetSettings` is the only gate on the config/tax READ surfaces;
+   `ManageSystemTest` is non-destructive on its own — every destructive endpoint also
+   stacks `ResetCompanyData` + the PIN + the typed company phrase, none of which this
+   account has.
+3. A user with `appUserType: 2` (CompanyUser), that role, and `companyIds` containing the
+   framework company (`POST /api/AppUsers`).
+
+`VISUAL_COMPANY_ID` is REQUIRED: a company user names its tenant at sign-in, and the
+company cannot be discovered first because reading `/environment` needs the token that
+login returns. Keep the password out of the repo — env var or CI secret only.
