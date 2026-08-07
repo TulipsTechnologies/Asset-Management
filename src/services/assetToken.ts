@@ -54,6 +54,9 @@ export const persistActiveCompanyIdIfAbsent = (
  * Exchange the HRM `AuthToken` for an AssetAuthToken via a raw fetch (avoids
  * an import cycle with httpService). Single-flight so concurrent callers share
  * one in-progress exchange.
+ *
+ * The endpoint authenticates from the request body, so no Authorization header
+ * is sent — the hub token travels in `body.token` only.
  */
 export async function ensureAssetToken(
   force = false
@@ -90,7 +93,6 @@ export async function ensureAssetToken(
         cache: 'no-cache',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`,
           'Accept-Language': 'en',
         },
         body: JSON.stringify({ token: authToken }),

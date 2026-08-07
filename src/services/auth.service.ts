@@ -1,13 +1,13 @@
-import Cookies from 'js-cookie';
-import jwt from 'jsonwebtoken';
-import { requestApi } from './httpService';
-import { ensureAssetToken } from './assetToken';
-import { ILoginFromHrmRequest, IValidUser } from '@/interface/IAuth';
-import { JwtPayload } from '@/interface/IJwtPayload';
-import { IResponse } from '@/interface/IGeneric';
+import Cookies from "js-cookie";
+import jwt from "jsonwebtoken";
+import { requestApi } from "./httpService";
+import { ensureAssetToken } from "./assetToken";
+import { ILoginFromHrmRequest, IValidUser } from "@/interface/IAuth";
+import { JwtPayload } from "@/interface/IJwtPayload";
+import { IResponse } from "@/interface/IGeneric";
 
 export async function getAuthToken() {
-  return Cookies.get('AuthToken');
+  return Cookies.get("AuthToken");
 }
 
 /** The signed-in user with their company. The JWT carries the company ID but not its NAME,
@@ -23,13 +23,17 @@ export interface ICurrentUser {
 
 /** GET /api/AppUsers/me — authenticated, no permission gate. */
 export const fetchCurrentUser = (): Promise<IResponse<ICurrentUser>> =>
-  requestApi({ apiEndpoint: '/AppUsers/me', method: 'GET', completeData: true });
+  requestApi({
+    apiEndpoint: "/AppUsers/me",
+    method: "GET",
+    completeData: true,
+  });
 
 export function parseJwt(token: string): JwtPayload | null {
   try {
     return jwt.decode(token) as JwtPayload | null;
   } catch (error) {
-    console.error('Failed to decode token:', error);
+    console.error("Failed to decode token:", error);
     return null;
   }
 }
@@ -37,6 +41,10 @@ export function parseJwt(token: string): JwtPayload | null {
 /**
  * POST /api/AppUsers/TulipsHrm/Login {token}
  * → Result envelope {success, statusCode, message, data: ValidUserDto}
+ *
+ * Unauthenticated: the endpoint authenticates from the body, so `noAuth`
+ * suppresses the Authorization header requestApi would otherwise attach
+ * (which would carry the stale AssetAuthToken this call exists to mint).
  */
 export const loginUsingToken = (
   token: string
@@ -46,11 +54,12 @@ export const loginUsingToken = (
   };
 
   return requestApi({
-    apiEndpoint: '/AppUsers/TulipsHrm/Login',
-    method: 'POST',
+    apiEndpoint: "/AppUsers/TulipsHrm/Login",
+    method: "POST",
     body: JSON.stringify(body),
-    contentType: 'application/json',
+    contentType: "application/json",
     completeData: true,
+    noAuth: true,
   });
 };
 

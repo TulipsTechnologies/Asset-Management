@@ -26,6 +26,7 @@ export const requestApi = async ({
   removeCache = true,
   returnBlob = false,
   externalApi = false,
+  noAuth = false,
   _retried = false,
 }: {
   apiEndpoint: string;
@@ -41,6 +42,9 @@ export const requestApi = async ({
   removeCache?: boolean;
   returnBlob?: boolean;
   externalApi?: boolean;
+  /** Skip the Authorization header entirely — for endpoints that authenticate
+   *  from the request body (e.g. the HRM token exchange). */
+  noAuth?: boolean;
   /** Internal: set after a single 401 re-exchange retry. */
   _retried?: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -60,7 +64,7 @@ export const requestApi = async ({
 
   const defaultToken = getAssetToken() ?? "";
 
-  if (token || defaultToken) {
+  if (!noAuth && (token || defaultToken)) {
     options.headers = {
       ...options.headers,
       Authorization: token ?? `Bearer ${defaultToken}`,
@@ -139,7 +143,9 @@ export const requestApi = async ({
     const isLoginCall = apiEndpoint === ASSET_LOGIN_ENDPOINT;
     // Re-exchange once (skip the login endpoint itself to avoid a loop), then
     // retry the original request with the fresh asset token.
-    if (!isLoginCall && !_retried && !token) {
+    // An intentionally anonymous request cannot be helped by a re-exchange —
+    // the replay would deliberately send no token either.
+    if (!isLoginCall && !_retried && !token && !noAuth) {
       const { token: refreshed } = await ensureAssetToken(true);
       if (refreshed) {
         return requestApi({
@@ -156,6 +162,7 @@ export const requestApi = async ({
           removeCache,
           returnBlob,
           externalApi,
+          noAuth,
           _retried: true,
         });
       }
