@@ -1,0 +1,82 @@
+name: Deploy Asset Management Frontend
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: asset-management-nextjs-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, Windows, X64]
+    env:
+      DEPLOY_DIR: D:\WWWROOT\TulipsHrm_webdev\TulipsHRM.AssetManagement
+      APP_POOL: TulipsHRM_Webdev_AssetManagement
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+        shell: powershell
+
+      - name: Build
+        run: npm run build
+        shell: powershell
+        env:
+          NODE_ENV: production
+
+      - name: Stop app pool
+        shell: powershell
+        run: |
+          Import-Module WebAdministration
+          if (Get-Item "IIS:\AppPools\$env:APP_POOL" -ErrorAction SilentlyContinue) {
+            if ((Get-WebAppPoolState -Name $env:APP_POOL).Value -ne 'Stopped') {
+              Stop-WebAppPool -Name $env:APP_POOL
+              Start-Sleep -Seconds 3
+            }
+          } else {
+            Write-Host "App pool $env:APP_POOL not found yet, skipping stop."
+          }
+
+      - name: Sync build output to IIS site folder
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:DEPLOY_DIR | Out-Null
+
+          function Sync-Dir($src, $dst) {
+            Write-Host "=== robocopy $src -> $dst ==="
+            robocopy $src $dst /MIR /NFL /NDL /NP /R:2 /W:1
+            $code = $LASTEXITCODE
+            Write-Host "robocopy exit code: $code"
+            if ($code -ge 8) { throw "robocopy failed for $src -> $dst (exit $code)" }
+          }
+
+          Sync-Dir ".next" "$env:DEPLOY_DIR\.next"
+          Sync-Dir "public" "$env:DEPLOY_DIR\public"
+          Sync-Dir "node_modules" "$env:DEPLOY_DIR\node_modules"
+
+          Copy-Item package.json,package-lock.json,server.js,web.config,next.config.ts "$env:DEPLOY_DIR\" -Force -ErrorAction Stop
+
+          # robocopy's own exit code (0-7 = success) lingers in $LASTEXITCODE after
+          # it returns, and Copy-Item (a cmdlet, not an external exe) never resets it.
+          # GitHub Actions fails the step on a nonzero $LASTEXITCODE at script end, so
+          # clear it explicitly now that every command above has been checked.
+          $global:LASTEXITCODE = 0
+
+      - name: Start app pool
+        shell: powershell
+        run: |
+          Import-Module WebAdministration
+          if (-not (Get-Item "IIS:\AppPools\$env:APP_POOL" -ErrorAction SilentlyContinue)) {
+            throw "App pool $env:APP_POOL does not exist. Create the IIS site/app pool once before the first deploy."
+          }
+          Start-WebAppPool -Name $env:APP_POOL
