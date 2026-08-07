@@ -51,10 +51,6 @@ export const loginUsingToken = (
     body: JSON.stringify(body),
     contentType: 'application/json',
     completeData: true,
-    // The default bearer now resolves to `AssetAuthToken`, which does not
-    // exist yet at login time. Pass the HRM `AuthToken` explicitly so the
-    // login request still authenticates against the hub.
-    token: `Bearer ${token}`,
   });
 };
 
