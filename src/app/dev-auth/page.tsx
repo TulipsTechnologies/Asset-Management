@@ -1,10 +1,10 @@
 import { Suspense } from 'react';
-import Signin from './Signin';
+import DevAuth from './DevAuth';
 
 const Page = () => {
   return (
     <Suspense>
-      <Signin />
+      <DevAuth />
     </Suspense>
   );
 };

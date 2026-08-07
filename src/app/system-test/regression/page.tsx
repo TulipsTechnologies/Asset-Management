@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import cookies from 'js-cookie';
 import BackButton from '@/components/UI/BackButton';
 import Button from '@/components/UI/Button';
@@ -151,9 +152,9 @@ const RegressionContent = () => {
         {environment && !inTestCompany && (
           <p className="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800">
             You are not inside the registered test company. Open it from the{' '}
-            <a href="/system-test/demo" className="font-medium underline">
+            <Link href="/system-test/demo" className="font-medium underline">
               Demo &amp; Environment page
-            </a>{' '}
+            </Link>{' '}
             first — the suite runs against the company you are signed into.
           </p>
         )}

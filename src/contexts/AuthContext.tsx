@@ -8,109 +8,93 @@ import {
   ReactNode,
   useEffect,
 } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Cookies from 'js-cookie';
 
-import { parseJwt, signIn } from '@/services/auth.service';
+import { parseJwt } from '@/services/auth.service';
+import {
+  clearActiveCompanyId,
+  clearAssetToken,
+  ensureAssetToken,
+  persistActiveCompanyIdIfAbsent,
+} from '@/services/assetToken';
 import { requestApi } from '@/services/httpService';
 import { IUser } from '@/interface/IUser';
 import { fetchUserPermissionsList } from '@/utils/helpers';
 import { useAppDispatch } from '@/store';
 import { setAuthToken, setCurrentUser } from '@/store/slice/AuthSlice';
-import { useErrorHandler } from '@/hooks/useErrorHandler';
+import { getBaseUrl, isDevAuthBypass } from '@/utils/constants';
 
 interface AuthContextProps {
   user: IUser | null;
   token: string | null;
-  login: (userName: string, password: string) => Promise<void>;
-  setSessionData: (token: string, user: IUser) => Promise<void>;
   logout: () => void;
   userPermissions: number[];
 }
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
-const AUTH_PAGES = ['/signin'];
-
 export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const pathname = usePathname();
   const dispatch = useAppDispatch();
-  const handleError = useErrorHandler();
 
   const [user, setUser] = useState<IUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [userPermissions, setUserPermissions] = useState<number[]>([]);
+  const [bootstrapping, setBootstrapping] = useState<boolean>(true);
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const cookieToken = Cookies.get('AuthToken');
-    const cookieUser = Cookies.get('user');
-
-    if (!cookieToken) {
-      if (!AUTH_PAGES.some((page) => pathname.includes(page))) {
-        router.push('/signin?redirect=' + window.location.href);
-      }
-      return;
-    }
-
-    setToken(cookieToken);
-    dispatch(setAuthToken(cookieToken));
-    setUserPermissions(fetchUserPermissionsList(cookieToken));
-
-    // Sessions created before tenant headers existed have no company cookie.
-    if (!Cookies.get('ActiveCompanyId')) {
-      void resolveActiveCompany(cookieToken);
-    }
-
+  /**
+   * Build the display user from the `user` cookie when it is usable, otherwise
+   * from the JWT claims. The AssetManagement JWT carries the user id as
+   * "AppUserId"; the HRM hub token uses "userId".
+   */
+  const buildUserFromToken = (authToken: string, cookieUser?: string): IUser => {
     if (cookieUser) {
       try {
         const parsedUser = JSON.parse(cookieUser) as IUser;
         // Older cookies may carry userId 0 (claim name mismatch) — in that
         // case fall through and rebuild the user from the token claims.
         if (parsedUser.userId) {
-          setUser(parsedUser);
-          dispatch(setCurrentUser(parsedUser));
-          return;
+          return parsedUser;
         }
       } catch {
         // fall through to token claims
       }
     }
 
-    const claims = parseJwt(cookieToken);
-    const fallbackUser: IUser = {
-      // The VehicleManagement JWT carries the user id as "AppUserId".
+    const claims = parseJwt(authToken);
+    return {
       userId: claims?.userId ?? claims?.AppUserId ?? 0,
       fullName: claims?.fullName ?? claims?.username ?? '',
       email: claims?.email ?? claims?.username ?? '',
       userName: claims?.username,
     };
-    setUser(fallbackUser);
-    dispatch(setCurrentUser(fallbackUser));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  };
+
+  // Central hub sign-in/logout target shared by all modules
+  // (getBaseUrl() + NEXT_PUBLIC_LOGOUT_URL).
+  const redirectToHubSignin = () => {
+    router.replace(
+      `${getBaseUrl()}${
+        process.env.NEXT_PUBLIC_LOGOUT_URL
+      }?redirect=${encodeURIComponent(window.location.href)}`
+    );
+  };
 
   /**
    * Resolves the tenant every request is scoped to and stores it in the
    * `ActiveCompanyId` cookie (read by requestApi as the `x-company-id` header).
-   * Company users carry their own company on the login payload; internal users
-   * (superadmin) carry none, so we fall back to the first active company.
+   * Company users carry their own company on the exchange payload; internal
+   * users (superadmin) carry none, so we fall back to the first active company.
    */
-  const resolveActiveCompany = async (
-    authToken: string,
-    companyIdFromLogin?: string | null
-  ) => {
-    if (companyIdFromLogin) {
-      setCookie('ActiveCompanyId', companyIdFromLogin, 30);
-      return;
-    }
+  const resolveActiveCompanyIfAbsent = async () => {
+    if (Cookies.get('ActiveCompanyId')) return;
 
     try {
       const res = await requestApi({
         apiEndpoint: '/Companies',
         method: 'GET',
-        token: `Bearer ${authToken}`,
         completeData: true,
       });
       const companies = Array.isArray(res?.data) ? res.data : [];
@@ -118,7 +102,7 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
         companies.find((c: { isDeleted?: boolean }) => !c?.isDeleted) ??
         companies[0];
       if (active?.id) {
-        setCookie('ActiveCompanyId', active.id, 30);
+        persistActiveCompanyIdIfAbsent(active.id);
       } else {
         console.warn('[tenant] no company returned', res);
       }
@@ -128,54 +112,64 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
     }
   };
 
-  const setCookie = (name: string, value: string, days: number) => {
-    const expires = new Date();
-    expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
-    document.cookie = `${name}=${encodeURIComponent(
-      value
-    )}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
-  };
+  useEffect(() => {
+    const bootstrap = async () => {
+      const cookieToken = Cookies.get('AuthToken');
+      const cookieUser = Cookies.get('user');
 
-  const setSessionData = async (newToken: string, newUser: IUser) => {
-    setUserPermissions(fetchUserPermissionsList(newToken));
-    setUser(newUser);
-    setToken(newToken);
-    dispatch(setAuthToken(newToken));
-    dispatch(setCurrentUser(newUser));
+      // No hub session — bounce to the central sign-in. Middleware handles this
+      // server-side too; this is the client-side fallback. On localhost in
+      // development the middleware sends to /dev-auth instead, so skip here.
+      if (!cookieToken) {
+        if (!isDevAuthBypass(window.location.hostname)) {
+          redirectToHubSignin();
+        }
+        setBootstrapping(false);
+        return;
+      }
 
-    Cookies.remove('AuthToken');
-    Cookies.remove('user');
-    setCookie('AuthToken', newToken, 30);
-    setCookie('user', JSON.stringify(newUser), 30);
+      setToken(cookieToken);
+      dispatch(setAuthToken(cookieToken));
 
-    // Every sign-in path funnels through here (AuthContext.login and the
-    // sign-in page both call it), so resolve the tenant once, centrally.
-    await resolveActiveCompany(newToken, newUser.companyId ?? null);
-  };
+      const resolvedUser = buildUserFromToken(cookieToken, cookieUser);
+      setUser(resolvedUser);
+      dispatch(setCurrentUser(resolvedUser));
 
-  const login = async (userName: string, password: string) => {
-    const res = await signIn({ userName, password });
-    if (res.success && res.statusCode === 200 && res.data?.token) {
-      const newToken = res.data.token;
-      const claims = parseJwt(newToken);
+      // Exchange the HRM AuthToken for the asset-module token before any page
+      // mounts and fires asset API calls.
+      const { token: assetToken, companyId, error } = await ensureAssetToken(
+        true
+      );
+      if (!assetToken) {
+        const message =
+          error ||
+          'Could not exchange AuthToken for an AssetAuthToken. Sign in again.';
+        if (isDevAuthBypass(window.location.hostname)) {
+          // Surface the real failure instead of silently rendering with no
+          // Authorization header (httpService only reads AssetAuthToken).
+          setBootstrapError(message);
+          setBootstrapping(false);
+          return;
+        }
+        redirectToHubSignin();
+        setBootstrapping(false);
+        return;
+      }
 
-      const newUser: IUser = {
-        userId: res.data.userId ?? claims?.userId ?? claims?.AppUserId ?? 0,
-        fullName: res.data.fullName ?? claims?.fullName ?? userName,
-        email: res.data.email ?? claims?.email ?? userName,
-        userName,
-        companyId:
-          typeof res.data.companyId === 'string' ? res.data.companyId : null,
-      };
+      // Module permissions live in the AssetAuthToken, not the hub token.
+      setUserPermissions(fetchUserPermissionsList(assetToken));
 
-      await setSessionData(newToken, newUser);
+      // Internal users carry no company claim, so the exchange returns none.
+      if (!companyId) {
+        await resolveActiveCompanyIfAbsent();
+      }
 
-      const redirect = searchParams.get('redirect');
-      router.replace(redirect || '/dashboard');
-    } else {
-      handleError(res);
-    }
-  };
+      setBootstrapping(false);
+    };
+
+    void bootstrap();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const logout = () => {
     setUser(null);
@@ -185,8 +179,18 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
     dispatch(setCurrentUser(null));
     Cookies.remove('AuthToken');
     Cookies.remove('user');
+    clearAssetToken();
+    clearActiveCompanyId();
     localStorage.clear();
-    window.location.href = '/signin';
+    window.location.href = `${getBaseUrl()}${
+      process.env.NEXT_PUBLIC_LOGOUT_URL
+    }`;
+  };
+
+  const retryBootstrap = () => {
+    setBootstrapError(null);
+    setBootstrapping(true);
+    window.location.reload();
   };
 
   return (
@@ -194,13 +198,48 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
       value={{
         user,
         token,
-        login,
-        setSessionData,
         logout,
         userPermissions,
       }}
     >
-      {children}
+      {bootstrapping ? (
+        <div className="flex h-screen w-full items-center justify-center">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-primarycolor" />
+        </div>
+      ) : bootstrapError ? (
+        <div className="flex h-screen w-full items-center justify-center bg-gray-50 p-6">
+          <div className="w-full max-w-lg space-y-4 rounded-lg border border-red-200 bg-white p-6 shadow-sm">
+            <h1 className="text-lg font-semibold text-gray-900">
+              Authentication failed
+            </h1>
+            {process.env.NODE_ENV === 'development' ? (
+              <>
+                <p className="text-sm text-gray-600">{bootstrapError}</p>
+                <p className="text-xs text-gray-500">
+                  The module needs an AssetAuthToken exchanged from your HRM
+                  AuthToken before any API call can succeed. Fix the cause
+                  above, then retry.
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-gray-600">
+                We couldn&apos;t complete authentication. Please try again.
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={retryBootstrap}
+                className="rounded-md bg-primarycolor px-4 py-2 text-sm font-medium text-white"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        children
+      )}
     </AuthContext.Provider>
   );
 };

@@ -1,10 +1,16 @@
 import { TContentType } from "@/interface/IHttpService";
-import { API_PREFIX, getBaseUrl } from "@/utils/constants";
+import { buildApiUrl, getApiBaseUrl } from "@/utils/constants";
 import cookies from "js-cookie";
+import {
+  ASSET_LOGIN_ENDPOINT,
+  clearAssetToken,
+  ensureAssetToken,
+  getAssetToken,
+} from "./assetToken";
 
 /**
  * Same requestApi conventions as the employee module, pointed at the
- * VehicleManagement API (getBaseUrl() + '/api').
+ * AssetManagement API (same-origin + NEXT_PUBLIC_API_BASE + '/api').
  */
 export const requestApi = async ({
   apiEndpoint,
@@ -20,6 +26,7 @@ export const requestApi = async ({
   removeCache = true,
   returnBlob = false,
   externalApi = false,
+  _retried = false,
 }: {
   apiEndpoint: string;
   baseUrl?: string | null;
@@ -34,6 +41,8 @@ export const requestApi = async ({
   removeCache?: boolean;
   returnBlob?: boolean;
   externalApi?: boolean;
+  /** Internal: set after a single 401 re-exchange retry. */
+  _retried?: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 }): Promise<any> => {
   const options: RequestInit = {
@@ -49,7 +58,7 @@ export const requestApi = async ({
     options.body = body;
   }
 
-  const defaultToken = cookies.get("AuthToken") ?? "";
+  const defaultToken = getAssetToken() ?? "";
 
   if (token || defaultToken) {
     options.headers = {
@@ -94,7 +103,7 @@ export const requestApi = async ({
   if (externalApi) {
     url = apiEndpoint;
   } else {
-    url = `${baseUrl ?? getBaseUrl()}${API_PREFIX}${apiEndpoint}`;
+    url = buildApiUrl(apiEndpoint, baseUrl);
   }
 
   let res: Response;
@@ -105,7 +114,7 @@ export const requestApi = async ({
     // Surface it as a normal envelope so callers show a message instead of
     // throwing an unhandled "TypeError: Failed to fetch".
     const message = `Unable to reach the server at ${
-      baseUrl ?? getBaseUrl()
+      baseUrl ?? getApiBaseUrl()
     }. Check that the API is running and reachable.`;
 
     if (returnBlob) throw new Error(message);
@@ -127,8 +136,33 @@ export const requestApi = async ({
   }
 
   if (res.status === 401) {
-    cookies.remove("AuthToken");
-    cookies.remove("user");
+    const isLoginCall = apiEndpoint === ASSET_LOGIN_ENDPOINT;
+    // Re-exchange once (skip the login endpoint itself to avoid a loop), then
+    // retry the original request with the fresh asset token.
+    if (!isLoginCall && !_retried && !token) {
+      const { token: refreshed } = await ensureAssetToken(true);
+      if (refreshed) {
+        return requestApi({
+          apiEndpoint,
+          baseUrl,
+          acceptLanguage,
+          body,
+          revalidate,
+          contentType,
+          completeData,
+          method,
+          token: null,
+          signal,
+          removeCache,
+          returnBlob,
+          externalApi,
+          _retried: true,
+        });
+      }
+    }
+
+    // The hub owns `AuthToken`; only the module-scoped token is ours to drop.
+    clearAssetToken();
     return {
       success: false,
       statusCode: 401,

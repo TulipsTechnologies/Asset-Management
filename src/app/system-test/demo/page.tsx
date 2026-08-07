@@ -33,6 +33,7 @@ import {
   provisionSystemTestCompanies,
   runSystemTestDemoData,
 } from '@/services/systemTest.service';
+import { appUrl } from '@/utils/constants';
 
 const PURPOSE_BADGE: Record<SystemTestCompanyPurposeEnum, string> = {
   [SystemTestCompanyPurposeEnum.TestCompany]: 'bg-blue-50 text-blue-700',
@@ -103,7 +104,7 @@ const DemoContent = () => {
    */
   const openCompany = (company: ISystemTestProvisionedCompany | ISystemTestCallerCompany) => {
     cookies.set('ActiveCompanyId', company.companyId);
-    window.location.href = '/dashboard';
+    window.location.href = appUrl('/dashboard');
   };
 
   const provision = async ({ pin }: { confirmationPhrase: string; pin: string }) => {

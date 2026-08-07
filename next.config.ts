@@ -1,4 +1,5 @@
 const nextConfig = {
+  basePath: "/asset-management",
   reactStrictMode: false,
   cleanDistDir: true,
   productionBrowserSourceMaps: true,
@@ -34,6 +35,25 @@ const nextConfig = {
             value: "public, max-age=31536000, immutable",
           },
         ],
+      },
+    ];
+  },
+  // Mirror server.js's API proxy for `next dev` (server.js is only used in IIS).
+  // Rewrite sources are auto-prefixed with basePath. Only register when a local
+  // API origin is explicitly configured — otherwise localhost talks to the
+  // shared webdev gateway via getApiBaseUrl().
+  async rewrites() {
+    if (process.env.NODE_ENV === "production") {
+      return [];
+    }
+    const target = process.env.NEXT_PUBLIC_ASSET_API_URL;
+    if (!target) {
+      return [];
+    }
+    return [
+      {
+        source: "/api/:path*",
+        destination: `${target}/api/:path*`,
       },
     ];
   },

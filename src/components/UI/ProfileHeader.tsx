@@ -1,21 +1,22 @@
 'use client';
 
 import { ReactNode, useRef } from 'react';
-import { getBaseUrl } from '@/utils/constants';
+import { getApiRoot } from '@/utils/constants';
 
 /**
  * Resolve a file path from the API against the API base URL.
  *
  * The backend no longer serves uploads from a static /Files path: DTO
  * photoPath/filePath fields now carry short-lived HMAC-signed URLs of the form
- * `/api/Files/content?path=...&exp=...&sig=...` (10-minute expiry). This helper
- * just prefixes the API origin; the signature in the URL is the access grant,
- * so <img> tags need no Authorization header.
+ * `/api/Files/content?path=...&exp=...&sig=...` (10-minute expiry). Those
+ * already include `/api`, so this prefixes the API origin plus the module
+ * root only; the signature in the URL is the access grant, so <img> tags need
+ * no Authorization header.
  */
 export const fileUrl = (path?: string | null): string | null => {
   if (!path) return null;
   if (path.startsWith('http')) return path;
-  return `${getBaseUrl()}/${path.replace(/^\//, '')}`;
+  return `${getApiRoot()}/${path.replace(/^\//, '')}`;
 };
 
 export const initialsOf = (name: string): string =>

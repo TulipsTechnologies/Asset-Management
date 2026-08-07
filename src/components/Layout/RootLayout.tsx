@@ -7,7 +7,9 @@ import DashboardLayout from './DashboardLayout/DashboardLayout';
 const SiteLayout = ({ children }: { children: ReactNode }) => {
   const pathname = usePathname();
 
-  if (pathname.includes('/signin')) {
+  // The localhost token-paste screen renders standalone — there is no session
+  // yet, so the dashboard chrome (header, sidebar) has nothing to show.
+  if (pathname.includes('/dev-auth')) {
     return <>{children}</>;
   }
 

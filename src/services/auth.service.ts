@@ -1,17 +1,10 @@
 import Cookies from 'js-cookie';
 import jwt from 'jsonwebtoken';
 import { requestApi } from './httpService';
+import { ensureAssetToken } from './assetToken';
+import { ILoginFromHrmRequest, IValidUser } from '@/interface/IAuth';
 import { JwtPayload } from '@/interface/IJwtPayload';
 import { IResponse } from '@/interface/IGeneric';
-
-export interface ILoginData {
-  token: string;
-  userId?: string;
-  fullName?: string;
-  email?: string;
-  userName?: string;
-  [key: string]: unknown;
-}
 
 export async function getAuthToken() {
   return Cookies.get('AuthToken');
@@ -32,23 +25,6 @@ export interface ICurrentUser {
 export const fetchCurrentUser = (): Promise<IResponse<ICurrentUser>> =>
   requestApi({ apiEndpoint: '/AppUsers/me', method: 'GET', completeData: true });
 
-/**
- * POST /api/AppUsers/Login {userName, password}
- * → Result envelope {success, statusCode, message, data:{token, ...}}
- */
-export const signIn = (data: {
-  userName: string;
-  password: string;
-}): Promise<IResponse<ILoginData>> => {
-  return requestApi({
-    apiEndpoint: '/AppUsers/Login',
-    body: JSON.stringify(data),
-    method: 'POST',
-    completeData: true,
-    contentType: 'application/json',
-  });
-};
-
 export function parseJwt(token: string): JwtPayload | null {
   try {
     return jwt.decode(token) as JwtPayload | null;
@@ -56,4 +32,45 @@ export function parseJwt(token: string): JwtPayload | null {
     console.error('Failed to decode token:', error);
     return null;
   }
+}
+
+/**
+ * POST /api/AppUsers/TulipsHrm/Login {token}
+ * → Result envelope {success, statusCode, message, data: ValidUserDto}
+ */
+export const loginUsingToken = (
+  token: string
+): Promise<IResponse<IValidUser>> => {
+  const body: ILoginFromHrmRequest = {
+    token,
+  };
+
+  return requestApi({
+    apiEndpoint: '/AppUsers/TulipsHrm/Login',
+    method: 'POST',
+    body: JSON.stringify(body),
+    contentType: 'application/json',
+    completeData: true,
+    // The default bearer now resolves to `AssetAuthToken`, which does not
+    // exist yet at login time. Pass the HRM `AuthToken` explicitly so the
+    // login request still authenticates against the hub.
+    token: `Bearer ${token}`,
+  });
+};
+
+/**
+ * Exchange the HRM `AuthToken` for the asset-module token and persist it as
+ * the `AssetAuthToken` cookie. Returns the asset token on success, or `null`
+ * if the login is invalid or no token is returned.
+ *
+ * Prefer `ensureAssetToken` when you also need the failure reason.
+ */
+export async function exchangeAndStoreAssetToken(
+  authToken: string
+): Promise<string | null> {
+  // authToken is already in the AuthToken cookie that ensureAssetToken reads;
+  // keep the parameter for call-site clarity / backwards compatibility.
+  void authToken;
+  const { token } = await ensureAssetToken(true);
+  return token;
 }

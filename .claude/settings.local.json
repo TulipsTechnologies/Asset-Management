@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "additionalDirectories": [
+      "../attendance-module",
+      "../common-module",
+      "../crm-module",
+      "../employee-module",
+      "../exam-module",
+      "../leave-management",
+      "../payroll-module",
+      "../recuritment-module-new",
+      "../training-new",
+      "../vehicle-management-module"
+    ]
+  }
+}
