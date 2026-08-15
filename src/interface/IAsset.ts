@@ -28,6 +28,8 @@ export interface IAssetListItem {
   financialStatus: FinancialStatusEnum;
   verificationStatus: VerificationStatusEnum;
   conditionName: string;
+  /** Free-text physical size as supplied, e.g. "39.5in L, 39.5in W, 16in H". */
+  dimension?: string | null;
   assetLocationName?: string | null;
   currentCustodianEmployeeId?: string | null;
   /** Who holds the asset right now — null while it is unassigned. */
@@ -87,6 +89,7 @@ export interface ICreateAsset {
   serialNumber?: string;
   description?: string;
   notes?: string;
+  dimension?: string;
   ownershipType?: OwnershipTypeEnum;
   purchaseDate?: string;
   purchaseCost?: number;
@@ -119,6 +122,7 @@ export interface IUpdateAsset {
   serialNumber?: string;
   description?: string;
   notes?: string;
+  dimension?: string;
   ownershipType?: OwnershipTypeEnum;
   purchaseDate?: string;
   purchaseCost?: number;

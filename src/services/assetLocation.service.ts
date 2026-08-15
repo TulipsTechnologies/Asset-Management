@@ -4,6 +4,7 @@ import { IPagedResponse, IResponse } from '@/interface/IGeneric';
 import {
   IAssetLocation,
   IAssetLocationFilter,
+  IAssetLocationTree,
   IUpdateAssetLocation,
   IUpsertAssetLocation,
 } from '@/interface/IAssetLocation';
@@ -25,6 +26,16 @@ export const fetchAssetLocations = (
     completeData: true,
   });
 };
+
+/** The full hierarchy (max depth 3) with per-node asset counts — the tree view's shape. */
+export const fetchAssetLocationTree = (): Promise<
+  IResponse<IAssetLocationTree[]>
+> =>
+  requestApi({
+    apiEndpoint: '/AssetLocations/tree',
+    method: 'GET',
+    completeData: true,
+  });
 
 export const createAssetLocation = (
   data: IUpsertAssetLocation

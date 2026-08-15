@@ -16,7 +16,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/Providers/ToastProvider';
 import { useAppDispatch, useAppSelector } from '@/store';
 import { setAdminView } from '@/store/slice/AuthSlice';
-import { getBaseUrl, getMenusApiBaseUrl } from '@/utils/constants';
+import { getMenusApiBaseUrl } from '@/utils/constants';
 import { resolveSidebarActivePath } from '@/utils/sidebarActivePath';
 import {
   ASSET_ACTIVE_MATCH_GROUPS,
@@ -41,7 +41,20 @@ const DashboardContents = ({ children }: { children: ReactNode }) => {
     (state) => state.auth
   );
 
-  const baseUrl = getBaseUrl();
+  /**
+   * Where the shared chrome's menu links point.
+   *
+   * This is the ORIGIN SERVING THESE PAGES, not the hub. The sidebar composes
+   * `baseUrl + item.url`, and its items are this module's own routes, so the
+   * hub base sent every click to the hub — on a developer machine that meant
+   * leaving localhost for the WebDev sign-in on the first menu click.
+   *
+   * Deployed, the module and the hub share an origin, so this is the same
+   * string the hub base would have produced; only localhost, where they
+   * genuinely differ, changes behaviour. The hub base keeps its own jobs
+   * (sign-in, sign-out, the menus API) — mixing the two is what broke this.
+   */
+  const baseUrl = typeof window === 'undefined' ? '' : window.location.origin;
 
   const { userMenuList, adminMenuList } = useSidebarMenus({
     token,

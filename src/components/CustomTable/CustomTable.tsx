@@ -410,7 +410,11 @@ const CustomTable = ({
   const renderHeaderField = (col: TTableColumn) => {
     switch (col.type) {
       case 'custom':
-        return col.custom?.content ?? <></>;
+        // Fall back to the label: a column whose CELLS are custom-rendered usually has
+        // a perfectly ordinary text heading. Without this, every such column renders a
+        // blank <th> (and a blank mobile-card label) — which is exactly how the reports
+        // screen shipped with headerless tables.
+        return col.custom?.content ?? col.label ?? <></>;
       default:
         return col.label;
     }

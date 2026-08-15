@@ -198,6 +198,20 @@ export const reverseRun = (
 export const fetchFiscalYears = (): Promise<IResponse<IFiscalYear[]>> =>
   requestApi({ apiEndpoint: '/FiscalPeriods/years', method: 'GET', completeData: true });
 
+/**
+ * Deletes a year and its periods. The server refuses while anything still references the
+ * year — closed periods, runs, schedules, journal proposals, tax runs — each with its own
+ * reason code, so the message it returns names what is actually in the way.
+ */
+export const deleteFiscalYear = (id: string, rowVersion: string) =>
+  requestApi({
+    apiEndpoint: `/FiscalPeriods/years/${id}`,
+    method: 'DELETE',
+    body: JSON.stringify({ rowVersion }),
+    contentType: 'application/json',
+    completeData: true,
+  });
+
 export const fetchFiscalPeriods = (filter: {
   pageNumber?: number;
   pageSize?: number;

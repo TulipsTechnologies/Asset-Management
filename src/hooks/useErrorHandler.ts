@@ -1,6 +1,6 @@
 'use client';
 import { useToast } from '@/components/Providers/ToastProvider';
-import { getBaseUrl } from '@/utils/constants';
+import { getHubBaseUrl } from '@/utils/constants';
 import { useRouter } from 'next/navigation';
 import { useCallback } from 'react';
 
@@ -17,7 +17,7 @@ export function useErrorHandler() {
           // aren't stranded on a broken page.
           addToast.error('Your session has expired. Please sign in again.');
           if (typeof window !== 'undefined') {
-            window.location.href = `${getBaseUrl()}${
+            window.location.href = `${getHubBaseUrl()}${
               process.env.NEXT_PUBLIC_LOGOUT_URL
             }?redirect=${encodeURIComponent(window.location.href)}`;
           }

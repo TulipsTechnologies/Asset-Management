@@ -31,6 +31,10 @@ export const clearAssetToken = (): void => {
   Cookies.remove(ASSET_AUTH_TOKEN_COOKIE, { path: '/' });
 };
 
+/** The tenant the UI is scoped to — namespaces per-company client-side preferences. */
+export const getActiveCompanyId = (): string | null =>
+  Cookies.get(ACTIVE_COMPANY_ID_COOKIE) ?? null;
+
 export const clearActiveCompanyId = (): void => {
   Cookies.remove(ACTIVE_COMPANY_ID_COOKIE, { path: '/' });
 };

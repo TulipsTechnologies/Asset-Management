@@ -43,6 +43,7 @@ const SECTION_FIELDS = {
     'manufacturer',
     'brand',
     'model',
+    'dimension',
   ] as const,
   purchase: [
     'supplierId',
@@ -98,6 +99,7 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
     manufacturer: asset?.manufacturer ?? '',
     brand: asset?.brand ?? '',
     model: asset?.model ?? '',
+    dimension: asset?.dimension ?? '',
     ownershipType: String(asset?.ownershipType ?? OwnershipTypeEnum.Owned),
     supplierId: asset?.supplierId ?? '',
     purchaseDate: toDateInput(asset?.purchaseDate),
@@ -276,6 +278,7 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
     insuranceExpiryDate: form.insuranceExpiryDate || undefined,
     description: form.description.trim() || undefined,
     notes: form.notes.trim() || undefined,
+    dimension: form.dimension.trim() || undefined,
   });
 
   const handleCreate = async () => {
@@ -511,6 +514,12 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
               />
               <Input label="Brand" value={form.brand} onChange={set('brand')} />
               <Input label="Model" value={form.model} onChange={set('model')} />
+              <Input
+                label="Dimension"
+                value={form.dimension}
+                onChange={set('dimension')}
+                helperText="Physical size, e.g. 39.5in L, 39.5in W, 16in H"
+              />
             </div>
           </Panel>
 

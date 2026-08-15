@@ -6,8 +6,16 @@ import Cookies from 'js-cookie';
 
 import Button from '@/components/UI/Button';
 import { parseJwt } from '@/services/auth.service';
-import { clearActiveCompanyId, clearAssetToken } from '@/services/assetToken';
-import { appUrl, isDevAuthBypass } from '@/utils/constants';
+import {
+  clearActiveCompanyId,
+  clearAssetToken,
+  setAssetToken,
+} from '@/services/assetToken';
+import {
+  DEV_AUTH_PLACEHOLDER_TOKEN,
+  appUrl,
+  isDevAuthEnabled,
+} from '@/utils/constants';
 
 const sanitizeToken = (raw: string): string =>
   raw.trim().replace(/^["']|["']$/g, '');
@@ -16,11 +24,13 @@ const DevAuth = () => {
   const searchParams = useSearchParams();
   const [tokenInput, setTokenInput] = useState('');
   const [userInput, setUserInput] = useState('');
+  const [moduleTokenInput, setModuleTokenInput] = useState('');
+  const [companyInput, setCompanyInput] = useState('');
   const [error, setError] = useState('');
   const [bypassActive, setBypassActive] = useState<boolean | null>(null);
 
   useEffect(() => {
-    setBypassActive(isDevAuthBypass(window.location.hostname));
+    setBypassActive(isDevAuthEnabled());
   }, []);
 
   const claims = useMemo(() => {
@@ -74,6 +84,47 @@ const DevAuth = () => {
     window.location.replace(resolveRedirect());
   };
 
+  /**
+   * Second route in: a module token you already hold, used AS-IS with no exchange.
+   *
+   * The normal route needs an HRM `AuthToken`, which means reaching the hub to copy one.
+   * When the hub is unreachable — down, or you are simply offline — that route is closed
+   * and there is otherwise no way into a local dev environment that is running perfectly
+   * well. A token from the module's own `POST /AppUsers/Login` gets you in without it.
+   *
+   * `AuthToken` is still set to a placeholder because the middleware gates on that cookie
+   * EXISTING, never on its contents; the module token in `AssetAuthToken` is what every
+   * API call actually carries.
+   */
+  const handleUseModuleToken = () => {
+    setError('');
+    const cleaned = sanitizeToken(moduleTokenInput);
+    if (!cleaned) {
+      setError('Paste an AssetAuthToken first.');
+      return;
+    }
+
+    const decoded = parseJwt(cleaned);
+    if (!decoded) {
+      setError('Could not decode the token. Check that it is a valid JWT.');
+      return;
+    }
+
+    setAssetToken(cleaned);
+    // Presence is all the middleware checks — see the note above.
+    Cookies.set('AuthToken', DEV_AUTH_PLACEHOLDER_TOKEN, { path: '/', sameSite: 'lax' });
+
+    // An internal user (superadmin) carries no company claim, so without this every
+    // write refuses with "a company context is required" and the UI looks broken when
+    // it is in fact correctly refusing.
+    const company = companyInput.trim();
+    if (company) {
+      Cookies.set('ActiveCompanyId', company, { path: '/', sameSite: 'lax' });
+    }
+
+    window.location.replace(resolveRedirect());
+  };
+
   const handleClear = () => {
     Cookies.remove('AuthToken', { path: '/' });
     Cookies.remove('user', { path: '/' });
@@ -81,6 +132,8 @@ const DevAuth = () => {
     clearActiveCompanyId();
     setTokenInput('');
     setUserInput('');
+    setModuleTokenInput('');
+    setCompanyInput('');
     setError('');
   };
 
@@ -171,6 +224,57 @@ const DevAuth = () => {
           <Button variant="outline" onClick={handleClear}>
             Clear cookies
           </Button>
+        </div>
+
+        <div className="border-t border-gray-200 pt-5 space-y-4">
+          <div>
+            <h2 className="text-sm font-semibold text-gray-900">
+              Or use a module token directly
+            </h2>
+            <p className="mt-1 text-xs text-gray-500">
+              For when the hub is unreachable. Get one from the module itself — no hub
+              involved:
+            </p>
+            <pre className="mt-2 overflow-x-auto rounded-md bg-gray-900 px-3 py-2 text-[11px] leading-relaxed text-gray-100">
+{`curl -s -X POST http://localhost:5199/api/AppUsers/Login \\
+  -H "Content-Type: application/json" \\
+  -d '{"UserName":"superadmin","Password":"<seeded password>"}'`}
+            </pre>
+          </div>
+
+          <label className="block space-y-1.5">
+            <span className="text-sm font-medium text-gray-700">
+              AssetAuthToken
+            </span>
+            <textarea
+              value={moduleTokenInput}
+              onChange={(e) => setModuleTokenInput(e.target.value)}
+              rows={5}
+              spellCheck={false}
+              placeholder="eyJhbGciOi..."
+              className="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-xs text-gray-800 outline-none focus:border-primarycolor focus:ring-1 focus:ring-primarycolor"
+            />
+          </label>
+
+          <label className="block space-y-1.5">
+            <span className="text-sm font-medium text-gray-700">
+              Active company id
+            </span>
+            <input
+              value={companyInput}
+              onChange={(e) => setCompanyInput(e.target.value)}
+              spellCheck={false}
+              placeholder="019fb760-a7bb-7692-a970-3c8ad1733849"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-xs text-gray-800 outline-none focus:border-primarycolor focus:ring-1 focus:ring-primarycolor"
+            />
+            <span className="block text-xs text-gray-500">
+              Required for an internal account such as superadmin, which carries no
+              company of its own — without it every write is refused for want of a
+              tenant.
+            </span>
+          </label>
+
+          <Button onClick={handleUseModuleToken}>Use this token</Button>
         </div>
       </div>
     </div>

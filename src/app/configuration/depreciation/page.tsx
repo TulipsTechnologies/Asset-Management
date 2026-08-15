@@ -23,6 +23,7 @@ import {
   createAccountMapping,
   createCapitalizationPolicy,
   createFiscalYear,
+  deleteFiscalYear,
   deleteAccountMapping,
   fetchAccountMappings,
   fetchCapitalizationPolicies,
@@ -70,6 +71,10 @@ export default function DepreciationConfigurationPage() {
 
   const [policies, setPolicies] = useState<ICapitalizationPolicy[]>([]);
   const [years, setYears] = useState<IFiscalYear[]>([]);
+  // Deleting a calendar is not undoable from the UI, so it goes through a confirmation that
+  // states what will go with it rather than a bare browser confirm().
+  const [yearToDelete, setYearToDelete] = useState<IFiscalYear | null>(null);
+  const [deletingYearId, setDeletingYearId] = useState<string>('');
   const [periods, setPeriods] = useState<IFiscalPeriod[]>([]);
   const [selectedYearId, setSelectedYearId] = useState('');
   const [mappings, setMappings] = useState<IDepreciationAccountMapping[]>([]);
@@ -100,6 +105,57 @@ export default function DepreciationConfigurationPage() {
   const [closing, setClosing] = useState<IFiscalPeriod | null>(null);
   const [reopening, setReopening] = useState<IFiscalPeriod | null>(null);
   const [reopenReason, setReopenReason] = useState('');
+
+
+  /**
+   * Deletes a fiscal year. The server owns every rule about whether it may go — closed
+   * periods, runs, schedules, journal proposals, tax runs — so this sends the request and
+   * shows whatever it says. Duplicating those checks here would give two answers to one
+   * question, and the client's copy would be the one that goes stale.
+   */
+  const handleDeleteYear = async () => {
+    if (!yearToDelete) return;
+
+    setDeletingYearId(yearToDelete.id);
+    try {
+      const response = await deleteFiscalYear(yearToDelete.id, yearToDelete.rowVersion);
+      if (response?.success) {
+        addToast.success(response.message ?? 'Fiscal year deleted.');
+        if (selectedYearId === yearToDelete.id) setSelectedYearId('');
+        setYearToDelete(null);
+        await load();
+      } else {
+        // The refusal names what is in the way — a count of runs, schedules or closed
+        // periods — which is more use than "could not delete".
+        addToast.error(response?.message ?? 'Could not delete the fiscal year.');
+      }
+    } catch {
+      addToast.error('Could not delete the fiscal year. Please try again.');
+    } finally {
+      setDeletingYearId('');
+    }
+  };
+
+  /**
+   * True when TulipsHRM owns this company's calendar, so no local write to it will be
+   * accepted — seeding a year included, not only deleting one. The server decides this per
+   * COMPANY, and every year it owns comes back flagged, so "they are all mirrored" is the
+   * same fact seen through the list. An empty calendar leaves it false on purpose: with no
+   * row to read there is nothing to infer from, and the server's refusal explains itself.
+   */
+  const calendarOwnedByHrm = years.length > 0 && years.every((year) => year.isMirrored);
+
+  /**
+   * Only the newest year may be deleted — consecutive years have to tile, so removing one
+   * from the middle would leave a gap. Derived from the dates rather than from the list
+   * order, which is the server's presentation choice and not a promise.
+   */
+  const newestYearId =
+    years.length === 0
+      ? null
+      : years.reduce((newest, year) =>
+          new Date(year.startDate) > new Date(newest.startDate) ? year : newest
+        ).id;
 
   const load = useCallback(async () => {
     try {
@@ -354,7 +410,13 @@ export default function DepreciationConfigurationPage() {
       <section className="mb-6 rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Fiscal Calendar</h2>
-          <Button onClick={openYearModal}>New Fiscal Year</Button>
+          {calendarOwnedByHrm ? (
+            <span className="rounded bg-blue-50 px-2 py-1 text-xs text-blue-700">
+              Owned by TulipsHRM — seed and edit years there
+            </span>
+          ) : (
+            <Button onClick={openYearModal}>New Fiscal Year</Button>
+          )}
         </div>
         <p className="mb-3 text-xs text-gray-500">
           Bikram Sambat months run 29–32 days and cannot be generated — each year is seeded
@@ -370,24 +432,44 @@ export default function DepreciationConfigurationPage() {
 
         <div className="flex flex-wrap gap-2">
           {years.map((year) => (
-            <button
+            <div
               key={year.id}
-              type="button"
-              onClick={() => setSelectedYearId(year.id === selectedYearId ? '' : year.id)}
-              className={`rounded border px-3 py-1.5 text-sm ${
+              className={`flex items-center rounded border text-sm ${
                 selectedYearId === year.id
                   ? 'border-primary bg-primary/5 text-primary'
                   : 'border-gray-200 text-gray-700 hover:border-gray-300'
               }`}
             >
-              {year.code}
-              <span className="ml-2 text-xs text-gray-500">
-                {year.openPeriodCount}/{year.periodCount} open
-              </span>
-              {year.isMirrored && (
-                <span className="ml-2 rounded bg-blue-50 px-1.5 text-[10px] text-blue-700">HRM</span>
+              <button
+                type="button"
+                onClick={() => setSelectedYearId(year.id === selectedYearId ? '' : year.id)}
+                className="px-3 py-1.5"
+              >
+                {year.code}
+                <span className="ml-2 text-xs text-gray-500">
+                  {year.openPeriodCount}/{year.periodCount} open
+                </span>
+                {year.isMirrored && (
+                  <span className="ml-2 rounded bg-blue-50 px-1.5 text-[10px] text-blue-700">HRM</span>
+                )}
+              </button>
+
+              {/* Offered only where the server would actually accept it. A mirrored year
+                  belongs to HRM, and any year but the newest would gap the calendar — both
+                  are refused regardless, so the button would exist only to be told no. */}
+              {!year.isMirrored && year.id === newestYearId && (
+                <button
+                  type="button"
+                  aria-label={`Delete fiscal year ${year.code}`}
+                  title="Delete this fiscal year"
+                  disabled={deletingYearId === year.id}
+                  onClick={() => setYearToDelete(year)}
+                  className="border-l border-inherit px-2 py-1.5 text-gray-400 hover:text-red-600 disabled:opacity-40"
+                >
+                  ×
+                </button>
               )}
-            </button>
+            </div>
           ))}
         </div>
 
@@ -761,6 +843,32 @@ export default function DepreciationConfigurationPage() {
         onConfirm={submitDeleteMapping}
         onClose={() => setDeletingMapping(null)}
       />
+
+      <Modal isOpen={yearToDelete !== null} onClose={() => setYearToDelete(null)} size="md">
+        <div className="p-5">
+          <h2 className="mb-1 text-lg font-semibold text-secondaryColor">
+            Delete fiscal year {yearToDelete?.code}?
+          </h2>
+          <p className="mb-4 text-sm text-gray-600">
+            Its {yearToDelete?.periodCount ?? 0} periods go with it, and every book&apos;s
+            schedule is rebuilt to the shortened calendar. The server refuses if anything
+            still depends on the year — a closed period, a depreciation run, a posted charge,
+            a journal proposal or a tax run — and will say which.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setYearToDelete(null)}>
+              Keep it
+            </Button>
+            <Button
+              type="button"
+              disabled={deletingYearId !== ''}
+              onClick={() => void handleDeleteYear()}
+            >
+              {deletingYearId !== '' ? 'Deleting…' : 'Delete'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

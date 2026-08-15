@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useToast } from '@/components/Providers/ToastProvider';
 import SummaryCard, { TSummaryTint } from '@/components/Dashboard/SummaryCard';
+import AssetsByLocationPanel from '@/components/Dashboard/AssetsByLocationPanel';
 import {
   IAssetDashboard,
   IDashboardCounts,
@@ -11,6 +13,7 @@ import {
   IMonthlyAmount,
 } from '@/interface/IDashboard';
 import { fetchDashboard } from '@/services/dashboard.service';
+import { appUrl } from '@/utils/constants';
 
 /* --------------------------------------------------------------------- */
 /* Top pastel KPI cards — same grid, tints and card style as the Vehicle  */
@@ -628,15 +631,30 @@ const DashboardPage = () => {
 
   const [dashboard, setDashboard] = useState<IAssetDashboard | null>(null);
   const [loading, setLoading] = useState(true);
+  /**
+   * Why the load failed, kept for the panel below. A toast is gone in seconds and
+   * never reaches whoever is looking at the screen afterwards, which is how a
+   * deployment ends up reporting only "could not be loaded" with the actual cause
+   * — a refused request, an unreachable API, a named server error — nowhere.
+   */
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadDashboard = async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const response = await fetchDashboard();
-      if (response?.success) setDashboard(response.data);
-      else addToast.error(response?.message || 'Failed to fetch the dashboard');
+      if (response?.success) {
+        setDashboard(response.data);
+      } else {
+        const message = response?.message || 'Failed to fetch the dashboard';
+        setLoadError(message);
+        addToast.error(message);
+      }
     } catch {
-      addToast.error('An error occurred while fetching the dashboard');
+      const message = 'An error occurred while fetching the dashboard';
+      setLoadError(message);
+      addToast.error(message);
     } finally {
       setLoading(false);
     }
@@ -818,6 +836,11 @@ const DashboardPage = () => {
             <p className="text-xs text-amber-700/80">
               These figures are unknown right now, not zero.
             </p>
+            {loadError && (
+              <p className="mt-1 break-words text-xs text-amber-800">
+                {loadError}
+              </p>
+            )}
           </div>
           <button
             type="button"
@@ -892,10 +915,32 @@ const DashboardPage = () => {
             <InFlightStrip items={inFlight} onNavigate={go} />
           </Panel>
 
-          {/* Band 3 — the always-populated anchor */}
+          {/* Band 3 — WHERE things physically are. Deliberately separate from custody
+              below: a room is a place, "Assigned" is a state, and mixing the two is how
+              an operator ends up looking for a chair in a status. */}
+          <Panel
+            emoji="🏢"
+            title="Assets by Location"
+            action={
+              <Link
+                href={appUrl('/reports?code=assets-by-location')}
+                className="flex items-center gap-1 text-xs font-medium text-primarycolor hover:underline"
+              >
+                View Explorer
+                <i className="icon icon-right text-[9px]" />
+              </Link>
+            }
+          >
+            <AssetsByLocationPanel
+              hierarchy={dashboard?.locationHierarchy ?? []}
+              loading={loading}
+            />
+          </Panel>
+
+          {/* Band 4 — who HOLDS things, which is a different question from where they are. */}
           <Panel
             emoji="📦"
-            title="Where Everything Is"
+            title="Asset Custody & Movement"
             action={
               <span className="text-xs text-gray-400 tabular-nums">
                 {custodySegments.reduce((sum, segment) => sum + segment.value, 0)} custody-tracked

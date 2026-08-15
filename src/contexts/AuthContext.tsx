@@ -17,6 +17,7 @@ import {
 } from '@tulipstechnologies/common/dist/services/auth.service';
 import { resolveAdminView } from '@tulipstechnologies/common/dist/utils/adminViewStorage';
 import type { IAdminUserData } from '@tulipstechnologies/common/dist/interface/IAdminUser';
+import USER_TYPES from '@tulipstechnologies/common/dist/enums/userTypes';
 
 import { parseJwt } from '@/services/auth.service';
 import {
@@ -37,7 +38,11 @@ import {
   setProfileImage,
   setCompanyLogo,
 } from '@/store/slice/AuthSlice';
-import { getBaseUrl, isDevAuthBypass } from '@/utils/constants';
+import {
+  DEV_AUTH_PLACEHOLDER_TOKEN,
+  getHubBaseUrl,
+  isDevAuthEnabled,
+} from '@/utils/constants';
 
 interface AuthContextProps {
   user: IUser | null;
@@ -100,11 +105,57 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
     };
   };
 
+  /**
+   * A minimal hub user assembled from the cookies this module already holds,
+   * for when the HRM hub cannot be reached.
+   *
+   * The shared chrome only reads a handful of fields — the sidebar checks
+   * `userType`, `userRoles` and `isAttendanceFromWeb`, the header adds
+   * `userId` and `company` — but it treats a NULL user as "not signed in" and
+   * renders no menu items at all. Publishing this keeps the navigation alive on
+   * a developer machine and during a hub outage; the moment the hub answers,
+   * the real user replaces it.
+   *
+   * `userType` is deliberately the hub's COMPANY value, taken from the shared
+   * package rather than written as a number: the sidebar reads userType in the
+   * HUB's id space (a different space from this module's AppUserType), and its
+   * INTERNAL branch renders `internalSidebarMenus`, which this module never
+   * passes — an internal fallback would show an empty sidebar all over again.
+   */
+  const fallbackHubUser = (): IAdminUserData => {
+    const authToken = Cookies.get('AuthToken') ?? '';
+    const claims = parseJwt(authToken);
+    // parseJwt returns an untyped claim bag, so coerce before using it as text.
+    const name = String(
+      claims?.fullName ?? claims?.username ?? claims?.unique_name ?? 'User'
+    );
+
+    return {
+      userId: Number(claims?.userId ?? claims?.UserId ?? 0),
+      username: String(claims?.username ?? claims?.unique_name ?? ''),
+      fullName: name,
+      firstName: name,
+      middleName: '',
+      lastName: '',
+      email: String(claims?.email ?? ''),
+      phoneNumber: '',
+      employeeId: 0,
+      userType: USER_TYPES.COMPANY,
+      profileColor: '',
+      profileInitial: (name.trim()[0] ?? 'U').toUpperCase(),
+      hasAccessToAllBranches: false,
+      hasAccessToAllDepartments: false,
+      hasPersonalizedPermissions: false,
+      userRoles: [],
+      isAttendanceFromWeb: false,
+    } as unknown as IAdminUserData;
+  };
+
   // Central hub sign-in/logout target shared by all modules
-  // (getBaseUrl() + NEXT_PUBLIC_LOGOUT_URL).
+  // (getHubBaseUrl() + NEXT_PUBLIC_LOGOUT_URL).
   const redirectToHubSignin = () => {
     router.replace(
-      `${getBaseUrl()}${
+      `${getHubBaseUrl()}${
         process.env.NEXT_PUBLIC_LOGOUT_URL
       }?redirect=${encodeURIComponent(window.location.href)}`
     );
@@ -118,11 +169,32 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
    *
    * Fire-and-forget: nothing here gates the module, so a hub hiccup must not
    * delay bootstrap or block asset pages from rendering.
+   *
+   * When the hub does not answer, a user is still published from this module's
+   * own token — see `fallbackHubUser`. The shared sidebar returns ZERO items
+   * while `currentUser` is null (it checks `hasCurrentUser` before it even looks
+   * at menus), so without that the fallback menu list can never render and the
+   * module is left with no navigation at all.
    */
   const loadCurrentUser = async () => {
+    // Dev-auth writes a PLACEHOLDER AuthToken — the middleware only checks that the cookie
+    // exists, and the real credential is the module token in AssetAuthToken. The hub cannot
+    // authenticate that placeholder, so calling it is a guaranteed 401, and a 401 there
+    // carries an EMPTY body: the shared client calls res.json() on it and throws
+    // "Unexpected end of JSON input", which Next surfaces as a red overlay error on every
+    // page load. The fallback below is the right answer for that state anyway, so ask for it
+    // directly instead of provoking a failure and recovering from it.
+    if (Cookies.get('AuthToken') === DEV_AUTH_PLACEHOLDER_TOKEN) {
+      dispatch(setCurrentUser(fallbackHubUser()));
+      return;
+    }
+
     try {
       const res = await getCurrentUser();
-      if (!res?.success || !res?.data) return;
+      if (!res?.success || !res?.data) {
+        dispatch(setCurrentUser(fallbackHubUser()));
+        return;
+      }
 
       const adminUser = res.data as IAdminUserData;
       dispatch(setCurrentUser(adminUser));
@@ -141,6 +213,7 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
       }
     } catch (error) {
       console.error('Failed to load current user', error);
+      dispatch(setCurrentUser(fallbackHubUser()));
     }
   };
 
@@ -176,6 +249,18 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
   useEffect(() => {
     const bootstrap = async () => {
+      // The dev-auth screen must never be gated by the bootstrap it exists to repair.
+      // A stale or unexchangeable token otherwise renders the failure card OVER the one
+      // page that can clear it — you cannot get in, and you cannot reach the screen that
+      // lets you in. Recovery UI has to sit outside the thing it recovers from.
+      if (
+        typeof window !== 'undefined' &&
+        window.location.pathname.endsWith('/dev-auth')
+      ) {
+        setBootstrapping(false);
+        return;
+      }
+
       const cookieToken = Cookies.get('AuthToken');
       const cookieUser = Cookies.get('user');
 
@@ -183,7 +268,7 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
       // server-side too; this is the client-side fallback. On localhost in
       // development the middleware sends to /dev-auth instead, so skip here.
       if (!cookieToken) {
-        if (!isDevAuthBypass(window.location.hostname)) {
+        if (!isDevAuthEnabled()) {
           redirectToHubSignin();
         }
         setBootstrapping(false);
@@ -210,14 +295,24 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
       // Exchange the HRM AuthToken for the asset-module token before any page
       // mounts and fires asset API calls.
+      //
+      // Deployed, always re-exchange: the hub token is the source of truth and a
+      // carried-over AssetAuthToken could hold stale permissions.
+      //
+      // Under dev auth, honour an AssetAuthToken that is already present instead.
+      // A developer whose hub SSO is unavailable — a signing-key mismatch against
+      // the environment that issued the hub token, say — can still obtain a module
+      // token directly and work, where forcing the exchange would discard it and
+      // fail on the very call that is broken. The dev-auth screen's "Clear cookies"
+      // is how you get rid of one that has gone stale.
       const { token: assetToken, companyId, error } = await ensureAssetToken(
-        true
+        !isDevAuthEnabled()
       );
       if (!assetToken) {
         const message =
           error ||
           'Could not exchange AuthToken for an AssetAuthToken. Sign in again.';
-        if (isDevAuthBypass(window.location.hostname)) {
+        if (isDevAuthEnabled()) {
           // Surface the real failure instead of silently rendering with no
           // Authorization header (httpService only reads AssetAuthToken).
           setBootstrapError(message);
@@ -266,7 +361,7 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
     clearAssetToken();
     clearActiveCompanyId();
     localStorage.clear();
-    window.location.href = `${getBaseUrl()}${
+    window.location.href = `${getHubBaseUrl()}${
       process.env.NEXT_PUBLIC_LOGOUT_URL
     }`;
   };

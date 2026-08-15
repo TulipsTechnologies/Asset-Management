@@ -41,6 +41,18 @@ export interface IPlannedDateConversion {
   to: string;
 }
 
+/**
+ * The Asset Code an imported row was given. Only rows that left Asset Code blank appear
+ * here — paste these into the sheet's Asset Code column and the next upload of the same
+ * file SKIPS those rows instead of creating a second copy of every one.
+ */
+export interface IAssignedCode {
+  /** Row number as Excel shows it, so values can be pasted back by row. */
+  row: number;
+  assetCode: string;
+  assetName: string;
+}
+
 export interface IImportResult {
   /** False means NOTHING was imported — fix the listed problems and re-upload. */
   imported: boolean;
@@ -55,6 +67,8 @@ export interface IImportResult {
   wouldAutoGenerateCodes: number;
   plannedEntities: IPlannedEntityGroup[];
   dateConversions: IPlannedDateConversion[];
+  /** Populated only on a committed import; always empty on a preview. */
+  assignedCodes: IAssignedCode[];
 }
 
 export const downloadImportTemplate = (
@@ -78,27 +92,59 @@ export const downloadExport = (entity: TExchangeEntity): Promise<Response> =>
  * check and the confirm — so the dialog snapshots it once and both requests send
  * the identical bytes: what was previewed is what imports, by construction.
  */
-const asForm = (bytes: Blob, name: string, overrides?: ICellOverride[]) => {
+const asForm = (
+  bytes: Blob,
+  name: string,
+  overrides?: ICellOverride[],
+  importId?: string
+) => {
   const formData = new FormData();
   formData.append('file', bytes, name);
   // Fixes ride the same request as the bytes they correct — check and import always
   // see the identical (file + fixes) pair.
   if (overrides && overrides.length > 0)
     formData.append('overrides', JSON.stringify(overrides));
+  // Correlates this request with the progress the browser polls for while it runs.
+  if (importId) formData.append('importId', importId);
   return formData;
 };
+
+/** How far an in-flight import has got. */
+export interface IImportProgress {
+  total: number;
+  done: number;
+  /** "Checking" while validating (no writes yet), "Importing" while committing. */
+  phase: string;
+  finished: boolean;
+  percent: number;
+}
+
+/**
+ * Polled WHILE the import POST is still in flight, so it is deliberately tiny and
+ * touches no data. A 404 simply means the run has not registered yet or has already
+ * been swept — never an error worth showing.
+ */
+export const fetchImportProgress = (
+  importId: string
+): Promise<IResponse<IImportProgress>> =>
+  requestApi({
+    apiEndpoint: `/DataExchange/import/progress/${importId}`,
+    method: 'GET',
+    completeData: true,
+  });
 
 /** All-or-nothing: any row problem means nothing was written. */
 export const importFile = (
   entity: TExchangeEntity,
   bytes: Blob,
   name: string,
-  overrides?: ICellOverride[]
+  overrides?: ICellOverride[],
+  importId?: string
 ): Promise<IResponse<IImportResult>> =>
   requestApi({
     apiEndpoint: `/DataExchange/import/${entity}`,
     method: 'POST',
-    body: asForm(bytes, name, overrides),
+    body: asForm(bytes, name, overrides, importId),
     completeData: true,
   });
 
@@ -107,11 +153,12 @@ export const previewImport = (
   entity: TExchangeEntity,
   bytes: Blob,
   name: string,
-  overrides?: ICellOverride[]
+  overrides?: ICellOverride[],
+  importId?: string
 ): Promise<IResponse<IImportResult>> =>
   requestApi({
     apiEndpoint: `/DataExchange/import/${entity}/preview`,
     method: 'POST',
-    body: asForm(bytes, name, overrides),
+    body: asForm(bytes, name, overrides, importId),
     completeData: true,
   });

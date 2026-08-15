@@ -14,13 +14,20 @@ import Input from '@/components/UI/Input';
 import Select from '@/components/UI/Select';
 import SearchBox from '@/components/SearchBox';
 import Pagination from '@/components/UI/Pagination';
-import { IAssetLocation, IAssetLocationFilter } from '@/interface/IAssetLocation';
+import {
+  IAssetLocation,
+  IAssetLocationFilter,
+  IAssetLocationTree,
+} from '@/interface/IAssetLocation';
 import {
   createAssetLocation,
   deleteAssetLocation,
   updateAssetLocation,
   fetchAssetLocations,
+  fetchAssetLocationTree,
 } from '@/services/assetLocation.service';
+import LocationTree from '@/components/Locations/LocationTree';
+import ViewSwitcher, { IViewOption, readStoredView } from '@/components/UI/ViewSwitcher';
 import CustomMenuItem from '@/components/UI/CustomMenuItem';
 import Dropdown from '@/components/UI/Dropdown';
 import RowKebab from '@/components/UI/RowKebab';
@@ -31,8 +38,24 @@ import { mergeTableFilters, unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import useDebounce from '@/hooks/useDebounce';
 
+type TLocationView = 'tree' | 'table';
+
+const VIEW_VALUES = ['tree', 'table'] as const;
+const VIEW_STORAGE_KEY = 'locations.viewMode';
+
+const VIEW_OPTIONS: IViewOption<TLocationView>[] = [
+  { value: 'tree', label: 'Tree', iconName: 'stream', title: 'Browse the hierarchy: Building → Floor → Room' },
+  { value: 'table', label: 'Table', iconName: 'menu', title: 'Sort, page and bulk-manage locations' },
+];
+
 const LocationsPage = () => {
   const { addToast } = useToast();
+
+  // Tree is the DEFAULT: a location master exists to answer "where is this room",
+  // and only the parent→child view answers it. The table stays for sorting/bulk work.
+  const [view, setView] = useState<TLocationView>('tree');
+  const [tree, setTree] = useState<IAssetLocationTree[]>([]);
+  const [treeLoading, setTreeLoading] = useState(false);
 
   const [locations, setLocations] = useState<IAssetLocation[]>([]);
 
@@ -83,6 +106,29 @@ const LocationsPage = () => {
       name: 'actions',
     },
   ];
+
+  useEffect(() => {
+    const stored = readStoredView(VIEW_STORAGE_KEY, VIEW_VALUES);
+    if (stored) setView(stored);
+  }, []);
+
+  const loadTree = useCallback(async () => {
+    setTreeLoading(true);
+    try {
+      const res = await fetchAssetLocationTree();
+      if (res?.success && res.data) setTree(res.data);
+      else addToast.error(res?.message || 'Failed to fetch the location tree');
+    } catch {
+      addToast.error('An error occurred while fetching the location tree');
+    } finally {
+      setTreeLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    loadTree();
+  }, [loadTree]);
 
   const loadLocations = useCallback(async () => {
     setLoading(true);
@@ -150,6 +196,42 @@ const LocationsPage = () => {
     setFormOpen(true);
   };
 
+  /** Tree rows carry no RowVersion, so edit/delete resolve the full record first. */
+  const findFullRecord = async (id: string): Promise<IAssetLocation | null> => {
+    try {
+      const res = await fetchAssetLocations({ pageNumber: 1, pageSize: 500 });
+      if (!res?.success) return null;
+      return unwrapPaged(res).items.find((item) => item.id === id) ?? null;
+    } catch {
+      return null;
+    }
+  };
+
+  const openEditFromTree = async (node: IAssetLocationTree) => {
+    const full = await findFullRecord(node.id);
+    if (full) openEdit(full);
+    else addToast.error('Could not load that location — refresh and try again.');
+  };
+
+  const openDeleteFromTree = async (node: IAssetLocationTree) => {
+    const full = await findFullRecord(node.id);
+    if (full) setDeleting(full);
+    else addToast.error('Could not load that location — refresh and try again.');
+  };
+
+  /** The tree's + button: create a child with the parent already chosen. */
+  const openCreateUnder = (parent: IAssetLocationTree) => {
+    setEditing(null);
+    setForm({ name: '', code: '', parentAssetLocationId: parent.id, address: '' });
+    setFormError('');
+    fetchAssetLocations({ pageNumber: 1, pageSize: 500 })
+      .then((res) => {
+        if (res?.success) setAllLocations(unwrapPaged(res).items);
+      })
+      .catch(() => undefined);
+    setFormOpen(true);
+  };
+
   const handleSave = async () => {
     if (!form.name.trim()) {
       setFormError('Name is required');
@@ -171,11 +253,13 @@ const LocationsPage = () => {
         addToast.success(res.message || 'Location saved successfully');
         setFormOpen(false);
         loadLocations();
+        loadTree();
       } else {
         addToast.error(res?.message || 'Failed to save the location');
         if (editing) {
           setFormOpen(false);
           loadLocations();
+          loadTree();
         }
       }
     } catch (error) {
@@ -199,6 +283,7 @@ const LocationsPage = () => {
       setSaving(false);
       setDeleting(null);
       loadLocations();
+      loadTree();
     }
   };
 
@@ -275,65 +360,16 @@ const LocationsPage = () => {
     } finally {
       setBulkRunning(false);
       loadLocations();
+      loadTree();
     }
   };
 
-  return (
-    <div className="px-4 mt-2">
-      <CustomTable
-        columns={columns}
-        rows={rowData}
-        tableName="Asset Locations"
-        serialOffset={
-          ((filters.pageNumber ?? 1) - 1) *
-          (filters.pageSize ?? DEFAULT_PAGE_SIZE)
-        }
-        isLoading={loading}
-        entityLabel="location"
-        bulkActions={[
-          {
-            label: 'Delete',
-            danger: true,
-            onClick: (selectedIds) => {
-              setBulkIds(selectedIds.map(String));
-              setBulkResult(null);
-              setBulkOpen(true);
-            },
-          },
-        ]}
-        tableHeaderLeft={
-          <Button onClick={openCreate}>
-            <i className="icon icon-plus text-xs"></i>
-            <span>Add Location</span>
-          </Button>
-        }
-        tableHeaderRight={
-          <>
-            <ImportExportOptions
-              entity="locations"
-              entityLabel="Locations"
-              onImported={loadLocations}
-            />
-            <SearchBox onSearch={setSearchQuery} searchVal={searchQuery} />
-          </>
-        }
-        updateFilters={updateFilters}
-      />
-
-      <div className="mt-3">
-        <Pagination
-          pageNumber={filters.pageNumber ?? 1}
-          totalPages={pageCount}
-          pageSize={filters.pageSize ?? DEFAULT_PAGE_SIZE}
-          totalCount={rowCount}
-          updateFilters={updateFilters}
-        />
-      </div>
-
+  const locationModals = (
+    <>
       <Modal isOpen={formOpen} onClose={() => setFormOpen(false)} size="lg">
         <div className="p-6">
           <h2 className="text-lg font-semibold text-secondaryColor mb-4">
-            Add Location
+            {editing ? 'Edit Location' : 'Add Location'}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
             <Input
@@ -417,6 +453,100 @@ const LocationsPage = () => {
         onConfirm={handleDelete}
         onClose={() => setDeleting(null)}
       />
+    </>
+  );
+
+  const headerRight = (
+    <>
+      <ImportExportOptions
+        entity="locations"
+        entityLabel="Locations"
+        onImported={() => {
+          loadLocations();
+          loadTree();
+        }}
+      />
+      <SearchBox onSearch={setSearchQuery} searchVal={searchQuery} />
+      <ViewSwitcher
+        options={VIEW_OPTIONS}
+        value={view}
+        onChange={setView}
+        storageKey={VIEW_STORAGE_KEY}
+      />
+    </>
+  );
+
+  if (view === 'tree') {
+    return (
+      <div className="px-4 mt-2">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Button onClick={openCreate}>
+            <i className="icon icon-plus text-xs"></i>
+            <span>Add Location</span>
+          </Button>
+          <div className="flex items-center gap-2">{headerRight}</div>
+        </div>
+
+        <div className="mt-3 rounded-xl border border-gray-200 bg-white p-4">
+          <LocationTree
+            tree={tree}
+            loading={treeLoading}
+            search={searchQuery}
+            onAddChild={openCreateUnder}
+            onEdit={openEditFromTree}
+            onDelete={openDeleteFromTree}
+          />
+        </div>
+
+        {locationModals}
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-4 mt-2">
+      <CustomTable
+        columns={columns}
+        rows={rowData}
+        tableName="Asset Locations"
+        serialOffset={
+          ((filters.pageNumber ?? 1) - 1) *
+          (filters.pageSize ?? DEFAULT_PAGE_SIZE)
+        }
+        isLoading={loading}
+        entityLabel="location"
+        bulkActions={[
+          {
+            label: 'Delete',
+            danger: true,
+            onClick: (selectedIds) => {
+              setBulkIds(selectedIds.map(String));
+              setBulkResult(null);
+              setBulkOpen(true);
+            },
+          },
+        ]}
+        tableHeaderLeft={
+          <Button onClick={openCreate}>
+            <i className="icon icon-plus text-xs"></i>
+            <span>Add Location</span>
+          </Button>
+        }
+        tableHeaderRight={headerRight}
+        updateFilters={updateFilters}
+      />
+
+      <div className="mt-3">
+        <Pagination
+          pageNumber={filters.pageNumber ?? 1}
+          totalPages={pageCount}
+          pageSize={filters.pageSize ?? DEFAULT_PAGE_SIZE}
+          totalCount={rowCount}
+          updateFilters={updateFilters}
+        />
+      </div>
+
+      {locationModals}
     </div>
   );
 };

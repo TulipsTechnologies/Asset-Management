@@ -11,7 +11,10 @@ import {
   downloadImportTemplate,
   importFile,
   previewImport,
+  fetchImportProgress,
+  IAssignedCode,
   ICellOverride,
+  IImportProgress,
   IImportResult,
   TExchangeEntity,
 } from '@/services/dataExchange.service';
@@ -27,6 +30,29 @@ const saveResponseFile = async (response: Response, fallbackName: string) => {
   const anchor = document.createElement('a');
   anchor.href = url;
   anchor.download = match?.[1] ?? fallbackName;
+  anchor.click();
+  URL.revokeObjectURL(url);
+};
+
+/**
+ * CSV, not xlsx: this file exists to be opened and its Asset Code column pasted back
+ * into the sheet the operator already has, and a CSV needs no library to produce.
+ * Excel-safe quoting — an asset name may legitimately contain a comma or a quote.
+ */
+const saveAssignedCodes = (codes: IAssignedCode[], sourceName: string) => {
+  const quote = (value: string | number) =>
+    `"${String(value).replace(/"/g, '""')}"`;
+  const csv = [
+    ['Excel Row', 'Asset Code', 'Asset Name'].map(quote).join(','),
+    ...codes.map((c) => [c.row, c.assetCode, c.assetName].map(quote).join(',')),
+  ].join('\r\n');
+
+  // The BOM keeps Excel from mangling non-ASCII names on open.
+  const blob = new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `${sourceName.replace(/\.[^.]+$/, '')}-assigned-codes.csv`;
   anchor.click();
   URL.revokeObjectURL(url);
 };
@@ -75,6 +101,7 @@ const ImportExportOptions = ({
   const [fileName, setFileName] = useState('');
   const [bytes, setBytes] = useState<Blob | null>(null);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<IImportProgress | null>(null);
   const [preview, setPreview] = useState<IImportResult | null>(null);
   const [result, setResult] = useState<IImportResult | null>(null);
   /** True when the shown problems came from a CONFIRM that failed after a clean check —
@@ -124,11 +151,39 @@ const ImportExportOptions = ({
       return { row: Number(row), column: column.join('|'), value };
     });
 
+  /**
+   * Polls progress for `id` until the caller's request settles. Started BEFORE the long
+   * request and stopped in its `finally`, so the bar can never outlive the work it
+   * describes. A failed poll is swallowed: progress is a courtesy, and an unreachable
+   * counter must not turn a succeeding import into a visible error.
+   */
+  const trackProgress = (id: string) => {
+    let cancelled = false;
+    const tick = async () => {
+      if (cancelled) return;
+      try {
+        const res = await fetchImportProgress(id);
+        if (!cancelled && res?.data) setProgress(res.data);
+      } catch {
+        /* ignore — see above */
+      }
+    };
+    const handle = setInterval(tick, 800);
+    void tick();
+    return () => {
+      cancelled = true;
+      clearInterval(handle);
+    };
+  };
+
   const runPreview = async (blob: Blob, name: string, withFixes?: Record<string, string>) => {
     setBusy(true);
     setDrifted(false);
+    setProgress(null);
+    const id = crypto.randomUUID();
+    const stop = trackProgress(id);
     try {
-      const res = await previewImport(entity, blob, name, toOverrides(withFixes ?? fixes));
+      const res = await previewImport(entity, blob, name, toOverrides(withFixes ?? fixes), id);
       if (res?.data) {
         setPreview(res.data);
         setResult(null);
@@ -138,6 +193,8 @@ const ImportExportOptions = ({
     } catch {
       addToast.error('The file could not be checked.');
     } finally {
+      stop();
+      setProgress(null);
       setBusy(false);
     }
   };
@@ -145,8 +202,11 @@ const ImportExportOptions = ({
   const confirm = async () => {
     if (!bytes) return;
     setBusy(true);
+    setProgress(null);
+    const id = crypto.randomUUID();
+    const stop = trackProgress(id);
     try {
-      const res = await importFile(entity, bytes, fileName, toOverrides(fixes));
+      const res = await importFile(entity, bytes, fileName, toOverrides(fixes), id);
       if (res?.data) {
         if (res.data.imported) {
           setResult(res.data);
@@ -169,6 +229,8 @@ const ImportExportOptions = ({
     } catch {
       addToast.error('An error occurred during the import.');
     } finally {
+      stop();
+      setProgress(null);
       setBusy(false);
     }
   };
@@ -282,8 +344,43 @@ const ImportExportOptions = ({
             }}
           />
 
-          {busy && !preview && !result && (
-            <p className="text-sm text-gray-500 text-center py-3">Checking the file…</p>
+          {/*
+            One bar for both phases. It shows a real percentage once the server knows the
+            row count, and stays an indeterminate "working" state before that — a bar that
+            invents a number while the file is still being read would be lying.
+          */}
+          {busy && (
+            <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+              <div className="flex items-baseline justify-between gap-3">
+                <p className="text-sm text-gray-700">
+                  {progress?.phase === 'Importing'
+                    ? 'Importing rows…'
+                    : 'Checking the file…'}
+                </p>
+                {progress && progress.total > 0 && (
+                  <p className="text-xs text-gray-500 tabular-nums">
+                    {progress.done.toLocaleString()} / {progress.total.toLocaleString()}
+                    {' · '}
+                    {progress.percent}%
+                  </p>
+                )}
+              </div>
+              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                {progress && progress.total > 0 ? (
+                  <div
+                    className="h-full rounded-full bg-primarycolor transition-[width] duration-300 ease-out"
+                    style={{ width: `${progress.percent}%` }}
+                  />
+                ) : (
+                  <div className="h-full w-1/3 animate-pulse rounded-full bg-primarycolor/60" />
+                )}
+              </div>
+              {progress?.phase === 'Importing' && (
+                <p className="mt-2 text-xs text-gray-500">
+                  Everything lands together — leave this open until it finishes.
+                </p>
+              )}
+            </div>
           )}
 
           {/* ---------------- the check's verdict ---------------- */}
@@ -492,6 +589,33 @@ const ImportExportOptions = ({
                       {warning}
                     </p>
                   ))}
+                </div>
+              )}
+
+              {/*
+                The rows that arrived without an Asset Code now have one. Handing it back
+                is what makes a second upload of the same sheet safe: with these pasted
+                into the Asset Code column those rows skip instead of importing twice.
+              */}
+              {result.assignedCodes.length > 0 && (
+                <div className="mt-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3">
+                  <p className="text-xs text-gray-700">
+                    <span className="font-medium text-secondaryColor">
+                      {result.assignedCodes.length} row
+                      {result.assignedCodes.length === 1 ? '' : 's'} received a generated
+                      Asset Code.
+                    </span>{' '}
+                    Download them and paste the Asset Code column into your sheet — then
+                    re-uploading that file skips these rows instead of creating duplicates.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => saveAssignedCodes(result.assignedCodes, fileName)}
+                    className="mt-2 inline-flex items-center gap-2 rounded-full border border-gray-300 bg-white px-4 py-1.5 text-xs font-medium text-secondaryColor hover:bg-gray-50"
+                  >
+                    <i className="icon icon-download text-xs" />
+                    <span>Download assigned codes</span>
+                  </button>
                 </div>
               )}
             </div>

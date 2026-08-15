@@ -1,7 +1,11 @@
 import { requestApi } from './httpService';
 import { buildQuery } from '@/utils/serviceUtils';
 import { IResponse } from '@/interface/IGeneric';
-import { IReportDescriptor, IReportFilter } from '@/interface/IReports';
+import {
+  ILocationSummary,
+  IReportDescriptor,
+  IReportFilter,
+} from '@/interface/IReports';
 
 /** Permission-aware — lists only the reports the caller can actually run. */
 export const fetchReportCatalogue = (): Promise<IResponse<IReportDescriptor[]>> =>
@@ -15,6 +19,36 @@ const query = (filter: IReportFilter) =>
     To: filter.to,
     FiscalYearCode: filter.fiscalYearCode,
     Dimension: filter.dimension,
+    LocationId: filter.locationId,
+    // Sent ONLY when explicitly false — absent binds true server-side, and the value
+    // must never pass through truthiness-stripping (review-pinned contract).
+    IncludeChildren: filter.includeChildren === false ? false : undefined,
+    Search: filter.search,
+    CategoryId: filter.categoryId,
+    Availability: filter.availability,
+    Unlocated: filter.unlocated === true ? true : undefined,
+    IncludeAggregates: filter.includeAggregates === false ? false : undefined,
+  });
+
+/**
+ * The Location Explorer's one-call header + grouped-view feed, keyed on
+ * (locationId, includeChildren) — never refetched for search/chip/page changes.
+ */
+export const fetchLocationSummary = (
+  locationId: string | null,
+  includeChildren: boolean,
+  withDescendants: boolean
+): Promise<IResponse<ILocationSummary>> =>
+  requestApi({
+    apiEndpoint:
+      '/AssetReports/assets-by-location/summary' +
+      buildQuery({
+        LocationId: locationId ?? undefined,
+        IncludeChildren: includeChildren === false ? false : undefined,
+        WithDescendants: withDescendants,
+      }),
+    method: 'GET',
+    completeData: true,
   });
 
 /**
