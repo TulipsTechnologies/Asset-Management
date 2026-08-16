@@ -73,3 +73,13 @@ export const deleteAssetConditionType = (
     method: 'DELETE',
     completeData: true,
   });
+
+/** Undo a hide: puts a built-in back in this company's list. `id` is the hidden row's own id. */
+export const restoreAssetConditionType = (
+  id: string
+): Promise<IResponse<string>> =>
+  requestApi({
+    apiEndpoint: `/AssetConditionTypes/${id}/restore`,
+    method: 'POST',
+    completeData: true,
+  });

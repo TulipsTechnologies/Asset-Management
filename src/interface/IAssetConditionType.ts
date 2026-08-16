@@ -3,16 +3,31 @@ export interface IAssetConditionType {
   name: string;
   description?: string | null;
   displayOrder: number;
-  /** Shipped with the module and shared by every company: never renamed or deleted here. */
+  /**
+   * Shipped with the module and shared by every company. Editing or deleting one does not
+   * change the shared row — the server forks or hides it for this company instead, so the id
+   * that comes back from a save is a NEW one.
+   */
   isSystem: boolean;
+  /** This company's private replacement for a built-in. Deleting it hides the built-in. */
+  isOverride: boolean;
+  /** A built-in this company removed from its own list. An absence, not a condition. */
+  isHidden: boolean;
   isActive: boolean;
-  /** Assets CURRENTLY recorded at this condition. */
+  /** Assets CURRENTLY recorded at this condition, within this company. */
   assetCount: number;
-  /** Referenced anywhere in history (assignments, transfers, returns, audits, work orders). */
+  /** Referenced anywhere in this company's history (assignments, transfers, returns, audits,
+   *  work orders). */
   isReferenced: boolean;
+  /**
+   * Whether the server will accept the action. Gate the row's menu on THESE, never on
+   * `!isSystem` — a built-in is now editable, and only the server knows what its own history
+   * allows.
+   */
   canEdit: boolean;
   canDelete: boolean;
-  /** Null on system rows, which are never updatable. */
+  canRestore: boolean;
+  /** Served on every row, built-ins included: forking one validates the base's token. */
   rowVersion: string | null;
 }
 

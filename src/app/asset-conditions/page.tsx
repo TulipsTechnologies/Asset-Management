@@ -23,6 +23,7 @@ import {
   createAssetConditionType,
   deleteAssetConditionType,
   fetchAssetConditionTypes,
+  restoreAssetConditionType,
   updateAssetConditionType,
 } from '@/services/assetConditionType.service';
 import { refreshAssetConditions } from '@/hooks/useAssetConditions';
@@ -36,16 +37,21 @@ import useDebounce from '@/hooks/useDebounce';
  * Settings → Asset Conditions.
  *
  * The condition an asset is graded at, everywhere one is recorded: registration, issue,
- * return, transfer, work-order completion and physical verification. Six conditions ship
- * with the module and are shared by every company — this screen adds the ones a particular
- * operation needs ("Refurbished", "Awaiting Parts") on top of them.
+ * return, transfer, work-order completion and physical verification. Six conditions ship with
+ * the module; this screen adds your own alongside them ("Refurbished", "Awaiting Parts") AND
+ * edits or removes the built-ins.
  *
- * Built-in rows carry a Built-in pill and offer NO edit or delete control — absent, not
- * disabled. A greyed-out button invites a click and then explains itself; the sentence above
- * the table says the rule once, for everyone, before anyone hunts for the missing action.
+ * Editing a built-in does not change the shared row — the server forks it into a private copy
+ * for this company. So a save returns a NEW id and the list must be reloaded rather than
+ * patched in place. Removing one records an absence that can be restored later; it never
+ * deletes anything another company can see.
  *
- * No bulk-delete affordance here on purpose: the list is a handful of rows, six of which can
- * never be deleted, so a selection column would be mostly decorative.
+ * Every row's menu is gated on the SERVER's canEdit / canDelete / canRestore, never on
+ * `!isSystem`. The server is the only thing that knows what this company's own history allows,
+ * and a client-side rule would drift from it the first time either changed.
+ *
+ * No bulk-delete affordance here on purpose: the list is a handful of rows and each removal
+ * asks a different question, so a selection column would be mostly decorative.
  */
 
 type TFormErrors = Partial<Record<'name' | 'displayOrder', string>>;
@@ -80,6 +86,7 @@ const AssetConditionsPage = () => {
   const [formError, setFormError] = useState('');
   const [editing, setEditing] = useState<IAssetConditionType | null>(null);
   const [deleting, setDeleting] = useState<IAssetConditionType | null>(null);
+  const [restoring, setRestoring] = useState<IAssetConditionType | null>(null);
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -191,6 +198,8 @@ const AssetConditionsPage = () => {
     try {
       const response = await deleteAssetConditionType(deleting.id);
       if (response?.success) {
+        // The server's own message distinguishes "deleted" from "hidden for your company",
+        // which is the difference the operator needs to hear — don't overwrite it.
         addToast.success(response.message || 'Condition deleted');
         refreshAssetConditions();
       } else {
@@ -201,6 +210,26 @@ const AssetConditionsPage = () => {
     } finally {
       setSaving(false);
       setDeleting(null);
+      load();
+    }
+  };
+
+  const handleRestore = async () => {
+    if (!restoring) return;
+    setSaving(true);
+    try {
+      const response = await restoreAssetConditionType(restoring.id);
+      if (response?.success) {
+        addToast.success(response.message || 'Condition restored');
+        refreshAssetConditions();
+      } else {
+        addToast.error(response?.message || 'Could not restore the condition');
+      }
+    } catch {
+      addToast.error('Could not restore the condition');
+    } finally {
+      setSaving(false);
+      setRestoring(null);
       load();
     }
   };
@@ -232,18 +261,42 @@ const AssetConditionsPage = () => {
     id: condition.id,
     name: (
       <span className="flex items-center gap-2">
-        <span className="font-medium text-secondaryColor">{condition.name}</span>
+        <span
+          className={
+            condition.isHidden
+              ? 'text-gray-400 line-through'
+              : 'font-medium text-secondaryColor'
+          }
+        >
+          {condition.name}
+        </span>
         {condition.isSystem && (
           <span
             className="rounded-full bg-gray-100 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-gray-500"
-            title="Shipped with the module and shared by every company — it can be neither renamed nor deleted."
+            title="Shipped with the module. Editing it creates a copy for your company; the shared original is left alone."
           >
             Built-in
           </span>
         )}
+        {condition.isOverride && (
+          <span
+            className="rounded-full bg-blue-50 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-blue-700"
+            title="Your company's version of a built-in condition. Other companies still see the original."
+          >
+            Customised
+          </span>
+        )}
+        {condition.isHidden && (
+          <span
+            className="rounded-full bg-amber-50 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-amber-700"
+            title="Removed from your company's list. Other companies still have it, and you can restore it."
+          >
+            Removed
+          </span>
+        )}
       </span>
     ),
-    description: condition.description || '—',
+    description: condition.isHidden ? '—' : condition.description || '—',
     displayOrder: <span className="tabular-nums">{condition.displayOrder}</span>,
     assetCount:
       condition.assetCount > 0 ? (
@@ -251,7 +304,11 @@ const AssetConditionsPage = () => {
       ) : (
         '—'
       ),
-    isActive: condition.isActive ? (
+    isActive: condition.isHidden ? (
+      <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700">
+        Removed
+      </span>
+    ) : condition.isActive ? (
       <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
         Active
       </span>
@@ -260,25 +317,38 @@ const AssetConditionsPage = () => {
         Inactive
       </span>
     ),
-    // A built-in row gets no menu at all rather than a menu of disabled items: there is
-    // nothing here the operator can do, and the pill already says why.
+    // Gated on the server's flags, not on isSystem: a built-in is editable now, and only the
+    // server knows whether this company's own history still blocks a removal. A row with
+    // nothing to offer gets no menu rather than a menu of disabled items.
     actions:
-      canManage && !condition.isSystem ? (
+      canManage && (condition.canEdit || condition.canDelete || condition.canRestore) ? (
         <div className="flex justify-center">
           <Dropdown ariaLabel="Row actions" buttonChildren={<RowKebab />} position="fixed">
-            <CustomMenuItem
-              label="Edit"
-              onClick={() => openEdit(condition)}
-              icon={<i className="icon icon-edit text-sm" />}
-              border
-              className="!py-2"
-            />
-            <CustomMenuItem
-              label="Delete"
-              onClick={() => setDeleting(condition)}
-              icon={<i className="icon icon-trash text-sm" />}
-              className="!py-2"
-            />
+            {condition.canEdit && (
+              <CustomMenuItem
+                label="Edit"
+                onClick={() => openEdit(condition)}
+                icon={<i className="icon icon-edit text-sm" />}
+                border
+                className="!py-2"
+              />
+            )}
+            {condition.canRestore && (
+              <CustomMenuItem
+                label="Restore"
+                onClick={() => setRestoring(condition)}
+                icon={<i className="icon icon-redo text-sm" />}
+                className="!py-2"
+              />
+            )}
+            {condition.canDelete && (
+              <CustomMenuItem
+                label={condition.isSystem || condition.isOverride ? 'Remove' : 'Delete'}
+                onClick={() => setDeleting(condition)}
+                icon={<i className="icon icon-trash text-sm" />}
+                className="!py-2"
+              />
+            )}
           </Dropdown>
         </div>
       ) : (
@@ -286,16 +356,30 @@ const AssetConditionsPage = () => {
       ),
   }));
 
-  /** Pre-state the refusal: the server will reject a delete of a condition in use, and
-   *  learning that only after confirming is a worse experience than not offering it. */
+  /**
+   * Pre-state the refusal: the server rejects a delete of a condition in use, and learning that
+   * only after confirming is worse than not offering it. (The menu already hides the action in
+   * that case; these branches survive as the belt to that braces, since canDelete is computed
+   * when the page loads and the data can move underneath it.)
+   *
+   * For a built-in, or this company's copy of one, the honest word is REMOVE: the shared row
+   * stays where it is and the change is reversible. Saying "delete permanently" about something
+   * a Restore button will bring back would be a lie the operator finds out about later.
+   */
   const deleteMessage = deleting
     ? deleting.assetCount > 0
       ? `'${deleting.name}' is recorded on ${deleting.assetCount} asset${
           deleting.assetCount === 1 ? '' : 's'
-        } and cannot be deleted. Deactivate it instead to stop it being chosen for new records.`
+        } and cannot be removed. Deactivate it instead to stop it being chosen for new records.`
       : deleting.isReferenced
-        ? `'${deleting.name}' appears in past assignments, transfers, returns or audits and cannot be deleted. Deactivate it instead to stop it being chosen for new records.`
-        : `Delete the condition '${deleting.name}'? It is not recorded on any asset or history.`
+        ? `'${deleting.name}' appears in past assignments, transfers, returns or audits and cannot be removed. Deactivate it instead to stop it being chosen for new records.`
+        : deleting.isSystem || deleting.isOverride
+          ? `Remove '${deleting.name}' from your company's conditions? It stays available to other companies, and you can restore it here later.`
+          : `Delete the condition '${deleting.name}'? It is not recorded on any asset or history.`
+    : '';
+
+  const restoreMessage = restoring
+    ? `Restore '${restoring.name}' to your company's conditions? It will be offered again wherever a condition is recorded.`
     : '';
 
   return (
@@ -304,8 +388,9 @@ const AssetConditionsPage = () => {
         <h1 className="text-lg font-semibold text-secondaryColor">Asset Conditions</h1>
         <p className="mt-0.5 text-xs text-gray-500">
           The scale an asset is graded on when it is registered, issued, returned,
-          transferred, serviced or verified. The six built-in conditions are shared by every
-          company and cannot be changed — add your own alongside them.
+          transferred, serviced or verified. Rename, reorder or remove the six built-in
+          conditions to suit your operation, or add your own alongside them. Changes apply to
+          your company only, and past records keep the wording they were signed with.
         </p>
       </div>
 
@@ -347,6 +432,18 @@ const AssetConditionsPage = () => {
             {editing ? 'Edit Condition' : 'Add Condition'}
           </h2>
 
+          {/* Editing a built-in is a copy, and the operator should know that before they type
+              rather than be surprised by a toast afterwards — particularly the part about
+              history keeping the original wording. */}
+          {editing?.isSystem && (
+            <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+              <span className="font-medium">{editing.name}</span> is a built-in condition.
+              Saving creates your company&apos;s own version of it — other companies keep the
+              original, and records already signed off under &ldquo;{editing.name}&rdquo; keep
+              saying so.
+            </div>
+          )}
+
           {formError && (
             <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {formError}
@@ -377,7 +474,7 @@ const AssetConditionsPage = () => {
                 setFormErrors((prev) => ({ ...prev, displayOrder: undefined }));
               }}
               error={formErrors.displayOrder}
-              helperText="Where it sits in the list. The built-ins occupy 1–6."
+              helperText="Where it sits in the list. The built-ins start at 1–6."
             />
             <div className="md:col-span-2">
               <TextArea
@@ -422,6 +519,14 @@ const AssetConditionsPage = () => {
         loading={saving}
         onConfirm={handleDelete}
         onClose={() => setDeleting(null)}
+      />
+
+      <ConfirmationModal
+        isOpen={!!restoring}
+        message={restoreMessage}
+        loading={saving}
+        onConfirm={handleRestore}
+        onClose={() => setRestoring(null)}
       />
     </div>
   );
