@@ -57,14 +57,29 @@ export interface IImportResult {
   /** False means NOTHING was imported — fix the listed problems and re-upload. */
   imported: boolean;
   created: number;
+  /** Existing assets rewritten from their matched rows (update mode only). */
+  updated: number;
   skippedExisting: number;
+  /**
+   * ECHO of the request flag. The confirm step sends THIS value back, never the
+   * checkbox's own state — so the previewed plan and the imported plan cannot disagree
+   * about the mode, the same way the snapshotted bytes work.
+   */
+  updateExisting: boolean;
   problems: IImportProblem[];
   warnings: string[];
   /** True when this run planned only — nothing was written, nothing will be. */
   preview: boolean;
   rowsRead: number;
   wouldCreate: number;
+  /** Existing assets that WOULD be rewritten (update mode). */
+  wouldUpdate: number;
   wouldAutoGenerateCodes: number;
+  /** What a generated code will look like, e.g. "AST-2026-00918" — shown so the
+   * operator can fix the format under Settings BEFORE codes become permanent. */
+  codeFormatExample: string | null;
+  /** False when no format was ever saved and the example shows the default. */
+  codeFormatConfigured: boolean;
   plannedEntities: IPlannedEntityGroup[];
   dateConversions: IPlannedDateConversion[];
   /** Populated only on a committed import; always empty on a preview. */
@@ -96,7 +111,8 @@ const asForm = (
   bytes: Blob,
   name: string,
   overrides?: ICellOverride[],
-  importId?: string
+  importId?: string,
+  updateExisting?: boolean
 ) => {
   const formData = new FormData();
   formData.append('file', bytes, name);
@@ -106,6 +122,8 @@ const asForm = (
     formData.append('overrides', JSON.stringify(overrides));
   // Correlates this request with the progress the browser polls for while it runs.
   if (importId) formData.append('importId', importId);
+  // Assets only; the server refuses it anywhere else.
+  if (updateExisting) formData.append('updateExisting', 'true');
   return formData;
 };
 
@@ -139,12 +157,13 @@ export const importFile = (
   bytes: Blob,
   name: string,
   overrides?: ICellOverride[],
-  importId?: string
+  importId?: string,
+  updateExisting?: boolean
 ): Promise<IResponse<IImportResult>> =>
   requestApi({
     apiEndpoint: `/DataExchange/import/${entity}`,
     method: 'POST',
-    body: asForm(bytes, name, overrides, importId),
+    body: asForm(bytes, name, overrides, importId, updateExisting),
     completeData: true,
   });
 
@@ -154,11 +173,12 @@ export const previewImport = (
   bytes: Blob,
   name: string,
   overrides?: ICellOverride[],
-  importId?: string
+  importId?: string,
+  updateExisting?: boolean
 ): Promise<IResponse<IImportResult>> =>
   requestApi({
     apiEndpoint: `/DataExchange/import/${entity}/preview`,
     method: 'POST',
-    body: asForm(bytes, name, overrides, importId),
+    body: asForm(bytes, name, overrides, importId, updateExisting),
     completeData: true,
   });
