@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { money } from '@/components/Assets/AssetViewShared';
-import { appUrl } from '@/utils/constants';
 
 /**
  * The walk-through view: one card per asset, sized to be recognised at arm's length
@@ -128,7 +127,8 @@ const LocationAssetCards = ({
           )}
 
           <Link
-            href={appUrl(`/assets/${asset.id}`)}
+            // Bare path: next/link applies basePath itself; appUrl() here 404'd.
+            href={`/assets/${asset.id}`}
             className="mt-3 inline-flex items-center gap-1 self-start text-xs font-medium text-primarycolor hover:underline"
           >
             View asset

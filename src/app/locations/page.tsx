@@ -298,10 +298,10 @@ const LocationsPage = () => {
     parentAssetLocationName: location.parentAssetLocationName || '—',
     address: location.address || '—',
     assetCount:
+      // A table cell needs no pill — the number in the table's own type is quieter
+      // and sorts visually with its column.
       location.assetCount > 0 ? (
-        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
-          {location.assetCount}
-        </span>
+        <span className="tabular-nums text-secondaryColor">{location.assetCount}</span>
       ) : (
         '—'
       ),

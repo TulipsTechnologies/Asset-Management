@@ -62,11 +62,14 @@ const LocationSummaryHeader = ({
   summary,
   loading,
   includeChildren,
+  onToggleIncludeChildren,
   availabilityFilter,
+  verificationFilter,
   categoryFilter,
   onNavigate,
   onRoot,
   onToggleAvailability,
+  onToggleVerification,
   onToggleCategory,
   canStartVerification,
   onStartVerification,
@@ -74,11 +77,15 @@ const LocationSummaryHeader = ({
   summary: ILocationSummary | null;
   loading: boolean;
   includeChildren: boolean;
+  onToggleIncludeChildren: (value: boolean) => void;
   availabilityFilter?: string;
+  /** VerificationStatusEnum name: NotVerified | Verified | Discrepancy. */
+  verificationFilter?: string;
   categoryFilter?: string;
   onNavigate: (segment: ILocationPathSegment) => void;
   onRoot: () => void;
   onToggleAvailability: (label: string) => void;
+  onToggleVerification: (status: string) => void;
   onToggleCategory: (id: string) => void;
   canStartVerification: boolean;
   onStartVerification: () => void;
@@ -109,7 +116,7 @@ const LocationSummaryHeader = ({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="truncate text-lg font-semibold text-secondaryColor">
-            {isRoot ? 'All locations' : summary.name}
+            {summary.name ?? 'All locations'}
           </h2>
           <div className="mt-1">
             <LocationBreadcrumb path={summary.path} onNavigate={onNavigate} onRoot={onRoot} />
@@ -132,6 +139,21 @@ const LocationSummaryHeader = ({
               </>
             )}
           </p>
+          {/* The toggle lives beside the number it changes — as a floating checkbox
+              above the panes it read as page furniture, not as this count's scope.
+              Leaves and the unlocated bucket have no children to include, so no
+              control appears there at all. */}
+          {summary.hasChildren && (
+            <label className="mt-1 flex cursor-pointer items-center justify-end gap-1.5 text-[11px] text-gray-500">
+              <input
+                type="checkbox"
+                checked={includeChildren}
+                onChange={(e) => onToggleIncludeChildren(e.target.checked)}
+                className="h-3.5 w-3.5 rounded border-gray-300 accent-primarycolor"
+              />
+              include child locations
+            </label>
+          )}
         </div>
       </div>
 
@@ -173,28 +195,53 @@ const LocationSummaryHeader = ({
       )}
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 pt-3">
-        <p className="text-xs text-gray-500">
+        <div className="flex flex-wrap items-center gap-x-1 text-xs text-gray-500">
           {verifiedTotal === 0 ? (
             'No verification recorded here.'
           ) : (
             <>
-              <span className="font-medium text-secondaryColor">Verification:</span>{' '}
-              {verification.verified.toLocaleString()} verified ·{' '}
-              {verification.notVerified.toLocaleString()} not verified
-              {verification.discrepancy > 0 &&
-                ` · ${verification.discrepancy.toLocaleString()} discrepancy`}
+              <span className="font-medium text-secondaryColor">Verification:</span>
+              {/* Each count is a FILTER, like the availability chips above — the
+                  numbers were already on screen; now they answer "which ones?". */}
+              {(
+                [
+                  { status: 'Verified', count: verification.verified, label: 'verified' },
+                  { status: 'NotVerified', count: verification.notVerified, label: 'not verified' },
+                  { status: 'Discrepancy', count: verification.discrepancy, label: 'discrepancy' },
+                ] as const
+              )
+                .filter((entry) => entry.status !== 'Discrepancy' || entry.count > 0)
+                .map((entry, index) => (
+                  <span key={entry.status} className="flex items-center gap-1">
+                    {index > 0 && <span className="text-gray-300">·</span>}
+                    <button
+                      type="button"
+                      aria-pressed={verificationFilter === entry.status}
+                      onClick={() => onToggleVerification(entry.status)}
+                      className={`rounded px-0.5 tabular-nums hover:text-secondaryColor hover:underline ${
+                        verificationFilter === entry.status
+                          ? 'font-semibold text-primarycolor underline'
+                          : entry.status === 'Discrepancy'
+                            ? 'text-red-600'
+                            : ''
+                      }`}
+                    >
+                      {entry.count.toLocaleString()} {entry.label}
+                    </button>
+                  </span>
+                ))}
               {verification.lastVerifiedOn && (
-                <>
+                <span>
                   {' · last '}
                   {new Date(verification.lastVerifiedOn).toLocaleDateString()}
-                </>
+                </span>
               )}
               {/* Said plainly: these are the register's current flags, not a campaign
                   reconciliation — an asset moved after verification keeps its flag. */}
               <span className="text-gray-400"> (register state)</span>
             </>
           )}
-        </p>
+        </div>
         <div className="flex items-center gap-3">
           {summary.totals.length > 0 && (
             <p className="text-xs text-gray-500">

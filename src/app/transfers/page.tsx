@@ -37,7 +37,6 @@ import { fetchAssetLocations } from '@/services/assetLocation.service';
 import { mergeTableFilters, unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import {
-  ASSET_CONDITIONS,
   CUSTODY_LABELS,
   CustodyStatusEnum,
   LifecycleStatusEnum,
@@ -48,6 +47,10 @@ import {
   TransferStatusEnum,
 } from '@/enum/transferEnums';
 import useDebounce from '@/hooks/useDebounce';
+import useAssetConditions from '@/hooks/useAssetConditions';
+import usePrintSheet, { usePrintIdentity } from '@/hooks/usePrintSheet';
+import GatePassSheet from '@/components/Print/GatePassSheet';
+import { fetchAssetById } from '@/services/asset.service';
 
 const formatDate = (value?: string | null) =>
   value ? new Date(value).toLocaleDateString() : '—';
@@ -55,8 +58,55 @@ const formatDate = (value?: string | null) =>
 type TConditionAction = 'dispatch' | 'receive';
 
 const TransfersPage = () => {
+  const { options: conditionOptions, emptyText: conditionEmptyText } = useAssetConditions();
   const { addToast } = useToast();
   const router = useRouter();
+
+  // The gate pass. Armed only while a transfer is chosen, so nothing is mounted and no body
+  // class is set during ordinary use of the page.
+  const [gatePassFor, setGatePassFor] = useState<IAssetTransfer | null>(null);
+  const [gatePassAsset, setGatePassAsset] = useState<{
+    serialNumber?: string | null;
+    assetTag?: string | null;
+  } | null>(null);
+  const printIdentity = usePrintIdentity();
+  const { print: printGatePass, PrintSheet } = usePrintSheet(!!gatePassFor);
+
+  /**
+   * The transfer record carries no serial or tag, and a gate pass that identifies the goods
+   * only by an internal code is weak at a barrier — the code is a sticker, the serial is
+   * stamped into the metal. One call fills it in; a failure still prints, marked as not
+   * recorded rather than left blank.
+   */
+  const openGatePass = async (transfer: IAssetTransfer) => {
+    // Resolve FIRST, then arm. Arming before the fetch settles would print a pass that says
+    // "no serial recorded" for an asset that has one — the sheet mounts on the next render
+    // and the print fires against whatever is on it at that moment.
+    let identity: { serialNumber?: string | null; assetTag?: string | null } | null = null;
+    try {
+      const response = await fetchAssetById(transfer.assetId);
+      if (response?.data)
+        identity = {
+          serialNumber: response.data.serialNumber,
+          assetTag: response.data.assetTag,
+        };
+    } catch {
+      /* The pass is still valid without it; the sheet says so rather than leaving a blank. */
+    }
+    setGatePassAsset(identity);
+    setGatePassFor(transfer);
+  };
+
+  // Print on the render AFTER the sheet mounts; inline would race the document snapshot.
+  useEffect(() => {
+    if (!gatePassFor) return;
+    // setTimeout, NOT requestAnimationFrame: rAF never fires while the document is
+    // hidden, so a user who switches tab straight after clicking would get no print
+    // at all and no error either. A timer fires regardless of visibility.
+    const timer = setTimeout(() => printGatePass(), 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gatePassFor]);
 
   const [transfers, setTransfers] = useState<IAssetTransfer[]>([]);
   const [loading, setLoading] = useState(false);
@@ -345,6 +395,18 @@ const TransfersPage = () => {
                   },
                 }]
               : []),
+            // Approved or Dispatched ONLY. A pass for a merely Requested transfer would
+            // authorise an unapproved asset out of the gate, and someone would use it that
+            // way; Received is history and needs no pass.
+            ...([TransferStatusEnum.Approved, TransferStatusEnum.Dispatched].includes(
+              transfer.status
+            )
+              ? [{
+                  label: 'Print Gate Pass',
+                  icon: <i className="icon icon-print text-sm" />,
+                  action: () => openGatePass(transfer),
+                }]
+              : []),
             ...([TransferStatusEnum.Requested, TransferStatusEnum.Approved,
                  TransferStatusEnum.Dispatched].includes(transfer.status)
               ? [{
@@ -541,10 +603,8 @@ const TransfersPage = () => {
             }
             required
             placeholder="Select condition"
-            options={ASSET_CONDITIONS.map((c) => ({
-              value: c.id,
-              label: c.name,
-            }))}
+            options={conditionOptions}
+            emptyText={conditionEmptyText}
             value={conditionId}
             onChange={(e) => setConditionId(e.target.value)}
           />
@@ -603,6 +663,30 @@ const TransfersPage = () => {
           </div>
         </div>
       </Modal>
+
+      {gatePassFor && (
+        <PrintSheet>
+          <GatePassSheet
+            companyName={printIdentity.companyName}
+            generatedBy={printIdentity.userName}
+            generatedOn={new Date()}
+            transferId={gatePassFor.id}
+            assetCode={gatePassFor.assetCode}
+            assetName={gatePassFor.assetName}
+            serialNumber={gatePassAsset?.serialNumber}
+            assetTag={gatePassAsset?.assetTag}
+            conditionAtDispatchName={gatePassFor.conditionAtDispatchName}
+            fromEmployeeName={gatePassFor.fromEmployeeName}
+            fromAssetLocationName={gatePassFor.fromAssetLocationName}
+            toEmployeeName={gatePassFor.toEmployeeName}
+            toAssetLocationName={gatePassFor.toAssetLocationName}
+            reason={gatePassFor.reason}
+            notes={gatePassFor.notes}
+            approvedOn={gatePassFor.approvedOn}
+            dispatchedOn={gatePassFor.dispatchedOn}
+          />
+        </PrintSheet>
+      )}
     </div>
   );
 };

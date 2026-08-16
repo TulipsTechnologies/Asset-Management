@@ -47,7 +47,6 @@ import { fetchVendors } from '@/services/vendor.service';
 import { mergeTableFilters, unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import {
-  ASSET_CONDITIONS,
   LifecycleStatusEnum,
   OPERATIONAL_LABELS,
 } from '@/enum/assetEnums';
@@ -71,6 +70,7 @@ import {
   WorkOrderStatusEnum,
 } from '@/enum/maintenanceEnums';
 import useDebounce from '@/hooks/useDebounce';
+import useAssetConditions from '@/hooks/useAssetConditions';
 
 const formatDate = (value?: string | null) =>
   value ? new Date(value).toLocaleDateString() : '—';
@@ -255,6 +255,7 @@ const DetailField = ({
 );
 
 const MaintenancePage = () => {
+  const { options: conditionOptions, emptyText: conditionEmptyText } = useAssetConditions();
   const { addToast } = useToast();
   const router = useRouter();
 
@@ -1738,10 +1739,8 @@ const MaintenancePage = () => {
               label="Condition After"
               required
               placeholder="Select condition"
-              options={ASSET_CONDITIONS.map((c) => ({
-                value: c.id,
-                label: c.name,
-              }))}
+              options={conditionOptions}
+              emptyText={conditionEmptyText}
               value={completeForm.conditionAfterId}
               onChange={(e) => {
                 setCompleteForm((prev) => ({

@@ -9,7 +9,7 @@ import TextArea from '@/components/UI/TextArea';
 import { useToast } from '@/components/Providers/ToastProvider';
 import { IEmployee } from '@/interface/IEmployee';
 import { assignAsset } from '@/services/assetAssignment.service';
-import { ASSET_CONDITIONS } from '@/enum/assetEnums';
+import useAssetConditions from '@/hooks/useAssetConditions';
 
 /**
  * Issue ONE known asset to one person.
@@ -42,6 +42,7 @@ interface IProps {
 
 const SingleAssignModal = ({ isOpen, onClose, asset, employees, onAssigned }: IProps) => {
   const { addToast } = useToast();
+  const { options: conditionOptions, emptyText: conditionEmptyText } = useAssetConditions();
 
   const [employeeId, setEmployeeId] = useState('');
   const [conditionAtIssueId, setConditionAtIssueId] = useState('');
@@ -132,7 +133,8 @@ const SingleAssignModal = ({ isOpen, onClose, asset, employees, onAssigned }: IP
             label="Condition at issue"
             required
             placeholder="Select a condition"
-            options={ASSET_CONDITIONS.map((c) => ({ value: c.id, label: c.name }))}
+            options={conditionOptions}
+            emptyText={conditionEmptyText}
             value={conditionAtIssueId}
             onChange={(e) => setConditionAtIssueId(e.target.value)}
           />

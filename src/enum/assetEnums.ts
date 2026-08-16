@@ -120,16 +120,15 @@ export const enumOptions = (labels: Record<number, string>) =>
     label,
   }));
 
-/**
- * The six global asset conditions seeded by the backend migration with FIXED ids
- * (AssetSeedData in the Domain project). Mirrored here until a lookup endpoint
- * ships — keep in sync with the backend seed, never invent new ids client-side.
+/*
+ * ASSET_CONDITIONS used to live here: the six seeded ids, mirrored client-side "until a
+ * lookup endpoint ships". That endpoint now exists, and a company can define conditions of
+ * its own — so a hardcoded list would show six options on a screen where the register has
+ * eight, and would keep offering a condition the company had deactivated.
+ *
+ * Use the `useAssetConditions` hook (src/hooks/useAssetConditions.ts). It is cached
+ * module-wide, so consuming it from several modals costs one request.
+ *
+ * Deliberately NOT left behind as a fallback: serving the six system ids to a tenant whose
+ * own list failed to load writes a valid-but-wrong condition onto their asset, silently.
  */
-export const ASSET_CONDITIONS: { id: string; name: string }[] = [
-  { id: '019836a0-0000-7000-8000-000000000001', name: 'New' },
-  { id: '019836a0-0000-7000-8000-000000000002', name: 'Good' },
-  { id: '019836a0-0000-7000-8000-000000000003', name: 'Fair' },
-  { id: '019836a0-0000-7000-8000-000000000004', name: 'Poor' },
-  { id: '019836a0-0000-7000-8000-000000000005', name: 'Damaged' },
-  { id: '019836a0-0000-7000-8000-000000000006', name: 'Unusable' },
-];

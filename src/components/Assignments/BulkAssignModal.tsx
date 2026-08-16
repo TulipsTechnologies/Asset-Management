@@ -18,7 +18,7 @@ import {
   fetchAssignableAssets,
 } from '@/services/assetAssignment.service';
 import { unwrapPaged } from '@/utils/serviceUtils';
-import { ASSET_CONDITIONS } from '@/enum/assetEnums';
+import useAssetConditions from '@/hooks/useAssetConditions';
 import useDebounce from '@/hooks/useDebounce';
 
 /**
@@ -85,6 +85,7 @@ const BulkAssignModal = ({
   initialEmployeeId,
   onAssigned,
 }: IProps) => {
+  const { options: conditionOptions, emptyText: conditionEmptyText } = useAssetConditions();
   const [stage, setStage] = useState<TStage>('pick');
 
   const [employeeId, setEmployeeId] = useState(initialEmployeeId ?? '');
@@ -399,7 +400,8 @@ const BulkAssignModal = ({
                 />
                 <Select
                   label="Condition at issue"
-                  options={ASSET_CONDITIONS.map((c) => ({ value: c.id, label: c.name }))}
+                  options={conditionOptions}
+                  emptyText={conditionEmptyText}
                   placeholder="Keep each asset's own condition"
                   value={conditionAtIssueId}
                   onChange={(e) => setConditionAtIssueId(e.target.value)}

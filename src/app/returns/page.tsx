@@ -31,7 +31,11 @@ import {
 import { fetchAssetAssignments } from '@/services/assetAssignment.service';
 import { mergeTableFilters, unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
-import { ASSET_CONDITIONS } from '@/enum/assetEnums';
+import useAssetConditions from '@/hooks/useAssetConditions';
+import usePrintSheet, { usePrintIdentity } from '@/hooks/usePrintSheet';
+import ReturnClearanceSheet from '@/components/Print/ReturnClearanceSheet';
+import { fetchAssetById } from '@/services/asset.service';
+import { fetchAssetAssignmentById } from '@/services/assetAssignment.service';
 import { AssignmentStatusEnum } from '@/enum/assignmentEnums';
 import {
   RECOVERY_CASE_STATUS_BADGE_CLASSES,
@@ -126,8 +130,64 @@ const DetailField = ({
 );
 
 const ReturnsPage = () => {
+  const { options: conditionOptions, emptyText: conditionEmptyText } = useAssetConditions();
   const { addToast } = useToast();
   const router = useRouter();
+
+  // The return receipt / clearance certificate.
+  const [clearanceFor, setClearanceFor] = useState<IAssetReturn | null>(null);
+  const [clearanceAsset, setClearanceAsset] = useState<{
+    serialNumber?: string | null;
+    assetTag?: string | null;
+  } | null>(null);
+  /** The condition the asset was ISSUED at — the baseline any damage claim rests on. */
+  const [clearanceBaseline, setClearanceBaseline] = useState<{
+    name?: string | null;
+    unavailable?: boolean;
+  } | null>(null);
+  const printIdentity = usePrintIdentity();
+  const { print: printClearance, PrintSheet } = usePrintSheet(!!clearanceFor);
+
+  /**
+   * A clearance certificate without the condition-at-issue baseline has no force — there is
+   * nothing for the returned condition to be judged against. It is fetched from the
+   * originating assignment; if that fails the sheet prints it as explicitly "not available"
+   * rather than leaving a blank column that quietly stops meaning anything.
+   */
+  const openClearance = async (assetReturn: IAssetReturn) => {
+    // Both lookups settle BEFORE the sheet is armed: it mounts on the next render and prints
+    // immediately, so anything still in flight would simply be missing from the paper.
+    const [assetResult, assignmentResult] = await Promise.allSettled([
+      fetchAssetById(assetReturn.assetId),
+      fetchAssetAssignmentById(assetReturn.assetAssignmentId),
+    ]);
+
+    setClearanceAsset(
+      assetResult.status === 'fulfilled' && assetResult.value?.data
+        ? {
+            serialNumber: assetResult.value.data.serialNumber,
+            assetTag: assetResult.value.data.assetTag,
+          }
+        : null
+    );
+    setClearanceBaseline(
+      assignmentResult.status === 'fulfilled' && assignmentResult.value?.data
+        ? { name: assignmentResult.value.data.conditionAtIssueName }
+        : { unavailable: true }
+    );
+    setClearanceFor(assetReturn);
+  };
+
+  // Print on the render AFTER the sheet mounts; inline would race the document snapshot.
+  useEffect(() => {
+    if (!clearanceFor) return;
+    // setTimeout, NOT requestAnimationFrame: rAF never fires while the document is
+    // hidden, so a user who switches tab straight after clicking would get no print
+    // at all and no error either. A timer fires regardless of visibility.
+    const timer = setTimeout(() => printClearance(), 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clearanceFor]);
 
   const [activeTab, setActiveTab] = useState<'returns' | 'recovery'>('returns');
 
@@ -467,6 +527,20 @@ const ReturnsPage = () => {
                   },
                 ]
               : []),
+            // Both states print, with DIFFERENT titles: a receipt before inspection, a
+            // clearance certificate after. Cancelled returns discharge nothing.
+            ...(assetReturn.status !== ReturnStatusEnum.Cancelled
+              ? [
+                  {
+                    label:
+                      assetReturn.status === ReturnStatusEnum.Completed
+                        ? 'Print Clearance'
+                        : 'Print Receipt',
+                    icon: <i className="icon icon-print text-sm" />,
+                    action: () => openClearance(assetReturn),
+                  },
+                ]
+              : []),
           ].map((option, index, arr) => (
             <CustomMenuItem
               key={index}
@@ -703,10 +777,8 @@ const ReturnsPage = () => {
               label="Condition at Return"
               required
               placeholder="Select condition"
-              options={ASSET_CONDITIONS.map((c) => ({
-                value: c.id,
-                label: c.name,
-              }))}
+              options={conditionOptions}
+              emptyText={conditionEmptyText}
               value={inspectForm.conditionAtReturnId}
               onChange={(e) => {
                 setInspectForm((prev) => ({
@@ -1032,6 +1104,34 @@ const ReturnsPage = () => {
           </div>
         )}
       </Modal>
+
+      {clearanceFor && (
+        <PrintSheet>
+          <ReturnClearanceSheet
+            companyName={printIdentity.companyName}
+            generatedBy={printIdentity.userName}
+            generatedOn={new Date()}
+            returnId={clearanceFor.id}
+            assetCode={clearanceFor.assetCode}
+            assetName={clearanceFor.assetName}
+            serialNumber={clearanceAsset?.serialNumber}
+            assetTag={clearanceAsset?.assetTag}
+            returnedByEmployeeName={clearanceFor.returnedByEmployeeName}
+            returnedByEmployeeCode={clearanceFor.returnedByEmployeeCode}
+            returnDate={clearanceFor.returnDate}
+            inspectedOn={clearanceFor.inspectedOn}
+            conditionAtReturnName={clearanceFor.conditionAtReturnName}
+            conditionAtIssueName={clearanceBaseline?.name}
+            baselineUnavailable={clearanceBaseline?.unavailable}
+            outcome={clearanceFor.outcome}
+            missingAccessories={clearanceFor.missingAccessories}
+            damageNotes={clearanceFor.damageNotes}
+            inspectionNotes={clearanceFor.inspectionNotes}
+            notes={clearanceFor.notes}
+            recoveryCases={clearanceFor.recoveryCases ?? []}
+          />
+        </PrintSheet>
+      )}
     </div>
   );
 };

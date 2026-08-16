@@ -26,6 +26,7 @@ const query = (filter: IReportFilter) =>
     Search: filter.search,
     CategoryId: filter.categoryId,
     Availability: filter.availability,
+    VerificationStatus: filter.verificationStatus,
     Unlocated: filter.unlocated === true ? true : undefined,
     IncludeAggregates: filter.includeAggregates === false ? false : undefined,
   });
@@ -37,7 +38,8 @@ const query = (filter: IReportFilter) =>
 export const fetchLocationSummary = (
   locationId: string | null,
   includeChildren: boolean,
-  withDescendants: boolean
+  withDescendants: boolean,
+  unlocated?: boolean
 ): Promise<IResponse<ILocationSummary>> =>
   requestApi({
     apiEndpoint:
@@ -46,6 +48,7 @@ export const fetchLocationSummary = (
         LocationId: locationId ?? undefined,
         IncludeChildren: includeChildren === false ? false : undefined,
         WithDescendants: withDescendants,
+        Unlocated: unlocated === true ? true : undefined,
       }),
     method: 'GET',
     completeData: true,

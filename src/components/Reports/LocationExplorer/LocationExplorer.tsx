@@ -26,7 +26,7 @@ import {
 } from '@/services/reports.service';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { Permission } from '@/enum/permissions';
-import { appUrl, DEFAULT_PAGE_SIZE } from '@/utils/constants';
+import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import useDebounce from '@/hooks/useDebounce';
 import { money } from '@/components/Assets/AssetViewShared';
 import LocationSummaryHeader from './LocationSummaryHeader';
@@ -104,12 +104,24 @@ const LocationExplorer = ({
   const [summaryLoading, setSummaryLoading] = useState(false);
 
   const [view, setView] = useState<TAssetView>('cards');
-  /** Set when the user asks for assets on a parent — otherwise parents show the map. */
-  const [forceAssets, setForceAssets] = useState(false);
+  /** Set when the user asks for assets on a parent — otherwise parents show the map.
+   *  A deep link carrying a filter is such an ask: the caller wants the rows. */
+  const [forceAssets, setForceAssets] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const params = new URLSearchParams(window.location.search);
+    return !!(params.get('availability') || params.get('verification'));
+  });
 
   const [assetSearch, setAssetSearch] = useState('');
   const debouncedAssetSearch = useDebounce(assetSearch, 400);
-  const [availability, setAvailability] = useState<string | undefined>();
+  const [availability, setAvailability] = useState<string | undefined>(() => {
+    if (typeof window === 'undefined') return undefined;
+    return new URLSearchParams(window.location.search).get('availability') ?? undefined;
+  });
+  const [verification, setVerification] = useState<string | undefined>(() => {
+    if (typeof window === 'undefined') return undefined;
+    return new URLSearchParams(window.location.search).get('verification') ?? undefined;
+  });
   const [categoryId, setCategoryId] = useState<string | undefined>();
 
   const [rows, setRows] = useState<ILocationAssetCard[]>([]);
@@ -176,27 +188,35 @@ const LocationExplorer = ({
 
   // Summary: location + include-children only. Search and chips never invalidate it,
   // which is what keeps the chip counts meaning "in this place" rather than "in this
-  // place, given what you have typed".
+  // place, given what you have typed". The "(No location)" bucket is a real scope
+  // with a real summary — it goes through the same fetch, flagged unlocated.
   useEffect(() => {
-    if (selection.unlocated) {
-      setSummary(null);
-      return;
-    }
     const token = ++summaryGeneration.current;
     setSummaryLoading(true);
     (async () => {
       try {
-        const response = await fetchLocationSummary(selection.id, includeChildren, true);
+        const response = await fetchLocationSummary(
+          selection.unlocated ? null : selection.id,
+          includeChildren,
+          !selection.unlocated,
+          selection.unlocated
+        );
         if (token !== summaryGeneration.current) return;
         if (response?.data) {
           setSummary(response.data);
-          setStaleSelection(null);
+          // Deliberately NOT clearing staleSelection here: the fallback's own root
+          // fetch lands moments after the notice is set, and clearing on success
+          // would wipe the explanation before anyone could read it. select() clears
+          // it on the next deliberate pick.
         } else if (selection.id) {
           // A pasted link or a Recent entry can outlive the location it names (a
           // re-import replaces ids wholesale). Fall back to the whole register with an
-          // inline explanation rather than leaving an empty screen behind a toast.
+          // inline explanation rather than leaving an empty screen behind a toast —
+          // and take the dead id out of the URL, or copying the address bar would
+          // share the very link that just failed.
           setStaleSelection(response?.message || 'That location no longer exists.');
           setSelection({ id: null, unlocated: false });
+          router.replace(`/reports?code=${REPORT_CODE}`, { scroll: false });
         } else {
           setSummary(null);
           addToast.error(response?.message || 'The location summary could not be loaded.');
@@ -210,7 +230,18 @@ const LocationExplorer = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterKey]);
 
-  const hasChildren = !!summary?.hasChildren;
+  // Optimistic while the summary is in flight: the tree already knows whether the
+  // node has children, and guessing "no children" would flash the assets toolbar
+  // AND fire a rows fetch a building-sized scope never needed. Before the tree
+  // arrives, assume children — a leaf briefly shows the Breakdown skeleton, which
+  // costs nothing; the wrong guess in the other direction costs a 2,500-row fetch.
+  const treeHasChildren = treeLoading
+    ? true
+    : selection.id
+      ? (nodeIndex.get(selection.id)?.children.length ?? 0) > 0
+      : tree.length > 0;
+  const hasChildren =
+    summaryLoading || !summary ? treeHasChildren && !selection.unlocated : !!summary.hasChildren;
   const showingAssets = selection.unlocated || !hasChildren || forceAssets;
 
   const rowFilter = useMemo<IReportFilter>(
@@ -222,6 +253,7 @@ const LocationExplorer = ({
       includeChildren,
       search: debouncedAssetSearch.trim() || undefined,
       availability,
+      verificationStatus: verification,
       categoryId,
       // The header already has the chips and totals; asking for them again on every
       // page turn would cost two extra scans of the scope for numbers nobody reads.
@@ -234,6 +266,7 @@ const LocationExplorer = ({
       includeChildren,
       debouncedAssetSearch,
       availability,
+      verification,
       categoryId,
     ]
   );
@@ -274,6 +307,27 @@ const LocationExplorer = ({
     [recentKey]
   );
 
+  /** The URL is the citation: what you are looking at can be pasted to a colleague.
+   *  Every writer goes through here so the address bar never lags the screen.
+   *  NOT appUrl(): next/navigation applies basePath itself, and prefixing twice
+   *  produces /asset-management/asset-management/reports — a 404. */
+  const syncUrl = useCallback(
+    (state: {
+      id: string | null;
+      unlocated: boolean;
+      availability?: string;
+      verification?: string;
+    }) => {
+      const query = new URLSearchParams({ code: REPORT_CODE });
+      if (state.id) query.set('locationId', state.id);
+      if (state.unlocated) query.set('unlocated', 'true');
+      if (state.availability) query.set('availability', state.availability);
+      if (state.verification) query.set('verification', state.verification);
+      router.replace(`/reports?${query.toString()}`, { scroll: false });
+    },
+    [router]
+  );
+
   /** One entry point for every way a location gets chosen — tree, breadcrumb, grouped
    *  row, Recent — so filters, paging and the URL can never drift out of step. */
   const select = useCallback(
@@ -283,20 +337,14 @@ const LocationExplorer = ({
       setForceAssets(!!options?.showAssets);
       setPageNumber(1);
       setAvailability(undefined);
+      setVerification(undefined);
       setCategoryId(undefined);
       setAssetSearch('');
       setTreeDrawerOpen(false);
       if (id) rememberRecent(id);
-
-      // The URL is the citation: what you are looking at can be pasted to a colleague.
-      const query = new URLSearchParams({ code: REPORT_CODE });
-      if (id) query.set('locationId', id);
-      if (options?.unlocated) query.set('unlocated', 'true');
-      // NOT appUrl(): next/navigation applies basePath itself, and prefixing twice
-      // produces /asset-management/asset-management/reports — a 404.
-      router.replace(`/reports?${query.toString()}`, { scroll: false });
+      syncUrl({ id, unlocated: !!options?.unlocated });
     },
-    [rememberRecent, router]
+    [rememberRecent, syncUrl]
   );
 
   const exportXlsx = async () => {
@@ -325,10 +373,13 @@ const LocationExplorer = ({
   };
 
   const activeFilters =
-    (debouncedAssetSearch.trim() ? 1 : 0) + (availability ? 1 : 0) + (categoryId ? 1 : 0);
+    (debouncedAssetSearch.trim() ? 1 : 0) +
+    (availability ? 1 : 0) +
+    (verification ? 1 : 0) +
+    (categoryId ? 1 : 0);
 
   const scopeName = selection.unlocated
-    ? 'assets with no location'
+    ? '(No location)'
     : summary?.name ?? 'all locations';
 
   // The Location column earns its place only when rows can come from more than one
@@ -381,7 +432,8 @@ const LocationExplorer = ({
           type: 'string' as const,
           content: (
             <Link
-              href={appUrl(`/assets/${row.id}`)}
+              // Bare path: next/link applies basePath itself; appUrl() here 404'd.
+              href={`/assets/${row.id}`}
               className="font-mono text-xs text-primarycolor hover:underline"
             >
               {row.assetCode}
@@ -503,6 +555,22 @@ const LocationExplorer = ({
           All locations
         </button>
 
+        {/* The unlocated bucket is a first-class scope — assets with no room are the
+            ones most worth finding. No count here: fetching one would break the
+            two-fetch-per-selection discipline for a number the summary shows anyway. */}
+        <button
+          type="button"
+          onClick={() => select(null, { unlocated: true })}
+          className={`mb-1 flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm ${
+            selection.unlocated
+              ? 'bg-primarycolor/15 font-medium text-secondaryColor ring-1 ring-primarycolor/40'
+              : 'text-gray-600 hover:bg-gray-50'
+          }`}
+        >
+          <i className="icon icon-marker text-[12px] text-gray-400" />
+          (No location)
+        </button>
+
         <LocationTree
           tree={tree}
           loading={treeLoading}
@@ -530,8 +598,10 @@ const LocationExplorer = ({
             onClick={() => {
               setAssetSearch('');
               setAvailability(undefined);
+              setVerification(undefined);
               setCategoryId(undefined);
               setPageNumber(1);
+              syncUrl({ ...selection });
             }}
             className="mt-2 text-xs font-medium text-primarycolor hover:underline"
           >
@@ -559,6 +629,17 @@ const LocationExplorer = ({
         </div>
       );
 
+    // An empty unlocated bucket is the GOOD outcome — say so, and offer nothing:
+    // "add an asset here" would mean creating one without a location on purpose.
+    if (selection.unlocated)
+      return (
+        <div className="rounded-xl border border-gray-200 bg-white py-12 text-center">
+          <p className="text-sm text-gray-500">
+            Every asset has a location — nothing is unfiled.
+          </p>
+        </div>
+      );
+
     return (
       <div className="rounded-xl border border-gray-200 bg-white py-12 text-center">
         <p className="text-sm text-gray-500">
@@ -567,7 +648,7 @@ const LocationExplorer = ({
         <div className="mt-3 flex justify-center gap-3">
           {can(Permission.ManageAssets) && (
             <Link
-              href={appUrl('/assets/create')}
+              href="/assets/create"
               className="rounded-full bg-primarycolor px-4 py-1.5 text-xs font-medium text-white hover:brightness-95"
             >
               Add asset
@@ -575,7 +656,7 @@ const LocationExplorer = ({
           )}
           {can(Permission.TransferAssets) && (
             <Link
-              href={appUrl('/transfers')}
+              href="/transfers"
               className="rounded-full border border-gray-300 px-4 py-1.5 text-xs font-medium text-secondaryColor hover:bg-gray-50"
             >
               Move assets here
@@ -588,43 +669,6 @@ const LocationExplorer = ({
 
   return (
     <div className="mt-4">
-      <div className="mb-3 flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={() => setTreeDrawerOpen(true)}
-          className="flex items-center gap-2 rounded-full border border-gray-300 px-4 py-1.5 text-sm text-secondaryColor lg:hidden"
-        >
-          <i className="icon icon-marker text-xs" />
-          {selection.unlocated ? '(No location)' : summary?.name ?? 'All locations'}
-        </button>
-
-        <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-600">
-          <input
-            type="checkbox"
-            checked={includeChildren}
-            onChange={(e) => {
-              setIncludeChildren(e.target.checked);
-              setPageNumber(1);
-            }}
-            className="h-4 w-4 rounded border-gray-300 accent-primarycolor"
-          />
-          Include child locations
-        </label>
-
-        <div className="ml-auto flex items-center gap-3">
-          <Button variant="secondary" onClick={exportXlsx} disabled={exporting}>
-            <i className="icon icon-download text-xs" />
-            <span>
-              {exporting
-                ? 'Exporting…'
-                : activeFilters > 0
-                  ? `Export ${rowCount.toLocaleString()} filtered`
-                  : `Export ${(showingAssets ? rowCount : summary?.subtreeCount ?? 0).toLocaleString()} assets`}
-            </span>
-          </Button>
-        </div>
-      </div>
-
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
         <aside className="hidden max-h-[calc(100vh-230px)] rounded-xl border border-gray-200 bg-white lg:flex lg:flex-col">
           {treePane}
@@ -645,36 +689,58 @@ const LocationExplorer = ({
             </div>
           )}
 
-          {!selection.unlocated && (
-            <LocationSummaryHeader
-              summary={summary}
-              loading={summaryLoading}
-              includeChildren={includeChildren}
-              availabilityFilter={availability}
-              categoryFilter={categoryId}
-              onNavigate={(segment: ILocationPathSegment) => select(segment.id)}
-              onRoot={() => select(null)}
-              onToggleAvailability={(label) => {
-                setAvailability((prev) => (prev === label ? undefined : label));
-                setForceAssets(true);
-                setPageNumber(1);
-              }}
-              onToggleCategory={(id) => {
-                setCategoryId((prev) => (prev === id ? undefined : id));
-                setForceAssets(true);
-                setPageNumber(1);
-              }}
-              canStartVerification={can(Permission.AuditAssets)}
-              onStartVerification={() =>
-                router.push(
-                  `/physical-verification?createForLocation=${selection.id}`
-                )
-              }
-            />
-          )}
+          <LocationSummaryHeader
+            summary={summary}
+            loading={summaryLoading}
+            includeChildren={includeChildren}
+            onToggleIncludeChildren={(value) => {
+              setIncludeChildren(value);
+              setPageNumber(1);
+            }}
+            availabilityFilter={availability}
+            verificationFilter={verification}
+            categoryFilter={categoryId}
+            onNavigate={(segment: ILocationPathSegment) => select(segment.id)}
+            onRoot={() => select(null)}
+            onToggleAvailability={(label) => {
+              const next = availability === label ? undefined : label;
+              setAvailability(next);
+              setForceAssets(true);
+              setPageNumber(1);
+              syncUrl({ ...selection, availability: next, verification });
+            }}
+            onToggleVerification={(status) => {
+              const next = verification === status ? undefined : status;
+              setVerification(next);
+              setForceAssets(true);
+              setPageNumber(1);
+              syncUrl({ ...selection, availability, verification: next });
+            }}
+            onToggleCategory={(id) => {
+              setCategoryId((prev) => (prev === id ? undefined : id));
+              setForceAssets(true);
+              setPageNumber(1);
+            }}
+            canStartVerification={can(Permission.AuditAssets) && !selection.unlocated}
+            onStartVerification={() =>
+              router.push(
+                `/physical-verification?createForLocation=${selection.id}`
+              )
+            }
+          />
 
           <div className="rounded-xl border border-gray-200 bg-white">
             <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 p-3">
+              {/* Mobile: the tree lives in a drawer; this is its handle. */}
+              <button
+                type="button"
+                onClick={() => setTreeDrawerOpen(true)}
+                className="flex items-center gap-2 rounded-full border border-gray-300 px-3 py-1 text-xs font-medium text-secondaryColor lg:hidden"
+              >
+                <i className="icon icon-marker text-[11px]" />
+                {selection.unlocated ? '(No location)' : summary?.name ?? 'All locations'}
+              </button>
+
               {hasChildren && !selection.unlocated && (
                 <div className="flex overflow-hidden rounded-full border border-gray-200">
                   <button
@@ -722,11 +788,35 @@ const LocationExplorer = ({
                   )}
                 </>
               )}
+
+              {/* Export lives beside what it exports; its count is the workbook's
+                  row count, whichever view is on screen. */}
+              <div className="ml-auto">
+                <Button variant="secondary" onClick={exportXlsx} disabled={exporting}>
+                  <i className="icon icon-download text-xs" />
+                  <span>
+                    {exporting
+                      ? 'Exporting…'
+                      : activeFilters > 0
+                        ? `Export ${rowCount.toLocaleString()} filtered`
+                        : `Export ${(showingAssets
+                            ? rowCount
+                            : (includeChildren
+                                ? summary?.subtreeCount
+                                : summary?.directCount) ?? 0
+                          ).toLocaleString()} assets`}
+                  </span>
+                </Button>
+              </div>
             </div>
 
             <div className="p-3">
               {!showingAssets ? (
                 <GroupedLocationView
+                  // Remounted per scope: the "floors open by default" seeding runs
+                  // once per component life, so drilling from building to building
+                  // must start a fresh life or the second building opens folded.
+                  key={selection.id ?? 'root'}
                   descendants={summary?.descendants ?? []}
                   directCount={summary?.directCount ?? 0}
                   selectedName={summary?.name ?? 'All locations'}

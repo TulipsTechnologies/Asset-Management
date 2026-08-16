@@ -57,6 +57,7 @@ const HUBS: IHub[] = [
     children: [
       { url: '/asset-categories', label: 'Categories' },
       { url: '/asset-code-format', label: 'Asset Code Format' },
+      { url: '/asset-conditions', label: 'Asset Conditions' },
       { url: '/locations', label: 'Locations' },
       { url: '/vendors', label: 'Vendors' },
       { url: '/configuration/depreciation', label: 'Depreciation Setup' },

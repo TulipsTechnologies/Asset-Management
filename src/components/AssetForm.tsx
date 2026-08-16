@@ -19,11 +19,11 @@ import { fetchAssetLocations } from '@/services/assetLocation.service';
 import { fetchVendors } from '@/services/vendor.service';
 import { unwrapPaged } from '@/utils/serviceUtils';
 import {
-  ASSET_CONDITIONS,
   enumOptions,
   OWNERSHIP_LABELS,
   OwnershipTypeEnum,
 } from '@/enum/assetEnums';
+import useAssetConditions from '@/hooks/useAssetConditions';
 
 type TFormErrors = Partial<
   Record<
@@ -75,6 +75,14 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
   const isEdit = !!asset;
   const router = useRouter();
   const { addToast } = useToast();
+
+  // The asset's OWN condition rides along via includeId, so an asset graded at a condition
+  // the company has since deactivated still shows its real grade rather than a blank.
+  const {
+    options: conditionOptions,
+    emptyText: conditionEmptyText,
+    nameById: conditionNameById,
+  } = useAssetConditions(asset?.assetConditionTypeId);
 
   const [categories, setCategories] = useState<IAssetCategory[]>([]);
   const [vendors, setVendors] = useState<IVendor[]>([]);
@@ -205,9 +213,7 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
   const selectedCategory = categories.find(
     (c) => c.id === form.assetCategoryId
   );
-  const conditionName = ASSET_CONDITIONS.find(
-    (c) => c.id === form.assetConditionTypeId
-  )?.name;
+  const conditionName = conditionNameById(form.assetConditionTypeId);
   const ownershipLabel = enumOptions(OWNERSHIP_LABELS).find(
     (o) => String(o.value) === form.ownershipType
   )?.label;
@@ -450,10 +456,8 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
                   label="Condition"
                   required
                   placeholder="Select condition"
-                  options={ASSET_CONDITIONS.map((c) => ({
-                    value: c.id,
-                    label: c.name,
-                  }))}
+                  options={conditionOptions}
+                  emptyText={conditionEmptyText}
                   value={form.assetConditionTypeId}
                   onChange={set('assetConditionTypeId')}
                   error={errors.assetConditionTypeId}

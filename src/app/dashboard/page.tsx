@@ -13,7 +13,6 @@ import {
   IMonthlyAmount,
 } from '@/interface/IDashboard';
 import { fetchDashboard } from '@/services/dashboard.service';
-import { appUrl } from '@/utils/constants';
 
 /* --------------------------------------------------------------------- */
 /* Top pastel KPI cards — same grid, tints and card style as the Vehicle  */
@@ -60,23 +59,31 @@ const KPI_CARDS: IKpiCard[] = [
  * collapse vertically instead of leaving a hole beside a tall neighbour.
  */
 const Panel = ({
-  emoji,
+  iconName,
   title,
   action,
-  className = '',
+  inset,
   children,
 }: {
-  emoji?: string;
+  /** Icon-font glyph, not an emoji — a glyph obeys the type system's color and
+   *  optical size; an emoji brings its own palette to every heading. */
+  iconName?: string;
   title?: string;
   action?: React.ReactNode;
-  className?: string;
+  /** Thin strips (Band 2) trade the p-5 frame for a slim one; px-3 + the strip's
+   *  own px-3 lands its first icon at ~24px like every p-5 band's content. */
+  inset?: boolean;
   children: React.ReactNode;
 }) => (
-  <section className={`bg-white rounded-2xl border border-gray-100 shadow-sm p-5 ${className}`}>
+  <section
+    className={`bg-white rounded-2xl border border-gray-100 shadow-sm ${
+      inset ? 'px-3 py-2' : 'p-5'
+    }`}
+  >
     {title && (
       <div className="flex items-center justify-between gap-2 mb-4">
         <h2 className="text-sm font-bold text-secondaryColor flex items-center gap-2">
-          {emoji && <span className="text-base leading-none">{emoji}</span>}
+          {iconName && <i className={`icon icon-${iconName} text-sm text-gray-400`} />}
           {title}
         </h2>
         {action}
@@ -254,9 +261,10 @@ const AttentionQueue = ({
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-secondaryColor truncate">{item.name}</p>
               <p className="flex items-center gap-1.5 mt-0.5 min-w-0">
-                <span
-                  className={`text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full shrink-0 ${kind.chip}`}
-                >
+                {/* The kind label is metadata, not signal — the tinted icon circle and
+                    the age badge carry the color; five chip palettes per row was a
+                    rainbow where a word suffices. */}
+                <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-full shrink-0 bg-gray-100 text-gray-500">
                   {kind.short}
                 </span>
                 <span className="text-xs text-gray-500 truncate">
@@ -345,7 +353,7 @@ const InFlightStrip = ({
         key={item.label}
         type="button"
         onClick={() => onNavigate(item.href)}
-        className="flex items-center gap-3 px-4 py-2.5 text-left rounded-lg hover:bg-hoverColor transition-colors"
+        className="flex items-center gap-3 px-3 py-2.5 text-left rounded-lg hover:bg-hoverColor transition-colors"
       >
         <span
           className={`flex items-center justify-center size-9 shrink-0 rounded-full ${item.circle}`}
@@ -416,10 +424,11 @@ const CustodyBand = ({
           <p className="text-sm text-gray-400">No assets in the register yet.</p>
           <button
             type="button"
-            className="text-xs font-medium text-primarycolor hover:underline mt-2"
+            className="mx-auto mt-2 flex items-center gap-1 text-xs font-medium text-primarycolor hover:underline"
             onClick={() => onNavigate('/assets')}
           >
-            Add or import assets →
+            Add or import assets
+            <i className="icon icon-right text-[9px]" />
           </button>
         </div>
       </>
@@ -444,27 +453,16 @@ const CustodyBand = ({
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mt-4">
         {segments.map((segment) => (
-          <button
+          <CountTile
             key={segment.label}
-            type="button"
+            label={segment.label}
+            sub={`${pct(segment.value)}% · ${segment.sub}`}
+            value={segment.value}
+            tintBg={segment.tintBg}
+            tintText={segment.tintText}
+            dot={segment.dot}
             onClick={() => onNavigate(segment.href)}
-            className={`rounded-xl px-3 py-2.5 text-left transition-shadow hover:shadow-md ${segment.tintBg}`}
-          >
-            <span className="flex items-center gap-1.5">
-              <span className={`size-2 rounded-full shrink-0 ${segment.dot}`}></span>
-              <span className="text-[11px] font-bold text-gray-600 truncate">{segment.label}</span>
-            </span>
-            <p
-              className={`text-xl font-bold leading-none mt-1.5 tabular-nums ${
-                segment.value > 0 ? segment.tintText : 'text-gray-300'
-              }`}
-            >
-              {segment.value}
-            </p>
-            <p className="text-[11px] text-gray-500 mt-1 truncate">
-              {pct(segment.value)}% · {segment.sub}
-            </p>
-          </button>
+          />
         ))}
       </div>
 
@@ -498,6 +496,48 @@ interface ICountTile {
   tintBg: string;
   tintText: string;
 }
+
+/**
+ * ONE tile spec for every tinted counter on the page — custody, depreciation,
+ * anything later. Two bands drawing the "colored tile with a number" idea two
+ * different ways read as two apps sharing a screen.
+ */
+const CountTile = ({
+  label,
+  sub,
+  value,
+  tintBg,
+  tintText,
+  dot,
+  onClick,
+}: {
+  label: string;
+  sub?: string;
+  value: number;
+  tintBg: string;
+  tintText: string;
+  dot?: string;
+  onClick: () => void;
+}) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`rounded-xl px-3 py-2.5 text-left transition-shadow hover:shadow-md ${tintBg}`}
+  >
+    <span className="flex items-center gap-1.5">
+      {dot && <span className={`size-2 rounded-full shrink-0 ${dot}`}></span>}
+      <span className="text-[11px] font-bold text-gray-600 truncate">{label}</span>
+    </span>
+    <p
+      className={`text-xl font-bold leading-none mt-1.5 tabular-nums ${
+        value > 0 ? tintText : 'text-gray-300'
+      }`}
+    >
+      {value}
+    </p>
+    {sub && <p className="text-[11px] text-gray-500 mt-1 truncate">{sub}</p>}
+  </button>
+);
 
 /**
  * The axis always draws twelve months, even with nothing posted. An empty ledger with
@@ -806,26 +846,35 @@ const DashboardPage = () => {
 
   return (
     <div className="px-4 sm:px-6 py-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-secondaryColor">
-            Asset Management Dashboard
-          </h1>
-          <p className="text-xs text-gray-500 mt-0.5">
-            Register health, custody and accounting at a glance.
-          </p>
-        </div>
+      <div>
+        <h1 className="text-lg font-semibold text-secondaryColor">
+          Asset Management Dashboard
+        </h1>
+        <p className="text-xs text-gray-500 mt-0.5">
+          Register health, custody and accounting at a glance.
+        </p>
       </div>
 
       {loading && !dashboard ? (
-        <p className="text-sm text-gray-500 mt-6">Loading dashboard…</p>
+        /* The skeleton draws the page's real bones — five KPI cells and three bands —
+           so the load settles into place instead of popping from a sentence. */
+        <div className="mt-5 space-y-5" aria-hidden>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-[104px] animate-pulse rounded-2xl bg-gray-100" />
+            ))}
+          </div>
+          <div className="h-16 animate-pulse rounded-2xl bg-gray-100" />
+          <div className="h-64 animate-pulse rounded-2xl bg-gray-100" />
+          <div className="h-40 animate-pulse rounded-2xl bg-gray-100" />
+        </div>
       ) : !dashboard ? (
         /*
          * Without this branch a failed fetch falls through to the body, where every count
          * reads 0 and the all-clear strip announces that the register is quiet — the one
          * claim we are in no position to make when we could not reach the server.
          */
-        <div className="mt-6 flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+        <div className="mt-5 flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
           <span className="inline-flex items-center justify-center size-9 rounded-full bg-amber-100 shrink-0">
             <i className="icon icon-alert text-amber-600 text-base"></i>
           </span>
@@ -891,7 +940,7 @@ const DashboardPage = () => {
             <AllClearStrip everythingQuiet={everythingQuiet} />
           ) : (
             <Panel
-              emoji="📌"
+              iconName="alert"
               title="Needs You Today"
               action={
                 /*
@@ -911,7 +960,7 @@ const DashboardPage = () => {
           )}
 
           {/* Band 2 — what is moving right now */}
-          <Panel className="!py-2">
+          <Panel inset>
             <InFlightStrip items={inFlight} onNavigate={go} />
           </Panel>
 
@@ -919,11 +968,13 @@ const DashboardPage = () => {
               below: a room is a place, "Assigned" is a state, and mixing the two is how
               an operator ends up looking for a chair in a status. */}
           <Panel
-            emoji="🏢"
+            iconName="company"
             title="Assets by Location"
             action={
+              // Bare path: next/link applies basePath itself — appUrl() here
+              // double-prefixed to /asset-management/asset-management and 404'd.
               <Link
-                href={appUrl('/reports?code=assets-by-location')}
+                href="/reports?code=assets-by-location"
                 className="flex items-center gap-1 text-xs font-medium text-primarycolor hover:underline"
               >
                 View Explorer
@@ -939,7 +990,7 @@ const DashboardPage = () => {
 
           {/* Band 4 — who HOLDS things, which is a different question from where they are. */}
           <Panel
-            emoji="📦"
+            iconName="move"
             title="Asset Custody & Movement"
             action={
               <span className="text-xs text-gray-400 tabular-nums">
@@ -956,35 +1007,29 @@ const DashboardPage = () => {
 
           {/* Band 4 — the two depreciation blocks, merged */}
           <Panel
-            emoji="🧾"
+            iconName="documents"
             title="Depreciation & Accounting"
             action={
               <button
                 type="button"
-                className="text-xs font-medium text-primarycolor hover:underline"
+                className="flex items-center gap-1 text-xs font-medium text-primarycolor hover:underline"
                 onClick={() => router.push('/depreciation')}
               >
-                View all →
+                View all
+                <i className="icon icon-right text-[9px]" />
               </button>
             }
           >
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {depreciationTiles.map((tile) => (
-                <button
+                <CountTile
                   key={tile.label}
-                  type="button"
+                  label={tile.label}
+                  value={tile.value}
+                  tintBg={tile.tintBg}
+                  tintText={tile.tintText}
                   onClick={() => router.push('/depreciation')}
-                  className={`rounded-xl py-3 px-2 text-center transition-shadow hover:shadow-md ${tile.tintBg}`}
-                >
-                  <p
-                    className={`text-2xl font-bold leading-none tabular-nums ${
-                      tile.value > 0 ? tile.tintText : 'text-gray-300'
-                    }`}
-                  >
-                    {tile.value}
-                  </p>
-                  <p className="text-[11px] text-gray-500 mt-1.5 leading-tight">{tile.label}</p>
-                </button>
+                />
               ))}
             </div>
             <MonthlyChart series={dashboard?.monthlyDepreciation ?? []} />

@@ -26,6 +26,8 @@ export interface IReportFilter {
   categoryId?: string;
   /** assets-by-location only: a label from the availability chips ("Available", "In Use", …). */
   availability?: string;
+  /** assets-by-location only: VerificationStatusEnum name — NotVerified | Verified | Discrepancy. */
+  verificationStatus?: string;
   /** assets-by-location only: the "(No location)" slice. Mutually exclusive with locationId. */
   unlocated?: boolean;
   /** assets-by-location only: false = rows without chips/money totals (the explorer's

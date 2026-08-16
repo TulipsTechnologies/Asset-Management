@@ -96,4 +96,37 @@ describe('assets-by-location query serialization', () => {
     expect(requests[1]).not.toContain('LocationId');
     expect(requests[1]).toContain('IncludeChildren=false');
   });
+
+  it('sends the verification filter as the enum name, and only when set', async () => {
+    const { runReport } = await loadService();
+
+    await runReport('assets-by-location', { verificationStatus: 'NotVerified' });
+    expect(requests[0]).toContain('VerificationStatus=NotVerified');
+
+    await runReport('assets-by-location', {});
+    expect(requests[1]).not.toContain('VerificationStatus');
+  });
+
+  it('asks for a held condition by id only when the record carries one', async () => {
+    const { fetchAssetConditionLookup } = await import('../assetConditionType.service');
+
+    await fetchAssetConditionLookup();
+    expect(requests[0]).toContain('/AssetConditionTypes/lookup');
+    // No IncludeId at all — an empty one would ask the server to merge "nothing" back in.
+    expect(requests[0]).not.toContain('IncludeId');
+
+    await fetchAssetConditionLookup('cond-7');
+    expect(requests[1]).toContain('IncludeId=cond-7');
+  });
+
+  it('asks the summary for the unlocated bucket only when asked', async () => {
+    const { fetchLocationSummary } = await loadService();
+
+    await fetchLocationSummary(null, true, false, true);
+    expect(requests[0]).toContain('Unlocated=true');
+    expect(requests[0]).not.toContain('LocationId');
+
+    await fetchLocationSummary('loc-1', true, true);
+    expect(requests[1]).not.toContain('Unlocated');
+  });
 });

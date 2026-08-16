@@ -573,6 +573,13 @@ input[type="number"]::-webkit-outer-spin-button {
     display: none !important;
   }
 
+  /* The GENERAL form of the rule above, for every sheet built on usePrintSheet(): the hook
+     adds `printing` to <body> and portals the sheet into #print-root. Same scoping discipline
+     — the class is only present while a print is in flight, so no other route can be blanked. */
+  body.printing > *:not(#print-root) {
+    display: none !important;
+  }
+
   /* A NAMED page, claimed only by the schedule sheet. The app-wide print block above
      already declares `@page { margin: … !important }`; overriding the anonymous page here
      would have re-margined every other printable view, and a plain (non-important) rule
@@ -584,6 +591,17 @@ input[type="number"]::-webkit-outer-spin-button {
 
   .print-sheet {
     page: schedule;
+  }
+
+  /* Landscape variant for wide tables. A separate NAMED page for the same reason as above;
+     a sheet opts in by adding .print-sheet--landscape alongside .print-sheet. */
+  @page sheet-landscape {
+    size: A4 landscape;
+    margin: 12mm 10mm;
+  }
+
+  .print-sheet--landscape {
+    page: sheet-landscape;
   }
 
   html,
@@ -746,5 +764,98 @@ input[type="number"]::-webkit-outer-spin-button {
     border-top: 0.5px solid #ccc;
     font-size: 7.5pt;
     color: #777;
+  }
+
+  /* ---- operational-form furniture (receipts, passes, count sheets) ----------------
+     The schedule is a REPORT — it is read. These documents are FORMS: a human signs them,
+     or fills them in with a pen while walking around a building. */
+
+  /* The sentence someone puts their name under. Never allowed to break across a page from
+     the signatures it governs. */
+  .print-terms {
+    font-size: 8pt;
+    line-height: 1.45;
+    color: #333;
+    margin-top: 8pt;
+  }
+
+  .print-signatures {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10pt 24pt;
+    margin-top: 16pt;
+    /* A signature block orphaned onto its own page is a document nobody can prove was
+       signed against the list it belongs to. */
+    break-inside: avoid;
+  }
+
+  .print-signature {
+    break-inside: avoid;
+  }
+
+  /* Ruled space to actually sign in. Height is deliberate: ~14mm is a comfortable
+     hand-written signature. */
+  .print-signature-line {
+    height: 14mm;
+    border-bottom: 0.75px solid #333;
+  }
+
+  .print-signature-role {
+    font-size: 7.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #666;
+    margin-top: 3pt;
+  }
+
+  .print-signature-name {
+    font-size: 9pt;
+    font-weight: 600;
+    margin-top: 1pt;
+  }
+
+  .print-signature-meta {
+    font-size: 7.5pt;
+    color: #777;
+  }
+
+  /* An empty box to tick with a pen. Printed as a real outline, because browsers drop
+     background colours by default — a filled box would come out blank. */
+  .print-tick {
+    display: inline-block;
+    width: 9pt;
+    height: 9pt;
+    border: 0.75px solid #333;
+    vertical-align: -1pt;
+  }
+
+  /* A ruled blank for writing a found value into. */
+  .print-write-in {
+    display: inline-block;
+    min-width: 22mm;
+    border-bottom: 0.5px solid #999;
+  }
+
+  /* Count-sheet rows need room for handwriting, so they are taller than a report's. */
+  .print-table--form td {
+    height: 9mm;
+    vertical-align: middle;
+  }
+
+  /* Status/condition wording must survive as TEXT: browsers drop background colours by
+     default, so an on-screen tinted chip prints as an unreadable ghost. Printed documents
+     use bordered text instead of tint. */
+  .print-chip {
+    display: inline-block;
+    border: 0.5px solid #666;
+    border-radius: 2pt;
+    padding: 0 3pt;
+    font-size: 7.5pt;
+    color: #222;
+  }
+
+  /* Forces a page break before an element — one receipt per page when several are printed. */
+  .print-break-before {
+    break-before: page;
   }
 }

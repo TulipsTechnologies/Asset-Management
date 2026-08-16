@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/Providers/ToastProvider';
 import Button from '@/components/UI/Button';
 import CustomTable from '@/components/CustomTable/CustomTable';
@@ -85,9 +86,13 @@ const formatCell = (value: unknown): string => {
 
 export default function ReportsPage() {
   const { addToast } = useToast();
+  const router = useRouter();
 
   const [catalogue, setCatalogue] = useState<IReportDescriptor[]>([]);
   const [selected, setSelected] = useState<IReportDescriptor | null>(null);
+  /** The 13-tile grid folds away once a report is on screen — a deep link from the
+   *  dashboard must land on the report, not on a wall of buttons above the fold. */
+  const [catalogueOpen, setCatalogueOpen] = useState(false);
   const [years, setYears] = useState<IFiscalYear[]>([]);
   /** Hierarchy flattened for the picker, indented so depth stays visible. */
   const [locationOptions, setLocationOptions] = useState<{ label: string; value: string }[]>([]);
@@ -155,6 +160,9 @@ export default function ReportsPage() {
 
   const load = useCallback(async () => {
     if (!selected) return;
+    // The explorer runs its own two-fetch discipline — the generic runner firing
+    // here too would pay for a full aggregate page nobody renders.
+    if (selected.code === 'assets-by-location') return;
     setLoading(true);
     try {
       const response = await runReport(selected.code, filter);
@@ -197,10 +205,14 @@ export default function ReportsPage() {
 
   const pick = (descriptor: IReportDescriptor) => {
     setSelected(descriptor);
+    setCatalogueOpen(false);
     setRows([]);
     setRowCount(0);
     setSummaryChips([]);
     setFilter({ pageNumber: 1, pageSize: DEFAULT_PAGE_SIZE });
+    // The URL follows the pick, dropping any stale locationId/unlocated from a
+    // previous report. Bare path — next/navigation applies basePath itself.
+    router.replace(`/reports?code=${descriptor.code}`, { scroll: false });
   };
 
   const exportXlsx = async () => {
@@ -289,37 +301,73 @@ export default function ReportsPage() {
         </p>
       </div>
 
-      {/* Every report the caller's permissions allow, three across. */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {catalogue.map((descriptor) => {
-          const active = selected?.code === descriptor.code;
-          return (
-            <button
-              key={descriptor.code}
-              type="button"
-              onClick={() => pick(descriptor)}
-              className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
-                active
-                  ? 'border-primarycolor bg-primarycolor/10'
-                  : 'border-gray-200 bg-white hover:border-primarycolor/40 hover:bg-hoverColor'
+      {/* The chosen report as a compact bar; the full catalogue folds beneath it.
+          Landing from a deep link puts the report itself at the top of the screen —
+          thirteen buttons the caller has already chosen between are one click away. */}
+      {selected && (
+        <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-2.5">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primarycolor/10">
+            <i
+              className={`icon icon-${REPORT_ICONS[selected.code] ?? 'bar-chart'} text-[15px] text-primarycolor`}
+            />
+          </span>
+          <span className="min-w-0 truncate text-sm font-semibold text-secondaryColor">
+            {selected.name}
+          </span>
+          <i
+            className="icon icon-info shrink-0 text-[15px] text-gray-300"
+            title={selected.description}
+          />
+          <button
+            type="button"
+            onClick={() => setCatalogueOpen((open) => !open)}
+            aria-expanded={catalogueOpen}
+            className="ml-auto flex shrink-0 items-center gap-1.5 rounded-full border border-gray-300 px-3 py-1 text-xs font-medium text-secondaryColor hover:bg-hoverColor"
+          >
+            <i className="icon icon-modules text-[11px]" />
+            All reports
+            <i
+              className={`icon icon-right text-[9px] transition-transform ${
+                catalogueOpen ? 'rotate-90' : ''
               }`}
-            >
-              <i
-                className={`icon icon-${REPORT_ICONS[descriptor.code] ?? 'bar-chart'} text-[17px] shrink-0 text-primarycolor`}
-              />
-              <span className="min-w-0 grow truncate text-sm font-medium text-secondaryColor">
-                {descriptor.name}
-              </span>
-              {/* The description lives here rather than under the grid, so picking a
-                  report does not shift the layout to make room for it. */}
-              <i
-                className="icon icon-info shrink-0 text-[15px] text-gray-300"
-                title={descriptor.description}
-              />
-            </button>
-          );
-        })}
-      </div>
+            />
+          </button>
+        </div>
+      )}
+
+      {/* Every report the caller's permissions allow, three across. */}
+      {(catalogueOpen || !selected) && (
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {catalogue.map((descriptor) => {
+            const active = selected?.code === descriptor.code;
+            return (
+              <button
+                key={descriptor.code}
+                type="button"
+                onClick={() => pick(descriptor)}
+                className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
+                  active
+                    ? 'border-primarycolor bg-primarycolor/10'
+                    : 'border-gray-200 bg-white hover:border-primarycolor/40 hover:bg-hoverColor'
+                }`}
+              >
+                <i
+                  className={`icon icon-${REPORT_ICONS[descriptor.code] ?? 'bar-chart'} text-[17px] shrink-0 text-primarycolor`}
+                />
+                <span className="min-w-0 grow truncate text-sm font-medium text-secondaryColor">
+                  {descriptor.name}
+                </span>
+                {/* The description lives here rather than under the grid, so picking a
+                    report does not shift the layout to make room for it. */}
+                <i
+                  className="icon icon-info shrink-0 text-[15px] text-gray-300"
+                  title={descriptor.description}
+                />
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* This report is not a table with filters — it is a place to explore. The
           catalogue above still switches reports; everything below it is the explorer. */}

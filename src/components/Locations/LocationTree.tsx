@@ -1,25 +1,42 @@
 'use client';
 
 import Link from 'next/link';
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { IAssetLocationTree } from '@/interface/IAssetLocation';
+import {
+  ANCHOR_ROW,
+  CountBadge,
+  ELBOW_DROP,
+  HOVER_ROW,
+  INDENT_MARGIN,
+  INDENT_PAD,
+  LeafDot,
+  LocationTypeIcon,
+  MeterBar,
+  nameClass,
+  SELECTED_ROW,
+  TreeChevron,
+} from './treeGrammar';
 
 /**
  * The location hierarchy as an explorable tree: Building → Floor → Room, parent to
  * child, exactly as the master data nests it.
  *
- * Two modes share one component:
+ * Modes share one component:
  * - MANAGEMENT (the /locations page): hover actions (add child / edit / delete) and
  *   count badges that LINK to the Assets-by-Location report.
- * - SELECTION (the report's Location Explorer): pass `onSelect` — rows become click
- *   targets, `selectedId` drives the highlight and auto-expands its ancestors, badges
- *   are plain counts (a navigation link inside the page that is already the report
- *   would be a dead click), and the mutation cluster is hidden unless handlers are
- *   provided.
+ * - SELECTION (the report's Location Explorer, the dashboard band): pass `onSelect` —
+ *   rows become click targets, `selectedId` drives the highlight and auto-expands its
+ *   ancestors, badges are plain counts (a navigation link inside the page that is
+ *   already the report would be a dead click), and the mutation cluster is hidden
+ *   unless handlers are provided.
  *
- * Visual grammar: depth carries weight (buildings are anchors, rooms are leaves),
- * elbow connectors draw containment the way a file explorer does, and every count
- * badge is the SUBTREE total — the same number the report shows for that node.
+ * Visual grammar comes from ./treeGrammar — shared with the explorer's grouped view
+ * so a location row reads identically on every surface. The star of each row is the
+ * VALUE BAR between name and count: buildings are drawn against the largest building,
+ * children against their parent, so the register's physical distribution is visible
+ * before a single number is read. Every count badge is the SUBTREE total — the same
+ * number the report shows for that node.
  */
 
 interface IProps {
@@ -37,6 +54,12 @@ interface IProps {
   selectedId?: string | null;
   /** Explorer default: buildings visible but collapsed on first load. */
   defaultCollapsedToBuildings?: boolean;
+  /** Dashboard default: every building collapsed EXCEPT these ids, seeded once. */
+  initialOpenIds?: string[];
+  /** Tighter rows + smaller type for panes that host the tree inside a band. */
+  density?: 'default' | 'compact-rows';
+  /** Per-node slot rendered on the value bar's tail — exception pills and the like. */
+  trailing?: (nodeId: string) => ReactNode;
 }
 
 const matchesSearch = (node: IAssetLocationTree, needle: string): boolean =>
@@ -94,7 +117,11 @@ const TreeNode = memo(function TreeNode({
   toggle,
   searching,
   subtotal,
+  /** The bar's comparison basis: largest root for depth 1, parent total below. */
+  scaleBasis,
   compact,
+  dense,
+  trailing,
   onAddChild,
   onEdit,
   onDelete,
@@ -108,7 +135,10 @@ const TreeNode = memo(function TreeNode({
   toggle: (id: string) => void;
   searching: boolean;
   subtotal: Map<string, number>;
+  scaleBasis: number;
   compact?: boolean;
+  dense?: boolean;
+  trailing?: (nodeId: string) => ReactNode;
   onAddChild?: IProps['onAddChild'];
   onEdit?: IProps['onEdit'];
   onDelete?: IProps['onDelete'];
@@ -123,158 +153,144 @@ const TreeNode = memo(function TreeNode({
   const selectable = !!onSelect;
   const isSelected = selectable && selectedId === node.id;
   const hasActions = !!(onAddChild || onEdit || onDelete);
+  const tier = depth === 1 ? 1 : depth === 2 ? 2 : 3;
+  const share = scaleBasis > 0 ? total / scaleBasis : 0;
+  const pct = scaleBasis > 0 ? Math.round((total / scaleBasis) * 100) : 0;
 
   const rowRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (isSelected)
       rowRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-  }, [isSelected]);
+    // `collapsed` is a dep so a deep link still scrolls once collapse seeding has
+    // revealed the row; block:'nearest' makes the extra runs free.
+  }, [isSelected, collapsed]);
 
-  const countBadge = (
-    <span
-      className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums transition-colors ${
-        isSelected
-          ? 'bg-white/80 text-primarycolor'
-          : depth === 1
-            ? 'bg-primarycolor/10 text-primarycolor hover:bg-primarycolor/20'
-            : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
-      }`}
-      title={
-        node.assetCount === total
-          ? `${total.toLocaleString()} asset${total === 1 ? '' : 's'} here`
-          : `${total.toLocaleString()} asset${total === 1 ? '' : 's'} in this ${depth === 1 ? 'building' : 'area'} (${node.assetCount.toLocaleString()} directly here)`
-      }
-    >
-      {total.toLocaleString()}
-      {depth === 1 && !compact && <span className="ml-1 font-normal">assets</span>}
+  // Names get a FIXED basis (shrinking by the indent step) so every bar track
+  // starts at the same x per level — bars are comparable only when their origins
+  // align. The reference details (code/address) live in the title, never inline:
+  // a hover-revealed span would steal track width and turn the bar into a lie.
+  const nameBasis = (compact ? 150 : 240) - (depth - 1) * (INDENT_MARGIN + INDENT_PAD);
+  const rowTitle = [
+    `${total.toLocaleString()} asset${total === 1 ? '' : 's'}`,
+    scaleBasis > 0 && depth === 1 ? `${pct}% of largest building` : null,
+    scaleBasis > 0 && depth > 1 ? `${pct}% of parent` : null,
+    node.assetCount !== total ? `${node.assetCount.toLocaleString()} directly here` : null,
+    node.code ?? null,
+    node.address ?? null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  const countCell = (
+    <span className="flex w-16 shrink-0 justify-end">
+      {total > 0 &&
+        (selectable ? (
+          // Inside a selecting surface the count is information, not navigation —
+          // the row itself selects, and a link to the page we are already on is a
+          // dead click.
+          <button type="button" onClick={() => onSelect!(node)} className="shrink-0" tabIndex={-1}>
+            <CountBadge total={total} anchor={tier === 1} selected={isSelected} />
+          </button>
+        ) : (
+          // On the management page the badge answers "what is here?" when clicked:
+          // the report, scoped to this node with children included — exactly what
+          // the subtree total counts, so the click never contradicts the badge.
+          <Link
+            href={`/reports?code=assets-by-location&locationId=${node.id}`}
+            className="shrink-0"
+            title="Open the Assets-by-Location report for this location"
+          >
+            <CountBadge total={total} anchor={tier === 1} />
+          </Link>
+        ))}
     </span>
   );
 
+  const elbowDrop = ELBOW_DROP[dense ? 'compact' : 'default'];
+
   return (
-    <div className={`relative ${depth === 1 ? 'mt-1.5 first:mt-0' : ''}`}>
-      {/* Each child draws its OWN segment of the parent's vertical guideline: full
-          height when siblings follow, elbow-deep when it is the last. */}
-      {depth > 1 && (
-        <span
-          aria-hidden
-          className={`absolute -left-[11px] top-0 w-px bg-gray-200 ${isLast ? 'h-[19px]' : 'bottom-0'}`}
-        />
-      )}
-      <div
-        ref={rowRef}
-        className={`group relative flex items-center gap-2 rounded-lg py-1.5 pl-1 pr-2 transition-colors ${
-          isSelected
-            ? 'bg-primarycolor/15 ring-1 ring-primarycolor/40'
-            : depth === 1
-              ? 'bg-gray-50 hover:bg-gray-100/80'
-              : 'hover:bg-gray-50'
-        }`}
-      >
-        {/* The elbow: this row's stub meeting the guideline at its centre. */}
-        {depth > 1 && (
+    <div
+      className={`relative ${depth === 1 ? 'mt-1.5 first:mt-0' : ''}`}
+      role="treeitem"
+      aria-level={depth}
+      aria-expanded={hasChildren ? isOpen : undefined}
+      aria-selected={selectable ? isSelected : undefined}
+    >
+      {/* Each child draws its OWN segment of the parent's vertical guideline: a
+          full-height straight run when siblings follow, a rounded terminal elbow
+          when it is the last — a container-wide line can't stop at the last elbow
+          once that child expands. */}
+      {depth > 1 &&
+        (isLast ? (
           <span
             aria-hidden
-            className="absolute -left-[11px] top-1/2 h-px w-[11px] bg-gray-200"
+            className="absolute -left-[10px] top-0 w-[10px] rounded-bl-[7px] border-b border-l border-gray-200"
+            style={{ height: elbowDrop }}
+          />
+        ) : (
+          <span aria-hidden className="absolute -left-[10px] bottom-0 top-0 w-px bg-gray-200" />
+        ))}
+      <div
+        ref={rowRef}
+        title={rowTitle}
+        className={`group relative flex items-center gap-2 rounded-lg pl-1 pr-2 transition-colors ${
+          dense ? 'py-1' : 'py-1.5'
+        } ${isSelected ? SELECTED_ROW : tier === 1 ? ANCHOR_ROW : HOVER_ROW}`}
+      >
+        {/* The elbow stub for rows that are NOT last: their guideline runs straight
+            through, so the stub meets it at the row's centre. */}
+        {depth > 1 && !isLast && (
+          <span
+            aria-hidden
+            className="absolute -left-[10px] top-1/2 h-px w-[10px] bg-gray-200"
           />
         )}
 
         {hasChildren ? (
-          <button
-            type="button"
-            onClick={() => toggle(node.id)}
-            aria-label={isOpen ? `Collapse ${node.name}` : `Expand ${node.name}`}
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-400 hover:bg-gray-200 hover:text-gray-600"
-          >
-            <i
-              className={`icon icon-right text-[10px] transition-transform duration-150 ${isOpen ? 'rotate-90' : ''}`}
-            />
-          </button>
+          <TreeChevron
+            isOpen={isOpen}
+            name={node.name}
+            onToggle={() => toggle(node.id)}
+            inert={searching}
+          />
         ) : (
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center">
-            <span className="h-1 w-1 rounded-full bg-gray-300" />
-          </span>
+          <LeafDot />
         )}
 
-        {/* Depth speaks through the icon: buildings anchor, floors carry, rooms point. */}
-        {depth === 1 ? (
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primarycolor/10">
-            <i className="icon icon-company text-[14px] text-primarycolor" />
-          </span>
-        ) : (
-          <i
-            className={`icon ${depth === 2 ? 'icon-home text-[13px] text-gray-500' : 'icon-marker text-[12px] text-gray-400'} shrink-0`}
-          />
-        )}
+        <LocationTypeIcon tier={tier} compact={compact || dense} />
 
         {selectable ? (
           <button
             type="button"
             onClick={() => onSelect!(node)}
-            className={`min-w-0 flex-[2_1_0%] truncate text-left ${
-              depth === 1
-                ? 'text-[15px] font-semibold text-secondaryColor'
-                : depth === 2
-                  ? 'text-sm font-medium text-secondaryColor'
-                  : 'text-sm text-gray-600'
-            }`}
+            className={`min-w-0 shrink truncate text-left ${nameClass(tier, compact || dense)}`}
+            style={{ flexBasis: nameBasis, flexGrow: 0 }}
             aria-current={isSelected ? 'true' : undefined}
           >
             {node.name}
           </button>
         ) : (
           <span
-            className={`truncate ${
-              depth === 1
-                ? 'text-[15px] font-semibold text-secondaryColor'
-                : depth === 2
-                  ? 'text-sm font-medium text-secondaryColor'
-                  : 'text-sm text-gray-600'
-            }`}
+            className={`min-w-0 shrink truncate ${nameClass(tier, compact || dense)}`}
+            style={{ flexBasis: nameBasis, flexGrow: 0 }}
           >
             {node.name}
           </span>
         )}
 
-        {!node.isActive && (
-          <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-gray-500">
-            Inactive
-          </span>
-        )}
-
-        {total > 0 &&
-          (selectable ? (
-            // Inside the explorer the count is information, not navigation — the row
-            // itself selects, and a link to the page we are already on is a dead click.
-            <button type="button" onClick={() => onSelect!(node)} className="shrink-0">
-              {countBadge}
-            </button>
-          ) : (
-            // On the management page the badge answers "what is here?" when clicked:
-            // the report, scoped to this node with children included — exactly what
-            // the subtree total counts, so the click never contradicts the badge.
-            <Link
-              href={`/reports?code=assets-by-location&locationId=${node.id}`}
-              className="shrink-0"
-              title="Open the Assets-by-Location report for this location"
-            >
-              {countBadge}
-            </Link>
-          ))}
-
-        {/* Reference details stay out of the way until the row is engaged — and stay
-            out of the LAYOUT entirely in the narrow explorer pane, where they were
-            stealing the width the location name needs. */}
-        <span className={`min-w-0 shrink items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 ${compact ? 'hidden' : 'hidden sm:flex'}`}>
-          {node.code && (
-            <span className="truncate font-mono text-[10px] text-gray-400">{node.code}</span>
+        <MeterBar share={share} tier={tier} selected={isSelected}>
+          {!node.isActive && (
+            <span className="rounded-full bg-gray-100 px-1.5 py-px text-[9px] font-medium uppercase tracking-wide text-gray-500 ring-1 ring-white">
+              Inactive
+            </span>
           )}
-          {node.address && (
-            <span className="truncate text-xs text-gray-400">{node.address}</span>
-          )}
-        </span>
+          {trailing?.(node.id)}
+        </MeterBar>
+
+        {countCell}
 
         {hasActions && (
-          <span className="ml-auto flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+          <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
             {onAddChild && depth < 3 && (
               <button
                 type="button"
@@ -310,7 +326,7 @@ const TreeNode = memo(function TreeNode({
       </div>
 
       {hasChildren && isOpen && (
-        <div className="ml-[15px] pl-[11px]">
+        <div role="group" style={{ marginLeft: INDENT_MARGIN, paddingLeft: INDENT_PAD }}>
           {node.children.map((child, index) => (
             <TreeNode
               key={child.id}
@@ -321,7 +337,10 @@ const TreeNode = memo(function TreeNode({
               toggle={toggle}
               searching={searching}
               subtotal={subtotal}
+              scaleBasis={total}
               compact={compact}
+              dense={dense}
+              trailing={trailing}
               onAddChild={onAddChild}
               onEdit={onEdit}
               onDelete={onDelete}
@@ -345,6 +364,9 @@ const LocationTree = ({
   onSelect,
   selectedId,
   defaultCollapsedToBuildings,
+  initialOpenIds,
+  density = 'default',
+  trailing,
 }: IProps) => {
   // Collapsed ids, not expanded ones: a brand-new node is visible by default without
   // any bookkeeping, and "expand all" is simply the empty set.
@@ -353,13 +375,25 @@ const LocationTree = ({
 
   const { subtotal, ancestors } = useMemo(() => indexTree(tree), [tree]);
 
-  // Explorer default: buildings visible but folded, seeded ONCE when the tree first
-  // arrives — after that the collapse state belongs to the user.
+  // Roots are drawn against the LARGEST building: the biggest spans the full
+  // track and every other building reads as a fraction of it at a glance.
+  const maxRoot = useMemo(
+    () => Math.max(1, ...tree.map((root) => subtotal.get(root.id) ?? 0)),
+    [tree, subtotal]
+  );
+
+  // Collapse seeding, ONCE when the tree first arrives — after that the collapse
+  // state belongs to the user. Explorer: buildings visible but folded. Dashboard:
+  // everything folded except the named ids (its biggest building).
   useEffect(() => {
-    if (!defaultCollapsedToBuildings || seededRef.current || tree.length === 0) return;
+    if ((!defaultCollapsedToBuildings && !initialOpenIds) || seededRef.current || tree.length === 0)
+      return;
     seededRef.current = true;
-    setCollapsed(new Set(collectIds(tree)));
-  }, [defaultCollapsedToBuildings, tree]);
+    const all = collectIds(tree);
+    setCollapsed(
+      new Set(initialOpenIds ? all.filter((id) => !initialOpenIds.includes(id)) : all)
+    );
+  }, [defaultCollapsedToBuildings, initialOpenIds, tree]);
 
   // A controlled selection must be VISIBLE: breadcrumb clicks, Recent picks and deep
   // links land on nodes the user may have collapsed away — expand their ancestors.
@@ -450,24 +484,29 @@ const LocationTree = ({
           </button>
         </div>
       </div>
-      {visible.map((root, index) => (
-        <TreeNode
-          key={root.id}
-          node={root}
-          depth={1}
-          isLast={index === visible.length - 1}
-          collapsed={collapsed}
-          toggle={toggle}
-          searching={needle.length > 0}
-          subtotal={subtotal}
-          compact={!!onSelect}
-          onAddChild={onAddChild}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          onSelect={onSelect}
-          selectedId={selectedId}
-        />
-      ))}
+      <div role="tree" aria-label="Locations">
+        {visible.map((root, index) => (
+          <TreeNode
+            key={root.id}
+            node={root}
+            depth={1}
+            isLast={index === visible.length - 1}
+            collapsed={collapsed}
+            toggle={toggle}
+            searching={needle.length > 0}
+            subtotal={subtotal}
+            scaleBasis={maxRoot}
+            compact={!!onSelect && density === 'default'}
+            dense={density === 'compact-rows'}
+            trailing={trailing}
+            onAddChild={onAddChild}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onSelect={onSelect}
+            selectedId={selectedId}
+          />
+        ))}
+      </div>
     </div>
   );
 };

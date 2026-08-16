@@ -1,19 +1,28 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import {
+  INDENT_MARGIN,
+  INDENT_PAD,
+  LeafDot,
+  LocationTypeIcon,
+  MeterBar,
+  TreeChevron,
+} from '@/components/Locations/treeGrammar';
 import { ILocationDescendantSummary } from '@/interface/IReports';
 
 /**
  * "How are the assets spread across this building?" — answered without loading a
  * single asset row. Descendants arrive flat from one grouped query and nest here:
  *
- *   Ground Floor — 43 assets
- *     Reception — 12      Sofa 4 · Table 2 · Rack 1     [Open] [View 12 assets]
- *     Admission Office 18 Desk 6 · Chair 8 · Computer 4 [Open] [View 18 assets]
+ *   Ground Floor ▮▮▮▮▮▮▮▮▮░ 43
+ *     Reception ▮▮▮░ 12        Sofa 4 · Table 2      [Open] [View 12 assets]
  *
  * Every level expands and collapses independently, and each row's count is its OWN
  * assets plus its descendants' — the same rollup the tree badge shows, so the two
- * never disagree.
+ * never disagree. The bar draws each row against the whole selected scope at the
+ * top level and against its parent below, in the same grammar as every location
+ * tree in the app.
  */
 
 interface IProps {
@@ -65,6 +74,8 @@ const buildForest = (rows: ILocationDescendantSummary[]): INode[] => {
 const GroupRow = ({
   node,
   depth,
+  isLast,
+  scaleBasis,
   expanded,
   toggle,
   onOpen,
@@ -72,6 +83,9 @@ const GroupRow = ({
 }: {
   node: INode;
   depth: number;
+  isLast: boolean;
+  /** Whole scope for top-level rows, the parent's rollup below. */
+  scaleBasis: number;
   expanded: Set<string>;
   toggle: (id: string) => void;
   onOpen: IProps['onOpen'];
@@ -80,64 +94,70 @@ const GroupRow = ({
   const key = node.id ?? '__unlocated__';
   const hasChildren = node.children.length > 0;
   const isOpen = expanded.has(key);
+  const tier = depth === 0 ? 1 : depth === 1 ? 2 : 3;
+  const share = scaleBasis > 0 ? node.rollup / scaleBasis : 0;
+  const pct = scaleBasis > 0 ? Math.round(share * 100) : 0;
+  const nameBasis = 220 - depth * (INDENT_MARGIN + INDENT_PAD);
 
   return (
-    <div>
-      <div
-        className="group flex items-center gap-3 rounded-lg border border-transparent px-2 py-2 transition-colors hover:border-gray-200 hover:bg-gray-50"
-        style={{ paddingLeft: depth * 22 + 8 }}
-      >
-        {hasChildren ? (
-          <button
-            type="button"
-            onClick={() => toggle(key)}
-            aria-label={isOpen ? `Collapse ${node.name}` : `Expand ${node.name}`}
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-400 hover:bg-gray-200"
-          >
-            <i
-              className={`icon icon-right text-[10px] transition-transform ${isOpen ? 'rotate-90' : ''}`}
-            />
-          </button>
+    <div className="relative">
+      {depth > 0 &&
+        (isLast ? (
+          <span
+            aria-hidden
+            className="absolute -left-[10px] top-0 h-[22px] w-[10px] rounded-bl-[7px] border-b border-l border-gray-200"
+          />
         ) : (
-          <span className="h-6 w-6 shrink-0" />
+          <span aria-hidden className="absolute -left-[10px] bottom-0 top-0 w-px bg-gray-200" />
+        ))}
+      <div
+        className="group relative flex items-center gap-2 rounded-lg border border-transparent px-2 py-2 transition-colors hover:border-gray-200 hover:bg-gray-50"
+        title={`${node.rollup.toLocaleString()} asset${node.rollup === 1 ? '' : 's'} · ${pct}% of ${depth === 0 ? 'this scope' : 'parent'}`}
+      >
+        {depth > 0 && !isLast && (
+          <span aria-hidden className="absolute -left-[10px] top-1/2 h-px w-[10px] bg-gray-200" />
         )}
 
-        <i
-          className={`icon shrink-0 ${
-            node.depth <= 1
-              ? 'icon-company text-[13px] text-primarycolor'
-              : node.depth === 2
-                ? 'icon-home text-[12px] text-gray-500'
-                : 'icon-marker text-[12px] text-gray-400'
-          }`}
-        />
+        {hasChildren ? (
+          <TreeChevron isOpen={isOpen} name={node.name} onToggle={() => toggle(key)} />
+        ) : (
+          <LeafDot />
+        )}
+
+        {/* The pseudo "(No location)" row is a bucket, not a building — it gets the
+            room marker whatever its depth. */}
+        <LocationTypeIcon tier={tier} compact pseudo={!node.id} />
 
         <button
           type="button"
           onClick={() => onOpen(node.id)}
-          className="min-w-0 truncate text-left text-sm font-medium text-secondaryColor hover:text-primarycolor hover:underline"
+          className="min-w-0 shrink truncate text-left text-sm font-medium text-secondaryColor hover:text-primarycolor"
+          style={{ flexBasis: nameBasis, flexGrow: 0 }}
           title={`Open ${node.name}`}
         >
           {node.name}
         </button>
 
-        <span className="shrink-0 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-blue-700">
+        <MeterBar share={share} tier={tier} />
+
+        <span className="w-14 shrink-0 text-right text-sm font-semibold tabular-nums text-secondaryColor">
           {node.rollup.toLocaleString()}
         </span>
 
         {/* Top categories: what KIND of thing is in there, without opening it. */}
-        {node.topCategories.length > 0 && (
-          <span className="hidden min-w-0 truncate text-xs text-gray-400 md:inline">
-            {node.topCategories.map((c) => `${c.name} ${c.count}`).join(' · ')}
-          </span>
-        )}
+        <span
+          className="hidden max-w-[260px] min-w-0 truncate text-xs text-gray-400 xl:inline"
+          title={node.topCategories.map((c) => `${c.name} ${c.count}`).join(' · ')}
+        >
+          {node.topCategories.map((c) => `${c.name} ${c.count}`).join(' · ')}
+        </span>
 
-        <span className="ml-auto shrink-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+        <span className="ml-auto flex w-28 shrink-0 justify-end opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
           {node.rollup > 0 && (
             <button
               type="button"
               onClick={() => onViewAssets(node.id)}
-              className="rounded-full border border-gray-300 bg-white px-3 py-1 text-[11px] font-medium text-secondaryColor hover:border-primarycolor hover:text-primarycolor"
+              className="whitespace-nowrap rounded-full border border-gray-300 bg-white px-3 py-1 text-[11px] font-medium text-secondaryColor hover:border-primarycolor hover:text-primarycolor"
             >
               View {node.rollup.toLocaleString()} asset{node.rollup === 1 ? '' : 's'}
             </button>
@@ -146,12 +166,14 @@ const GroupRow = ({
       </div>
 
       {hasChildren && isOpen && (
-        <div>
-          {node.children.map((child) => (
+        <div style={{ marginLeft: INDENT_MARGIN, paddingLeft: INDENT_PAD }}>
+          {node.children.map((child, index) => (
             <GroupRow
               key={child.id ?? child.name}
               node={child}
               depth={depth + 1}
+              isLast={index === node.children.length - 1}
+              scaleBasis={node.rollup}
               expanded={expanded}
               toggle={toggle}
               onOpen={onOpen}
@@ -173,6 +195,13 @@ const GroupedLocationView = ({
   loading,
 }: IProps) => {
   const forest = useMemo(() => buildForest(descendants), [descendants]);
+
+  /** The whole visible scope: what "100%" means for a top-level bar. */
+  const viewTotal = useMemo(
+    () => directCount + forest.reduce((sum, node) => sum + node.rollup, 0),
+    [directCount, forest]
+  );
+
   // Top level open by default: the first thing to see is the floors, not a row of
   // closed folders.
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -209,28 +238,36 @@ const GroupedLocationView = ({
   return (
     <div className="py-1">
       {directCount > 0 && (
-        <div className="mb-1 flex items-center gap-3 rounded-lg bg-gray-50 px-3 py-2">
+        <div className="group mb-1 flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2">
           <i className="icon icon-marker shrink-0 text-[12px] text-gray-400" />
-          <span className="text-sm text-gray-600">
+          <span
+            className="min-w-0 shrink truncate text-sm text-gray-600"
+            style={{ flexBasis: 220, flexGrow: 0 }}
+          >
             Directly in {selectedName}
           </span>
-          <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold tabular-nums text-gray-600">
+          <MeterBar share={viewTotal > 0 ? directCount / viewTotal : 0} tier={3} />
+          <span className="w-14 shrink-0 text-right text-sm font-semibold tabular-nums text-secondaryColor">
             {directCount.toLocaleString()}
           </span>
-          <button
-            type="button"
-            onClick={() => onViewAssets(null)}
-            className="ml-auto rounded-full border border-gray-300 bg-white px-3 py-1 text-[11px] font-medium text-secondaryColor hover:border-primarycolor hover:text-primarycolor"
-          >
-            View these
-          </button>
+          <span className="ml-auto flex w-28 shrink-0 justify-end">
+            <button
+              type="button"
+              onClick={() => onViewAssets(null)}
+              className="whitespace-nowrap rounded-full border border-gray-300 bg-white px-3 py-1 text-[11px] font-medium text-secondaryColor hover:border-primarycolor hover:text-primarycolor"
+            >
+              View these
+            </button>
+          </span>
         </div>
       )}
-      {forest.map((node) => (
+      {forest.map((node, index) => (
         <GroupRow
           key={node.id ?? node.name}
           node={node}
           depth={0}
+          isLast={index === forest.length - 1}
+          scaleBasis={viewTotal}
           expanded={expanded}
           toggle={toggle}
           onOpen={onOpen}
