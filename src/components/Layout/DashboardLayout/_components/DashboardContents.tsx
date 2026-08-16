@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { useDashbordCtx } from '@tulipstechnologies/common/dist/contexts/DashboardContext';
 import {
@@ -37,6 +37,7 @@ const DashboardContents = ({ children }: { children: ReactNode }) => {
   const { addToast } = useToast();
   const pathname = usePathname();
   const dispatch = useAppDispatch();
+  const headerHostRef = useRef<HTMLDivElement>(null);
 
   const { currentUser, adminView, profileImage, companyLogo } = useAppSelector(
     (state) => state.auth
@@ -94,6 +95,10 @@ const DashboardContents = ({ children }: { children: ReactNode }) => {
             : 'md:w-[calc(100vw-86px)]'
         } rounded-none md:rounded-xl overflow-hidden h-screen md:h-[calc(100vh-24px)] bg-white transition-all duration-300 ease-in-out`}
       >
+        {/* Anchor for the tenant badge, which portals into the shared Header's own row: that row
+            is this element's next sibling. Holding a handle this way rather than matching the
+            shared component's class names keeps the badge working when its styling changes. */}
+        <div ref={headerHostRef} className="hidden" aria-hidden />
         {token && (
           <Header
             addToast={addToast}
@@ -121,7 +126,7 @@ const DashboardContents = ({ children }: { children: ReactNode }) => {
             activeMatchGroups={ASSET_ACTIVE_MATCH_GROUPS}
           />
         )}
-        {token && <ActiveCompanyBadge />}
+        {token && <ActiveCompanyBadge headerHost={headerHostRef} />}
         <div
           className={`h-[calc(100vh-60px)] md:h-[calc(100vh-83px)] ${
             pathname === '/404' ? '' : 'overflow-y-auto overflow-x-hidden'
