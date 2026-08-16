@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useToast } from '@/components/Providers/ToastProvider';
 import SummaryCard, { TSummaryTint } from '@/components/Dashboard/SummaryCard';
+import Modal from '@/components/UI/Modal';
 import AssetsByLocationPanel from '@/components/Dashboard/AssetsByLocationPanel';
 import {
   IAssetDashboard,
@@ -671,6 +672,9 @@ const DashboardPage = () => {
 
   const [dashboard, setDashboard] = useState<IAssetDashboard | null>(null);
   const [loading, setLoading] = useState(true);
+  /** The location band, taken over the whole viewport. The dashboard row is a 340px
+   *  summary; on 193 locations the operator sometimes wants the map, not the postcard. */
+  const [locationExpanded, setLocationExpanded] = useState(false);
   /**
    * Why the load failed, kept for the panel below. A toast is gone in seconds and
    * never reaches whoever is looking at the screen afterwards, which is how a
@@ -971,15 +975,26 @@ const DashboardPage = () => {
             iconName="company"
             title="Assets by Location"
             action={
-              // Bare path: next/link applies basePath itself — appUrl() here
-              // double-prefixed to /asset-management/asset-management and 404'd.
-              <Link
-                href="/reports?code=assets-by-location"
-                className="flex items-center gap-1 text-xs font-medium text-primarycolor hover:underline"
-              >
-                View Explorer
-                <i className="icon icon-right text-[9px]" />
-              </Link>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setLocationExpanded(true)}
+                  title="Expand"
+                  aria-label="Expand Assets by Location"
+                  className="flex h-6 w-6 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-secondaryColor"
+                >
+                  <i className="icon icon-expand-diagonal text-xs" />
+                </button>
+                {/* Bare path: next/link applies basePath itself — appUrl() here
+                    double-prefixed to /asset-management/asset-management and 404'd. */}
+                <Link
+                  href="/reports?code=assets-by-location"
+                  className="flex items-center gap-1 text-xs font-medium text-primarycolor hover:underline"
+                >
+                  View Explorer
+                  <i className="icon icon-right text-[9px]" />
+                </Link>
+              </div>
             }
           >
             <AssetsByLocationPanel
@@ -987,6 +1002,27 @@ const DashboardPage = () => {
               loading={loading}
             />
           </Panel>
+
+          {/* The same band, given the viewport. A SECOND instance on the same payload —
+              zero extra fetches — that seeds its own selection and tree state; closing
+              simply unmounts it. Escape and backdrop click are the Modal's own manners. */}
+          <Modal
+            isOpen={locationExpanded}
+            onClose={() => setLocationExpanded(false)}
+            size="7xl"
+          >
+            <div className="p-5">
+              <h2 className="mb-4 flex items-center gap-2 text-sm font-bold text-secondaryColor">
+                <i className="icon icon-company text-sm text-gray-400" />
+                Assets by Location
+              </h2>
+              <AssetsByLocationPanel
+                hierarchy={dashboard?.locationHierarchy ?? []}
+                loading={loading}
+                tall
+              />
+            </div>
+          </Modal>
 
           {/* Band 4 — who HOLDS things, which is a different question from where they are. */}
           <Panel
