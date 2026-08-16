@@ -24,6 +24,7 @@ import {
 } from '@/utils/assetFallbackMenus';
 import { staticMenus } from '@/utils/staticMenus';
 import { headerStaticMenus } from '@/utils/headerStaticMenus';
+import ActiveCompanyBadge from '../../ActiveCompanyBadge';
 import Logo from '../../../../../public/logo.svg';
 
 const DashboardContents = ({ children }: { children: ReactNode }) => {
@@ -120,6 +121,7 @@ const DashboardContents = ({ children }: { children: ReactNode }) => {
             activeMatchGroups={ASSET_ACTIVE_MATCH_GROUPS}
           />
         )}
+        {token && <ActiveCompanyBadge />}
         <div
           className={`h-[calc(100vh-60px)] md:h-[calc(100vh-83px)] ${
             pathname === '/404' ? '' : 'overflow-y-auto overflow-x-hidden'
