@@ -8,6 +8,7 @@ import Modal from '@/components/UI/Modal';
 import TextArea from '@/components/UI/TextArea';
 import AssetDocumentsSection from './_components/AssetDocumentsSection';
 import ProfileHeader from '@/components/UI/ProfileHeader';
+import { useAssetPrimaryPhoto } from '@/hooks/useAssetPrimaryPhoto';
 import PageToolbar from '@/components/UI/PageToolbar';
 import InfoCard, { InfoCardGrid, InfoField } from '@/components/UI/InfoCard';
 import AssetDepreciationSection from './_components/AssetDepreciationSection';
@@ -102,6 +103,9 @@ const AssetDetailPage = () => {
   const router = useRouter();
   const { addToast } = useToast();
   const { can } = useUserPermissions();
+
+  // Fetched through the authenticated document endpoint — asset photos are not reachable by URL.
+  const primaryPhotoUrl = useAssetPrimaryPhoto(id);
 
   const [asset, setAsset] = useState<IAsset | null>(null);
   const [loading, setLoading] = useState(true);
@@ -304,6 +308,7 @@ const AssetDetailPage = () => {
         }
       />
       <ProfileHeader
+        photoUrl={primaryPhotoUrl}
         fallback={<i className="icon icon-briefcase text-2xl"></i>}
         title={asset.assetCode}
         titleBadges={
