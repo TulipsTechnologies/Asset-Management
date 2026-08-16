@@ -73,10 +73,20 @@ interface IExplorerSelection {
 const LocationExplorer = ({
   initialLocationId,
   companyKey,
+  embedded = false,
 }: {
   initialLocationId?: string | null;
   /** Namespaces the recent-locations list so tenants never see each other's history. */
   companyKey: string;
+  /**
+   * Mounted somewhere that is NOT the reports page — the dashboard's expand modal. The
+   * URL belongs to the page underneath, so the explorer neither reads its selection from
+   * the query string (the dashboard's params mean other things) nor writes it back
+   * (router.replace('/reports?…') from the dashboard would NAVIGATE, closing the modal
+   * out from under the user). Selection lives in state alone; everything else — fetches,
+   * views, Recent — behaves identically.
+   */
+  embedded?: boolean;
 }) => {
   const { addToast } = useToast();
   const router = useRouter();
@@ -90,8 +100,10 @@ const LocationExplorer = ({
   // it on every pick, so it reads from it too. Taking the parent's prop instead would
   // capture whatever it held at mount: the reports page resolves ?locationId in an
   // effect, so a deep link arrived one render too late and was silently ignored.
+  // (Embedded, both halves of that contract are off — see the prop.)
   const [selection, setSelection] = useState<IExplorerSelection>(() => {
-    if (typeof window === 'undefined') return { id: initialLocationId ?? null, unlocated: false };
+    if (typeof window === 'undefined' || embedded)
+      return { id: initialLocationId ?? null, unlocated: false };
     const params = new URLSearchParams(window.location.search);
     return {
       id: params.get('locationId') ?? initialLocationId ?? null,
@@ -107,7 +119,7 @@ const LocationExplorer = ({
   /** Set when the user asks for assets on a parent — otherwise parents show the map.
    *  A deep link carrying a filter is such an ask: the caller wants the rows. */
   const [forceAssets, setForceAssets] = useState(() => {
-    if (typeof window === 'undefined') return false;
+    if (typeof window === 'undefined' || embedded) return false;
     const params = new URLSearchParams(window.location.search);
     return !!(params.get('availability') || params.get('verification'));
   });
@@ -115,11 +127,11 @@ const LocationExplorer = ({
   const [assetSearch, setAssetSearch] = useState('');
   const debouncedAssetSearch = useDebounce(assetSearch, 400);
   const [availability, setAvailability] = useState<string | undefined>(() => {
-    if (typeof window === 'undefined') return undefined;
+    if (typeof window === 'undefined' || embedded) return undefined;
     return new URLSearchParams(window.location.search).get('availability') ?? undefined;
   });
   const [verification, setVerification] = useState<string | undefined>(() => {
-    if (typeof window === 'undefined') return undefined;
+    if (typeof window === 'undefined' || embedded) return undefined;
     return new URLSearchParams(window.location.search).get('verification') ?? undefined;
   });
   const [categoryId, setCategoryId] = useState<string | undefined>();
@@ -216,7 +228,8 @@ const LocationExplorer = ({
           // share the very link that just failed.
           setStaleSelection(response?.message || 'That location no longer exists.');
           setSelection({ id: null, unlocated: false });
-          router.replace(`/reports?code=${REPORT_CODE}`, { scroll: false });
+          if (!embedded)
+            router.replace(`/reports?code=${REPORT_CODE}`, { scroll: false });
         } else {
           setSummary(null);
           addToast.error(response?.message || 'The location summary could not be loaded.');
@@ -318,6 +331,9 @@ const LocationExplorer = ({
       availability?: string;
       verification?: string;
     }) => {
+      // Embedded, there is no citation to keep: the URL is the dashboard's, and writing
+      // /reports into it would navigate away mid-click.
+      if (embedded) return;
       const query = new URLSearchParams({ code: REPORT_CODE });
       if (state.id) query.set('locationId', state.id);
       if (state.unlocated) query.set('unlocated', 'true');
@@ -325,7 +341,7 @@ const LocationExplorer = ({
       if (state.verification) query.set('verification', state.verification);
       router.replace(`/reports?${query.toString()}`, { scroll: false });
     },
-    [router]
+    [router, embedded]
   );
 
   /** One entry point for every way a location gets chosen — tree, breadcrumb, grouped

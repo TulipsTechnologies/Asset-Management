@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { useToast } from '@/components/Providers/ToastProvider';
 import SummaryCard, { TSummaryTint } from '@/components/Dashboard/SummaryCard';
 import Modal from '@/components/UI/Modal';
+import LocationExplorer from '@/components/Reports/LocationExplorer/LocationExplorer';
+import { getActiveCompanyId } from '@/services/assetToken';
 import AssetsByLocationPanel from '@/components/Dashboard/AssetsByLocationPanel';
 import {
   IAssetDashboard,
@@ -983,7 +985,10 @@ const DashboardPage = () => {
                   aria-label="Expand Assets by Location"
                   className="flex h-6 w-6 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-secondaryColor"
                 >
-                  <i className="icon icon-expand-diagonal text-xs" />
+                  {/* icon-enlarge: the two-arrows-OUTWARD glyph. icon-expand-diagonal points
+                      into the corner — a collapse reading — verified by rendering the whole
+                      candidate set side by side. */}
+                  <i className="icon icon-enlarge text-xs" />
                 </button>
                 {/* Bare path: next/link applies basePath itself — appUrl() here
                     double-prefixed to /asset-management/asset-management and 404'd. */}
@@ -1003,9 +1008,11 @@ const DashboardPage = () => {
             />
           </Panel>
 
-          {/* The same band, given the viewport. A SECOND instance on the same payload —
-              zero extra fetches — that seeds its own selection and tree state; closing
-              simply unmounts it. Escape and backdrop click are the Modal's own manners. */}
+          {/* Expanded, the band becomes the REAL Location Explorer — the same component the
+              reports page mounts, in embedded mode so it keeps its hands off the dashboard's
+              URL. It fetches its own tree, summaries and rows on open (the Modal renders null
+              while closed, so nothing is paid until the click); closing unmounts it and the
+              dashboard is exactly as it was. Escape and backdrop are the Modal's own manners. */}
           <Modal
             isOpen={locationExpanded}
             onClose={() => setLocationExpanded(false)}
@@ -1016,10 +1023,9 @@ const DashboardPage = () => {
                 <i className="icon icon-company text-sm text-gray-400" />
                 Assets by Location
               </h2>
-              <AssetsByLocationPanel
-                hierarchy={dashboard?.locationHierarchy ?? []}
-                loading={loading}
-                tall
+              <LocationExplorer
+                embedded
+                companyKey={getActiveCompanyId() ?? 'default'}
               />
             </div>
           </Modal>

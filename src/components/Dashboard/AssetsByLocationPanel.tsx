@@ -170,14 +170,9 @@ const Stat = ({
 const AssetsByLocationPanel = ({
   hierarchy,
   loading,
-  tall = false,
 }: {
   hierarchy: IDashboardLocationNode[];
   loading: boolean;
-  /** Expanded (modal) rendering: the tree gets the viewport instead of a 340px band, so a
-   *  192-location hierarchy is navigation rather than scrolling. Same data, same state rules —
-   *  a second instance mounts in the modal and seeds its own selection. */
-  tall?: boolean;
 }) => {
   const forest = useMemo(() => buildForest(hierarchy), [hierarchy]);
   const all = useMemo(() => flatten(forest), [forest]);
@@ -347,21 +342,9 @@ const AssetsByLocationPanel = ({
         </select>
       </div>
 
-      <div
-        className={`grid grid-cols-1 gap-4 ${
-          tall
-            ? 'lg:grid-cols-[minmax(0,1fr)_300px]'
-            : 'lg:grid-cols-[minmax(0,1fr)_260px]'
-        }`}
-      >
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
         {/* Tablet keeps the tree and stacks the summary beneath it; only mobile drops it. */}
-        <div
-          className={`hidden overflow-y-auto pr-1 md:block ${
-            // 340px keeps the dashboard band honest; expanded, the tree takes what the
-            // modal gives it (85vh minus its own header) and becomes the point of the view.
-            tall ? 'max-h-[calc(85vh-150px)]' : 'max-h-[340px]'
-          }`}
-        >
+        <div className="hidden max-h-[340px] overflow-y-auto pr-1 md:block">
           <LocationTree
             tree={tree}
             loading={false}
