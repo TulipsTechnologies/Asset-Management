@@ -72,7 +72,19 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [userPermissions, setUserPermissions] = useState<number[]>([]);
   const [hubPermissions, setHubPermissions] = useState<number[]>([]);
   const [bootstrapping, setBootstrapping] = useState<boolean>(true);
-  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+  /**
+   * Why bootstrap stopped.
+   *
+   * `kind` decides how it is presented. A token that failed to exchange is a developer problem
+   * and its detail is hidden in production; NOT HAVING CHOSEN A TENANT is neither — it is a
+   * decision only the operator can make, the message names the companies they already have
+   * access to, and hiding it behind "please try again" leaves them pressing Retry forever on
+   * something Retry cannot fix.
+   */
+  const [bootstrapError, setBootstrapError] = useState<{
+    kind: 'auth' | 'tenant';
+    message: string;
+  } | null>(null);
 
   /**
    * Build the display user from the `user` cookie when it is usable, otherwise
@@ -228,8 +240,20 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
   /**
    * Resolves the tenant every request is scoped to and stores it in the
    * `ActiveCompanyId` cookie (read by requestApi as the `x-company-id` header).
-   * Company users carry their own company on the exchange payload; internal
-   * users (superadmin) carry none, so we fall back to the first active company.
+   * Company users carry their own company on the exchange payload and never reach this;
+   * internal users (superadmin) carry none.
+   *
+   * ONE candidate is chosen automatically. MORE THAN ONE IS NEVER GUESSED.
+   *
+   * It used to take `companies.find(c => !c.isDeleted) ?? companies[0]` — the first row of an
+   * unordered list — and that is how an operator ends up in the wrong company's data without
+   * ever choosing it or being told. It is not hypothetical here: the tenants on this database
+   * are two test companies and one real one, and the module's Master Data Reset wiped the real
+   * one twice. Combined with the tenant cookie having been session-scoped, "I did not change
+   * anything" and "I am now looking at production" were the same sentence.
+   *
+   * Failing closed costs an internal operator one explicit choice. Guessing costs somebody
+   * else's data, silently, and the guess looks exactly like a correct answer.
    */
   const resolveActiveCompanyIfAbsent = async () => {
     if (Cookies.get('ActiveCompanyId')) return;
@@ -240,15 +264,37 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
         method: 'GET',
         completeData: true,
       });
-      const companies = Array.isArray(res?.data) ? res.data : [];
-      const active =
-        companies.find((c: { isDeleted?: boolean }) => !c?.isDeleted) ??
-        companies[0];
-      if (active?.id) {
-        persistActiveCompanyIdIfAbsent(active.id);
-      } else {
-        console.warn('[tenant] no company returned', res);
+      const companies = (Array.isArray(res?.data) ? res.data : []).filter(
+        (c: { id?: string; isDeleted?: boolean }) => c?.id && !c.isDeleted
+      );
+
+      if (companies.length === 1) {
+        persistActiveCompanyIdIfAbsent(companies[0].id);
+        return;
       }
+
+      if (companies.length === 0) {
+        setBootstrapError({
+          kind: 'tenant',
+          message:
+            'Your account is not attached to a company, and no company was returned to choose ' +
+            'from. Ask an administrator to grant access.',
+        });
+        return;
+      }
+
+      const names = companies
+        .map((c: { name?: string }) => c?.name)
+        .filter(Boolean)
+        .join(', ');
+      setBootstrapError({
+        kind: 'tenant',
+        message:
+          `Your account can see ${companies.length} companies (${names}), so this module cannot ` +
+          'tell which one you mean. Choose one before continuing — picking for you risks showing, ' +
+          "and changing, another company's data." +
+          (isDevAuthEnabled() ? ' In development, set it on the /dev-auth screen.' : ''),
+      });
     } catch (err) {
       // Leave the cookie unset; writes will surface the API's tenant error.
       console.warn('[tenant] company resolution failed', err);
@@ -323,7 +369,7 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
         if (isDevAuthEnabled()) {
           // Surface the real failure instead of silently rendering with no
           // Authorization header (httpService only reads AssetAuthToken).
-          setBootstrapError(message);
+          setBootstrapError({ kind: 'auth', message });
           setBootstrapping(false);
           return;
         }
@@ -398,11 +444,19 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
         <div className="flex h-screen w-full items-center justify-center bg-gray-50 p-6">
           <div className="w-full max-w-lg space-y-4 rounded-lg border border-red-200 bg-white p-6 shadow-sm">
             <h1 className="text-lg font-semibold text-gray-900">
-              Authentication failed
+              {bootstrapError.kind === 'tenant'
+                ? 'Choose a company'
+                : 'Authentication failed'}
             </h1>
-            {process.env.NODE_ENV === 'development' ? (
+            {bootstrapError.kind === 'tenant' ? (
+              // Always shown, production included: this is the operator's decision to make and
+              // the message names companies they already have access to. "Please try again"
+              // would be a lie — Retry cannot choose for them, and choosing for them is the
+              // defect this replaced.
+              <p className="text-sm text-gray-600">{bootstrapError.message}</p>
+            ) : process.env.NODE_ENV === 'development' ? (
               <>
-                <p className="text-sm text-gray-600">{bootstrapError}</p>
+                <p className="text-sm text-gray-600">{bootstrapError.message}</p>
                 <p className="text-xs text-gray-500">
                   The module needs an AssetAuthToken exchanged from your HRM
                   AuthToken before any API call can succeed. Fix the cause

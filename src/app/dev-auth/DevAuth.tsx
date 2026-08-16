@@ -9,6 +9,7 @@ import { parseJwt } from '@/services/auth.service';
 import {
   clearActiveCompanyId,
   clearAssetToken,
+  setActiveCompanyId,
   setAssetToken,
 } from '@/services/assetToken';
 import {
@@ -119,7 +120,9 @@ const DevAuth = () => {
     // it is in fact correctly refusing.
     const company = companyInput.trim();
     if (company) {
-      Cookies.set('ActiveCompanyId', company, { path: '/', sameSite: 'lax' });
+      // Through the helper so the deliberate choice gets the same lifetime everywhere — a
+      // session-scoped tenant is what made the active company appear to change on its own.
+      setActiveCompanyId(company);
     }
 
     window.location.replace(resolveRedirect());

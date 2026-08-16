@@ -8,6 +8,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
  */
 
 const cookieJar = new Map<string, string>();
+/** Attributes each cookie was written with — the lifetime is behaviour, not decoration. */
+const cookieOptions = new Map<string, Record<string, unknown> | undefined>();
 
 vi.mock('js-cookie', () => ({
   default: {
@@ -15,11 +17,13 @@ vi.mock('js-cookie', () => ({
       key === undefined
         ? Object.fromEntries(cookieJar)
         : cookieJar.get(key),
-    set: (key: string, value: string) => {
+    set: (key: string, value: string, options?: Record<string, unknown>) => {
       cookieJar.set(key, value);
+      cookieOptions.set(key, options);
     },
     remove: (key: string) => {
       cookieJar.delete(key);
+      cookieOptions.delete(key);
     },
   },
 }));
@@ -43,6 +47,7 @@ const jsonResponse = (body: unknown, status = 200) =>
 
 beforeEach(() => {
   cookieJar.clear();
+  cookieOptions.clear();
 });
 
 afterEach(() => {
@@ -215,5 +220,35 @@ describe('AssetAuthToken exchange', () => {
     await ensureAssetToken();
 
     expect(cookieJar.get('ActiveCompanyId')).toBe('chosen-by-hub');
+  });
+});
+
+/**
+ * The active tenant must OUTLIVE the browsing session.
+ *
+ * Written without an expiry it is a session cookie, and that is what made the active company
+ * look like it changed on its own: it disappears when the session ends, and the next bootstrap
+ * resolves a tenant from scratch. On a database holding two test companies and one real one,
+ * an operator who touched nothing came back pointed somewhere else.
+ */
+describe('the active tenant cookie', () => {
+  it('is written with a lifetime, not as a session cookie', async () => {
+    const { setActiveCompanyId } = await loadToken();
+
+    setActiveCompanyId('company-a');
+
+    expect(cookieJar.get('ActiveCompanyId')).toBe('company-a');
+    expect(cookieOptions.get('ActiveCompanyId')).toMatchObject({ path: '/' });
+    // The assertion that matters: something, anything, bounds how long it lives.
+    expect(cookieOptions.get('ActiveCompanyId')?.expires).toBeTruthy();
+  });
+
+  it('adopting a tenant from the login envelope is just as durable', async () => {
+    const { persistActiveCompanyIdIfAbsent } = await loadToken();
+
+    persistActiveCompanyIdIfAbsent('from-login');
+
+    expect(cookieJar.get('ActiveCompanyId')).toBe('from-login');
+    expect(cookieOptions.get('ActiveCompanyId')?.expires).toBeTruthy();
   });
 });
