@@ -24,6 +24,7 @@ import {
   clearActiveCompanyId,
   clearAssetToken,
   ensureAssetToken,
+  getAssetToken,
   persistActiveCompanyIdIfAbsent,
 } from '@/services/assetToken';
 import { requestApi } from '@/services/httpService';
@@ -38,11 +39,7 @@ import {
   setProfileImage,
   setCompanyLogo,
 } from '@/store/slice/AuthSlice';
-import {
-  DEV_AUTH_PLACEHOLDER_TOKEN,
-  getHubBaseUrl,
-  isDevAuthEnabled,
-} from '@/utils/constants';
+import { getHubBaseUrl, isDevAuthEnabled } from '@/utils/constants';
 
 interface AuthContextProps {
   user: IUser | null;
@@ -123,8 +120,13 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
    * passes — an internal fallback would show an empty sidebar all over again.
    */
   const fallbackHubUser = (): IAdminUserData => {
-    const authToken = Cookies.get('AuthToken') ?? '';
-    const claims = parseJwt(authToken);
+    // "This module's own token" means exactly that: in the dev-auth flow the AuthToken cookie
+    // is a placeholder carrying no claims, and the identity lives in the module token. Reading
+    // AuthToken first and stopping there is why the header showed a generic "User" for a
+    // perfectly well-identified session. Hub token first when there IS one, module token
+    // otherwise — the fallback is only ever reached when the hub could not answer.
+    const claims =
+      parseJwt(Cookies.get('AuthToken') ?? '') ?? parseJwt(getAssetToken() ?? '');
     // parseJwt returns an untyped claim bag, so coerce before using it as text.
     const name = String(
       claims?.fullName ?? claims?.username ?? claims?.unique_name ?? 'User'
@@ -179,12 +181,18 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const loadCurrentUser = async () => {
     // Dev-auth writes a PLACEHOLDER AuthToken — the middleware only checks that the cookie
     // exists, and the real credential is the module token in AssetAuthToken. The hub cannot
-    // authenticate that placeholder, so calling it is a guaranteed 401, and a 401 there
-    // carries an EMPTY body: the shared client calls res.json() on it and throws
-    // "Unexpected end of JSON input", which Next surfaces as a red overlay error on every
-    // page load. The fallback below is the right answer for that state anyway, so ask for it
-    // directly instead of provoking a failure and recovering from it.
-    if (Cookies.get('AuthToken') === DEV_AUTH_PLACEHOLDER_TOKEN) {
+    // authenticate a placeholder, so calling it is a guaranteed failure: a 401 with an EMPTY
+    // body that the shared client calls res.json() on, or — when the hub host is simply not
+    // reachable from a dev machine — a raw "TypeError: Failed to fetch". Either way Next
+    // surfaces it as a red overlay error on every page load. The fallback below is the right
+    // answer for that state anyway, so ask for it directly instead of provoking the failure.
+    //
+    // Tested by SHAPE, not against the sentinel. A hub credential is a JWT; anything that is
+    // not one cannot possibly authenticate. Matching the exact placeholder string missed every
+    // browser still holding the value an earlier build wrote ("devauth"), and those cookies do
+    // not expire — the note on DEV_AUTH_PLACEHOLDER_TOKEN warned that two copies of a sentinel
+    // are one rename away from never matching, and this is that rename, seen from the reader.
+    if (!parseJwt(Cookies.get('AuthToken') ?? '')) {
       dispatch(setCurrentUser(fallbackHubUser()));
       return;
     }
