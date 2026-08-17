@@ -17,12 +17,14 @@ import {
 } from '@tulipstechnologies/common/dist/services/auth.service';
 import { resolveAdminView } from '@tulipstechnologies/common/dist/utils/adminViewStorage';
 import type { IAdminUserData } from '@tulipstechnologies/common/dist/interface/IAdminUser';
+import USER_TYPES from '@tulipstechnologies/common/dist/enums/userTypes';
 
 import { parseJwt } from '@/services/auth.service';
 import {
   clearActiveCompanyId,
   clearAssetToken,
   ensureAssetToken,
+  getAssetToken,
   persistActiveCompanyIdIfAbsent,
 } from '@/services/assetToken';
 import { requestApi } from '@/services/httpService';
@@ -37,7 +39,7 @@ import {
   setProfileImage,
   setCompanyLogo,
 } from '@/store/slice/AuthSlice';
-import { getBaseUrl, isDevAuthBypass } from '@/utils/constants';
+import { getHubBaseUrl, isDevAuthEnabled } from '@/utils/constants';
 
 interface AuthContextProps {
   user: IUser | null;
@@ -70,7 +72,19 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const [userPermissions, setUserPermissions] = useState<number[]>([]);
   const [hubPermissions, setHubPermissions] = useState<number[]>([]);
   const [bootstrapping, setBootstrapping] = useState<boolean>(true);
-  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+  /**
+   * Why bootstrap stopped.
+   *
+   * `kind` decides how it is presented. A token that failed to exchange is a developer problem
+   * and its detail is hidden in production; NOT HAVING CHOSEN A TENANT is neither — it is a
+   * decision only the operator can make, the message names the companies they already have
+   * access to, and hiding it behind "please try again" leaves them pressing Retry forever on
+   * something Retry cannot fix.
+   */
+  const [bootstrapError, setBootstrapError] = useState<{
+    kind: 'auth' | 'tenant';
+    message: string;
+  } | null>(null);
 
   /**
    * Build the display user from the `user` cookie when it is usable, otherwise
@@ -100,11 +114,62 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
     };
   };
 
+  /**
+   * A minimal hub user assembled from the cookies this module already holds,
+   * for when the HRM hub cannot be reached.
+   *
+   * The shared chrome only reads a handful of fields — the sidebar checks
+   * `userType`, `userRoles` and `isAttendanceFromWeb`, the header adds
+   * `userId` and `company` — but it treats a NULL user as "not signed in" and
+   * renders no menu items at all. Publishing this keeps the navigation alive on
+   * a developer machine and during a hub outage; the moment the hub answers,
+   * the real user replaces it.
+   *
+   * `userType` is deliberately the hub's COMPANY value, taken from the shared
+   * package rather than written as a number: the sidebar reads userType in the
+   * HUB's id space (a different space from this module's AppUserType), and its
+   * INTERNAL branch renders `internalSidebarMenus`, which this module never
+   * passes — an internal fallback would show an empty sidebar all over again.
+   */
+  const fallbackHubUser = (): IAdminUserData => {
+    // "This module's own token" means exactly that: in the dev-auth flow the AuthToken cookie
+    // is a placeholder carrying no claims, and the identity lives in the module token. Reading
+    // AuthToken first and stopping there is why the header showed a generic "User" for a
+    // perfectly well-identified session. Hub token first when there IS one, module token
+    // otherwise — the fallback is only ever reached when the hub could not answer.
+    const claims =
+      parseJwt(Cookies.get('AuthToken') ?? '') ?? parseJwt(getAssetToken() ?? '');
+    // parseJwt returns an untyped claim bag, so coerce before using it as text.
+    const name = String(
+      claims?.fullName ?? claims?.username ?? claims?.unique_name ?? 'User'
+    );
+
+    return {
+      userId: Number(claims?.userId ?? claims?.UserId ?? 0),
+      username: String(claims?.username ?? claims?.unique_name ?? ''),
+      fullName: name,
+      firstName: name,
+      middleName: '',
+      lastName: '',
+      email: String(claims?.email ?? ''),
+      phoneNumber: '',
+      employeeId: 0,
+      userType: USER_TYPES.COMPANY,
+      profileColor: '',
+      profileInitial: (name.trim()[0] ?? 'U').toUpperCase(),
+      hasAccessToAllBranches: false,
+      hasAccessToAllDepartments: false,
+      hasPersonalizedPermissions: false,
+      userRoles: [],
+      isAttendanceFromWeb: false,
+    } as unknown as IAdminUserData;
+  };
+
   // Central hub sign-in/logout target shared by all modules
-  // (getBaseUrl() + NEXT_PUBLIC_LOGOUT_URL).
+  // (getHubBaseUrl() + NEXT_PUBLIC_LOGOUT_URL).
   const redirectToHubSignin = () => {
     router.replace(
-      `${getBaseUrl()}${
+      `${getHubBaseUrl()}${
         process.env.NEXT_PUBLIC_LOGOUT_URL
       }?redirect=${encodeURIComponent(window.location.href)}`
     );
@@ -118,11 +183,38 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
    *
    * Fire-and-forget: nothing here gates the module, so a hub hiccup must not
    * delay bootstrap or block asset pages from rendering.
+   *
+   * When the hub does not answer, a user is still published from this module's
+   * own token — see `fallbackHubUser`. The shared sidebar returns ZERO items
+   * while `currentUser` is null (it checks `hasCurrentUser` before it even looks
+   * at menus), so without that the fallback menu list can never render and the
+   * module is left with no navigation at all.
    */
   const loadCurrentUser = async () => {
+    // Dev-auth writes a PLACEHOLDER AuthToken — the middleware only checks that the cookie
+    // exists, and the real credential is the module token in AssetAuthToken. The hub cannot
+    // authenticate a placeholder, so calling it is a guaranteed failure: a 401 with an EMPTY
+    // body that the shared client calls res.json() on, or — when the hub host is simply not
+    // reachable from a dev machine — a raw "TypeError: Failed to fetch". Either way Next
+    // surfaces it as a red overlay error on every page load. The fallback below is the right
+    // answer for that state anyway, so ask for it directly instead of provoking the failure.
+    //
+    // Tested by SHAPE, not against the sentinel. A hub credential is a JWT; anything that is
+    // not one cannot possibly authenticate. Matching the exact placeholder string missed every
+    // browser still holding the value an earlier build wrote ("devauth"), and those cookies do
+    // not expire — the note on DEV_AUTH_PLACEHOLDER_TOKEN warned that two copies of a sentinel
+    // are one rename away from never matching, and this is that rename, seen from the reader.
+    if (!parseJwt(Cookies.get('AuthToken') ?? '')) {
+      dispatch(setCurrentUser(fallbackHubUser()));
+      return;
+    }
+
     try {
       const res = await getCurrentUser();
-      if (!res?.success || !res?.data) return;
+      if (!res?.success || !res?.data) {
+        dispatch(setCurrentUser(fallbackHubUser()));
+        return;
+      }
 
       const adminUser = res.data as IAdminUserData;
       dispatch(setCurrentUser(adminUser));
@@ -141,14 +233,27 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
       }
     } catch (error) {
       console.error('Failed to load current user', error);
+      dispatch(setCurrentUser(fallbackHubUser()));
     }
   };
 
   /**
    * Resolves the tenant every request is scoped to and stores it in the
    * `ActiveCompanyId` cookie (read by requestApi as the `x-company-id` header).
-   * Company users carry their own company on the exchange payload; internal
-   * users (superadmin) carry none, so we fall back to the first active company.
+   * Company users carry their own company on the exchange payload and never reach this;
+   * internal users (superadmin) carry none.
+   *
+   * ONE candidate is chosen automatically. MORE THAN ONE IS NEVER GUESSED.
+   *
+   * It used to take `companies.find(c => !c.isDeleted) ?? companies[0]` — the first row of an
+   * unordered list — and that is how an operator ends up in the wrong company's data without
+   * ever choosing it or being told. It is not hypothetical here: the tenants on this database
+   * are two test companies and one real one, and the module's Master Data Reset wiped the real
+   * one twice. Combined with the tenant cookie having been session-scoped, "I did not change
+   * anything" and "I am now looking at production" were the same sentence.
+   *
+   * Failing closed costs an internal operator one explicit choice. Guessing costs somebody
+   * else's data, silently, and the guess looks exactly like a correct answer.
    */
   const resolveActiveCompanyIfAbsent = async () => {
     if (Cookies.get('ActiveCompanyId')) return;
@@ -159,15 +264,37 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
         method: 'GET',
         completeData: true,
       });
-      const companies = Array.isArray(res?.data) ? res.data : [];
-      const active =
-        companies.find((c: { isDeleted?: boolean }) => !c?.isDeleted) ??
-        companies[0];
-      if (active?.id) {
-        persistActiveCompanyIdIfAbsent(active.id);
-      } else {
-        console.warn('[tenant] no company returned', res);
+      const companies = (Array.isArray(res?.data) ? res.data : []).filter(
+        (c: { id?: string; isDeleted?: boolean }) => c?.id && !c.isDeleted
+      );
+
+      if (companies.length === 1) {
+        persistActiveCompanyIdIfAbsent(companies[0].id);
+        return;
       }
+
+      if (companies.length === 0) {
+        setBootstrapError({
+          kind: 'tenant',
+          message:
+            'Your account is not attached to a company, and no company was returned to choose ' +
+            'from. Ask an administrator to grant access.',
+        });
+        return;
+      }
+
+      const names = companies
+        .map((c: { name?: string }) => c?.name)
+        .filter(Boolean)
+        .join(', ');
+      setBootstrapError({
+        kind: 'tenant',
+        message:
+          `Your account can see ${companies.length} companies (${names}), so this module cannot ` +
+          'tell which one you mean. Choose one before continuing — picking for you risks showing, ' +
+          "and changing, another company's data." +
+          (isDevAuthEnabled() ? ' In development, set it on the /dev-auth screen.' : ''),
+      });
     } catch (err) {
       // Leave the cookie unset; writes will surface the API's tenant error.
       console.warn('[tenant] company resolution failed', err);
@@ -176,6 +303,18 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
   useEffect(() => {
     const bootstrap = async () => {
+      // The dev-auth screen must never be gated by the bootstrap it exists to repair.
+      // A stale or unexchangeable token otherwise renders the failure card OVER the one
+      // page that can clear it — you cannot get in, and you cannot reach the screen that
+      // lets you in. Recovery UI has to sit outside the thing it recovers from.
+      if (
+        typeof window !== 'undefined' &&
+        window.location.pathname.endsWith('/dev-auth')
+      ) {
+        setBootstrapping(false);
+        return;
+      }
+
       const cookieToken = Cookies.get('AuthToken');
       const cookieUser = Cookies.get('user');
 
@@ -183,7 +322,7 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
       // server-side too; this is the client-side fallback. On localhost in
       // development the middleware sends to /dev-auth instead, so skip here.
       if (!cookieToken) {
-        if (!isDevAuthBypass(window.location.hostname)) {
+        if (!isDevAuthEnabled()) {
           redirectToHubSignin();
         }
         setBootstrapping(false);
@@ -210,17 +349,27 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
       // Exchange the HRM AuthToken for the asset-module token before any page
       // mounts and fires asset API calls.
+      //
+      // Deployed, always re-exchange: the hub token is the source of truth and a
+      // carried-over AssetAuthToken could hold stale permissions.
+      //
+      // Under dev auth, honour an AssetAuthToken that is already present instead.
+      // A developer whose hub SSO is unavailable — a signing-key mismatch against
+      // the environment that issued the hub token, say — can still obtain a module
+      // token directly and work, where forcing the exchange would discard it and
+      // fail on the very call that is broken. The dev-auth screen's "Clear cookies"
+      // is how you get rid of one that has gone stale.
       const { token: assetToken, companyId, error } = await ensureAssetToken(
-        true
+        !isDevAuthEnabled()
       );
       if (!assetToken) {
         const message =
           error ||
           'Could not exchange AuthToken for an AssetAuthToken. Sign in again.';
-        if (isDevAuthBypass(window.location.hostname)) {
+        if (isDevAuthEnabled()) {
           // Surface the real failure instead of silently rendering with no
           // Authorization header (httpService only reads AssetAuthToken).
-          setBootstrapError(message);
+          setBootstrapError({ kind: 'auth', message });
           setBootstrapping(false);
           return;
         }
@@ -266,7 +415,7 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
     clearAssetToken();
     clearActiveCompanyId();
     localStorage.clear();
-    window.location.href = `${getBaseUrl()}${
+    window.location.href = `${getHubBaseUrl()}${
       process.env.NEXT_PUBLIC_LOGOUT_URL
     }`;
   };
@@ -295,11 +444,19 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
         <div className="flex h-screen w-full items-center justify-center bg-gray-50 p-6">
           <div className="w-full max-w-lg space-y-4 rounded-lg border border-red-200 bg-white p-6 shadow-sm">
             <h1 className="text-lg font-semibold text-gray-900">
-              Authentication failed
+              {bootstrapError.kind === 'tenant'
+                ? 'Choose a company'
+                : 'Authentication failed'}
             </h1>
-            {process.env.NODE_ENV === 'development' ? (
+            {bootstrapError.kind === 'tenant' ? (
+              // Always shown, production included: this is the operator's decision to make and
+              // the message names companies they already have access to. "Please try again"
+              // would be a lie — Retry cannot choose for them, and choosing for them is the
+              // defect this replaced.
+              <p className="text-sm text-gray-600">{bootstrapError.message}</p>
+            ) : process.env.NODE_ENV === 'development' ? (
               <>
-                <p className="text-sm text-gray-600">{bootstrapError}</p>
+                <p className="text-sm text-gray-600">{bootstrapError.message}</p>
                 <p className="text-xs text-gray-500">
                   The module needs an AssetAuthToken exchanged from your HRM
                   AuthToken before any API call can succeed. Fix the cause

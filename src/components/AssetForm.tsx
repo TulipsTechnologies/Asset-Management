@@ -19,11 +19,11 @@ import { fetchAssetLocations } from '@/services/assetLocation.service';
 import { fetchVendors } from '@/services/vendor.service';
 import { unwrapPaged } from '@/utils/serviceUtils';
 import {
-  ASSET_CONDITIONS,
   enumOptions,
   OWNERSHIP_LABELS,
   OwnershipTypeEnum,
 } from '@/enum/assetEnums';
+import useAssetConditions from '@/hooks/useAssetConditions';
 
 type TFormErrors = Partial<
   Record<
@@ -43,6 +43,7 @@ const SECTION_FIELDS = {
     'manufacturer',
     'brand',
     'model',
+    'dimension',
   ] as const,
   purchase: [
     'supplierId',
@@ -75,6 +76,14 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
   const router = useRouter();
   const { addToast } = useToast();
 
+  // The asset's OWN condition rides along via includeId, so an asset graded at a condition
+  // the company has since deactivated still shows its real grade rather than a blank.
+  const {
+    options: conditionOptions,
+    emptyText: conditionEmptyText,
+    nameById: conditionNameById,
+  } = useAssetConditions(asset?.assetConditionTypeId);
+
   const [categories, setCategories] = useState<IAssetCategory[]>([]);
   const [vendors, setVendors] = useState<IVendor[]>([]);
   const [locations, setLocations] = useState<IAssetLocation[]>([]);
@@ -98,6 +107,7 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
     manufacturer: asset?.manufacturer ?? '',
     brand: asset?.brand ?? '',
     model: asset?.model ?? '',
+    dimension: asset?.dimension ?? '',
     ownershipType: String(asset?.ownershipType ?? OwnershipTypeEnum.Owned),
     supplierId: asset?.supplierId ?? '',
     purchaseDate: toDateInput(asset?.purchaseDate),
@@ -203,9 +213,7 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
   const selectedCategory = categories.find(
     (c) => c.id === form.assetCategoryId
   );
-  const conditionName = ASSET_CONDITIONS.find(
-    (c) => c.id === form.assetConditionTypeId
-  )?.name;
+  const conditionName = conditionNameById(form.assetConditionTypeId);
   const ownershipLabel = enumOptions(OWNERSHIP_LABELS).find(
     (o) => String(o.value) === form.ownershipType
   )?.label;
@@ -276,6 +284,7 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
     insuranceExpiryDate: form.insuranceExpiryDate || undefined,
     description: form.description.trim() || undefined,
     notes: form.notes.trim() || undefined,
+    dimension: form.dimension.trim() || undefined,
   });
 
   const handleCreate = async () => {
@@ -447,10 +456,8 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
                   label="Condition"
                   required
                   placeholder="Select condition"
-                  options={ASSET_CONDITIONS.map((c) => ({
-                    value: c.id,
-                    label: c.name,
-                  }))}
+                  options={conditionOptions}
+                  emptyText={conditionEmptyText}
                   value={form.assetConditionTypeId}
                   onChange={set('assetConditionTypeId')}
                   error={errors.assetConditionTypeId}
@@ -511,6 +518,12 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
               />
               <Input label="Brand" value={form.brand} onChange={set('brand')} />
               <Input label="Model" value={form.model} onChange={set('model')} />
+              <Input
+                label="Dimension"
+                value={form.dimension}
+                onChange={set('dimension')}
+                helperText="Physical size, e.g. 39.5in L, 39.5in W, 16in H"
+              />
             </div>
           </Panel>
 

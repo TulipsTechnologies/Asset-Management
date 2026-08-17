@@ -3,9 +3,18 @@ import { useEffect, useState } from 'react';
 interface SearchBoxProps {
   onSearch: (query: string) => void;
   searchVal?: string;
+  /** Say WHAT is searched ("Search assets in Reception…") — two identical boxes on one
+   * screen are indistinguishable without it. */
+  placeholder?: string;
+  ariaLabel?: string;
 }
 
-const SearchBox: React.FC<SearchBoxProps> = ({ onSearch, searchVal = '' }) => {
+const SearchBox: React.FC<SearchBoxProps> = ({
+  onSearch,
+  searchVal = '',
+  placeholder = 'Search by name...',
+  ariaLabel,
+}) => {
   const [query, setQuery] = useState(searchVal);
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -36,7 +45,8 @@ const SearchBox: React.FC<SearchBoxProps> = ({ onSearch, searchVal = '' }) => {
       <input
         type="text"
         value={query}
-        placeholder="Search by name..."
+        placeholder={placeholder}
+        aria-label={ariaLabel ?? placeholder}
         onChange={handleChange}
         onKeyPress={handleKeyPress}
         className="h-[40px] pr-10 focus:outline-none bg-transparent text-sm border-b"

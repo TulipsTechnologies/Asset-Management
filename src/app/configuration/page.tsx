@@ -48,6 +48,13 @@ const SECTIONS: IHubSection[] = [
         iconName: 'handshake',
         url: '/vendors',
       },
+      {
+        label: 'Asset Conditions',
+        description:
+          'The condition scale recorded at registration, issue, return, transfer and audit',
+        iconName: 'dials',
+        url: '/asset-conditions',
+      },
     ],
   },
   {

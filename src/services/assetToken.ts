@@ -31,9 +31,23 @@ export const clearAssetToken = (): void => {
   Cookies.remove(ASSET_AUTH_TOKEN_COOKIE, { path: '/' });
 };
 
+/** The tenant the UI is scoped to — namespaces per-company client-side preferences. */
+export const getActiveCompanyId = (): string | null =>
+  Cookies.get(ACTIVE_COMPANY_ID_COOKIE) ?? null;
+
 export const clearActiveCompanyId = (): void => {
   Cookies.remove(ACTIVE_COMPANY_ID_COOKIE, { path: '/' });
 };
+
+/**
+ * Days the chosen tenant is remembered for.
+ *
+ * Written with an explicit lifetime because the alternative is a SESSION cookie, and a session
+ * cookie is what made the active tenant look like it changed on its own: it disappears when the
+ * browsing session ends, and the next bootstrap resolves a tenant again from scratch. An operator
+ * who never touched anything came back to a different company's data.
+ */
+const ACTIVE_COMPANY_ID_DAYS = 30;
 
 /**
  * Persist the active tenant from the login response only when the cookie is
@@ -44,9 +58,15 @@ export const persistActiveCompanyIdIfAbsent = (
 ): void => {
   if (!companyId) return;
   if (Cookies.get(ACTIVE_COMPANY_ID_COOKIE)) return;
+  setActiveCompanyId(companyId);
+};
+
+/** Writes the tenant cookie with the lifetime every writer should be using. */
+export const setActiveCompanyId = (companyId: string): void => {
   Cookies.set(ACTIVE_COMPANY_ID_COOKIE, companyId, {
     path: '/',
     sameSite: 'lax',
+    expires: ACTIVE_COMPANY_ID_DAYS,
   });
 };
 

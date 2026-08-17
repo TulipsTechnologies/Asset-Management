@@ -15,6 +15,18 @@ export interface IAssetLocation {
   level: number;
 }
 
+/** One node of the hierarchy (Building → Floor → Room), children nested. */
+export interface IAssetLocationTree {
+  id: string;
+  name: string;
+  code?: string | null;
+  address?: string | null;
+  isActive: boolean;
+  /** Assets filed AT this node itself — children report their own. */
+  assetCount: number;
+  children: IAssetLocationTree[];
+}
+
 export interface IUpsertAssetLocation {
   name: string;
   code?: string;

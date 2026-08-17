@@ -27,12 +27,16 @@ import {
 import { IEmployee } from '@/interface/IEmployee';
 import {
   fetchAssetAssignments,
+  fetchAssignableAssets,
   returnAsset,
 } from '@/services/assetAssignment.service';
+import IssueReceiptSheet from '@/components/Print/IssueReceiptSheet';
+import usePrintSheet, { usePrintIdentity } from '@/hooks/usePrintSheet';
+import { IReceiptLine } from '@/utils/printDocuments';
 import { fetchEmployees } from '@/services/employee.service';
 import { mergeTableFilters, unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
-import { ASSET_CONDITIONS } from '@/enum/assetEnums';
+import useAssetConditions from '@/hooks/useAssetConditions';
 import {
   ASSIGNMENT_STATUS_BADGE_CLASSES,
   ASSIGNMENT_STATUS_LABELS,
@@ -63,8 +67,16 @@ const VIEW_OPTIONS: IViewOption<TAssignmentView>[] = [
 ];
 
 const AssignmentsPage = () => {
+  const { options: conditionOptions, emptyText: conditionEmptyText } = useAssetConditions();
   const { addToast } = useToast();
   const router = useRouter();
+
+  // The handover receipt. Armed only while a row is chosen, so nothing is mounted and no
+  // body class is set during ordinary use of the page.
+  const [receiptFor, setReceiptFor] = useState<IAssetAssignment | null>(null);
+  const [receiptLines, setReceiptLines] = useState<IReceiptLine[]>([]);
+  const printIdentity = usePrintIdentity();
+  const { print, PrintSheet } = usePrintSheet(!!receiptFor && receiptLines.length > 0);
 
   const [assignments, setAssignments] = useState<IAssetAssignment[]>([]);
   const [loading, setLoading] = useState(false);
@@ -177,6 +189,55 @@ const AssignmentsPage = () => {
     setFilters((prev) => mergeTableFilters(prev, updates));
   };
 
+  /**
+   * Build and print a handover receipt for one assignment.
+   *
+   * The assignment DTO carries no serial number or asset tag, and a receipt that identifies
+   * the accountable item only by an internal code is weak — the code is a sticker that falls
+   * off, the serial is stamped into the metal. One extra call rehydrates it;
+   * `includeIneligible` is required because the asset is, by definition, already assigned.
+   * A failed lookup still prints, with the serial marked as not recorded rather than blank.
+   */
+  const openReceipt = async (assignment: IAssetAssignment) => {
+    const base: IReceiptLine = {
+      assetId: assignment.assetId,
+      assetCode: assignment.assetCode,
+      assetName: assignment.assetName,
+      conditionName: assignment.conditionAtIssueName,
+      accessories: assignment.accessories,
+    };
+
+    // Resolve FIRST, then arm: the sheet mounts on the next render and prints immediately,
+    // so a serial still in flight would simply be absent from a signed document.
+    let line = base;
+    try {
+      const response = await fetchAssignableAssets({
+        assetIds: [assignment.assetId],
+        includeIneligible: true,
+        pageSize: 1,
+      });
+      const detail = unwrapPaged(response).items[0];
+      if (detail)
+        line = { ...base, serialNumber: detail.serialNumber, assetTag: detail.assetTag };
+    } catch {
+      /* The receipt is still correct without it — the sheet says "no serial recorded". */
+    }
+    setReceiptLines([line]);
+    setReceiptFor(assignment);
+  };
+
+  // The sheet mounts on the render after the state lands, so the print is queued behind it;
+  // calling window.print() in the click handler would race the document snapshot.
+  useEffect(() => {
+    if (!receiptFor || receiptLines.length === 0) return;
+    // setTimeout, NOT requestAnimationFrame: rAF never fires while the document is
+    // hidden, so a user who switches tab straight after clicking would get no print
+    // at all and no error either. A timer fires regardless of visibility.
+    const timer = setTimeout(() => print(), 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [receiptFor]);
+
   const openReturn = (assignment: IAssetAssignment) => {
     setReturning(assignment);
     setReturnConditionId('');
@@ -271,6 +332,11 @@ const AssignmentsPage = () => {
                   },
                 ]
               : []),
+            {
+              label: 'Print Receipt',
+              icon: <i className="icon icon-print text-sm" />,
+              action: () => openReceipt(assignment),
+            },
           ].map((option, index, arr) => (
             <CustomMenuItem
               key={index}
@@ -487,10 +553,8 @@ const AssignmentsPage = () => {
               label="Condition at Return"
               required
               placeholder="Select condition"
-              options={ASSET_CONDITIONS.map((c) => ({
-                value: c.id,
-                label: c.name,
-              }))}
+              options={conditionOptions}
+              emptyText={conditionEmptyText}
               value={returnConditionId}
               onChange={(e) => setReturnConditionId(e.target.value)}
             />
@@ -595,6 +659,25 @@ const AssignmentsPage = () => {
           </InfoCardGrid>
         </div>
       </Modal>
+
+      {/* Hidden on screen; the print stylesheet reveals it and hides everything else. */}
+      {receiptFor && receiptLines.length > 0 && (
+        <PrintSheet>
+          <IssueReceiptSheet
+            companyName={printIdentity.companyName}
+            generatedBy={printIdentity.userName}
+            generatedOn={new Date()}
+            employeeName={receiptFor.employeeName}
+            employeeCode={receiptFor.employeeCode}
+            assignmentDate={receiptFor.assignmentDate}
+            expectedReturnDate={receiptFor.expectedReturnDate}
+            accessories={receiptFor.accessories}
+            handoverNotes={receiptFor.handoverNotes}
+            referenceId={receiptFor.id}
+            lines={receiptLines}
+          />
+        </PrintSheet>
+      )}
     </div>
   );
 };

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import cookies from 'js-cookie';
+import { setActiveCompanyId } from '@/services/assetToken';
 import BackButton from '@/components/UI/BackButton';
 import Button from '@/components/UI/Button';
 import Select from '@/components/UI/Select';
@@ -103,7 +104,10 @@ const DemoContent = () => {
    * the new company. No backend change involved (§5).
    */
   const openCompany = (company: ISystemTestProvisionedCompany | ISystemTestCallerCompany) => {
-    cookies.set('ActiveCompanyId', company.companyId);
+    // Through the helper for the lifetime. A bare set is session-scoped, and this is the screen
+    // people use to move OFF a real company onto a test one before doing something destructive —
+    // a tenant choice that quietly expires is the last thing it should write.
+    setActiveCompanyId(company.companyId);
     window.location.href = appUrl('/dashboard');
   };
 

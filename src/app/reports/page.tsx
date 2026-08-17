@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/Providers/ToastProvider';
 import Button from '@/components/UI/Button';
 import CustomTable from '@/components/CustomTable/CustomTable';
@@ -16,6 +17,10 @@ import {
   runReport,
 } from '@/services/reports.service';
 import { fetchFiscalYears } from '@/services/depreciation.service';
+import { fetchAssetLocationTree } from '@/services/assetLocation.service';
+import { IAssetLocationTree } from '@/interface/IAssetLocation';
+import LocationExplorer from '@/components/Reports/LocationExplorer/LocationExplorer';
+import { getActiveCompanyId } from '@/services/assetToken';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 
 /**
@@ -31,6 +36,7 @@ const humanize = (key: string) =>
 /** One glyph per report so the grid is scannable by shape, not just by reading. */
 const REPORT_ICONS: Record<string, string> = {
   'asset-register': 'briefcase',
+  'assets-by-location': 'marker',
   'asset-movement': 'move',
   'missing-assets': 'alert',
   'audit-discrepancies': 'checked',
@@ -43,6 +49,28 @@ const REPORT_ICONS: Record<string, string> = {
   'asset-roll-forward': 'redo',
   'subledger-reconciliation': 'calculator',
 };
+
+/**
+ * One colour per availability meaning, used by the summary chips AND the table badge so
+ * the two always agree: green = take it, blue = someone has it, amber = held back,
+ * red = gone missing, gray = not in active life.
+ */
+const AVAILABILITY_STYLES: Record<string, string> = {
+  Available: 'bg-green-50 text-green-700 ring-green-200',
+  'In Use': 'bg-blue-50 text-blue-700 ring-blue-200',
+  'In Transfer': 'bg-sky-50 text-sky-700 ring-sky-200',
+  Missing: 'bg-red-50 text-red-700 ring-red-200',
+  'Under Maintenance': 'bg-amber-50 text-amber-700 ring-amber-200',
+  Quarantined: 'bg-amber-50 text-amber-700 ring-amber-200',
+  'Out Of Service': 'bg-amber-50 text-amber-700 ring-amber-200',
+};
+const availabilityStyle = (label: string) =>
+  AVAILABILITY_STYLES[label] ?? 'bg-gray-100 text-gray-600 ring-gray-200';
+
+interface ISummaryChip {
+  label: string;
+  count: number;
+}
 
 const formatCell = (value: unknown): string => {
   if (value === null || value === undefined || value === '') return '—';
@@ -58,14 +86,21 @@ const formatCell = (value: unknown): string => {
 
 export default function ReportsPage() {
   const { addToast } = useToast();
+  const router = useRouter();
 
   const [catalogue, setCatalogue] = useState<IReportDescriptor[]>([]);
   const [selected, setSelected] = useState<IReportDescriptor | null>(null);
+  /** The 13-tile grid folds away once a report is on screen — a deep link from the
+   *  dashboard must land on the report, not on a wall of buttons above the fold. */
+  const [catalogueOpen, setCatalogueOpen] = useState(false);
   const [years, setYears] = useState<IFiscalYear[]>([]);
+  /** Hierarchy flattened for the picker, indented so depth stays visible. */
+  const [locationOptions, setLocationOptions] = useState<{ label: string; value: string }[]>([]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [rows, setRows] = useState<Record<string, any>[]>([]);
   const [moneyTotals, setMoneyTotals] = useState<{ currencyId: string; total: number }[]>([]);
+  const [summaryChips, setSummaryChips] = useState<ISummaryChip[]>([]);
   const [rowCount, setRowCount] = useState(0);
   const [pageCount, setPageCount] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -78,18 +113,45 @@ export default function ReportsPage() {
   useEffect(() => {
     (async () => {
       try {
-        const [catalogueResponse, yearResponse] = await Promise.all([
+        const [catalogueResponse, yearResponse, treeResponse] = await Promise.all([
           fetchReportCatalogue(),
           fetchFiscalYears(),
+          fetchAssetLocationTree(),
         ]);
         const descriptors = catalogueResponse?.data ?? [];
         setCatalogue(descriptors);
         setYears(yearResponse?.data ?? []);
-        // Land on the first report the catalogue offers — Asset Register, unless the
-        // caller's permissions hide it — so the page opens with a report on screen
-        // instead of a grid of buttons and nothing under it. Taking [0] rather than
-        // the literal code keeps that true for whatever the catalogue allows.
-        if (descriptors.length > 0) setSelected((prev) => prev ?? descriptors[0]);
+
+        const flatten = (
+          nodes: IAssetLocationTree[],
+          depth: number,
+          into: { label: string; value: string }[]
+        ) => {
+          for (const node of nodes) {
+            into.push({
+              value: node.id,
+              label: `${'\u2007\u2007\u2007'.repeat(depth)}${depth > 0 ? '└ ' : ''}${node.name}`,
+            });
+            flatten(node.children, depth + 1, into);
+          }
+          return into;
+        };
+        setLocationOptions(flatten(treeResponse?.data ?? [], 0, []));
+
+        // Deep link: the location tree's asset-count badges land here already scoped
+        // ("what is in Admission Office" is one click, not a form to re-fill).
+        const params = new URLSearchParams(window.location.search);
+        const linkedCode = params.get('code');
+        const linkedLocation = params.get('locationId');
+        const linked = linkedCode ? descriptors.find((d) => d.code === linkedCode) : null;
+        if (linked) {
+          setSelected((prev) => prev ?? linked);
+          if (linkedLocation && linked.supportsLocation)
+            setFilter((prev) => ({ ...prev, locationId: linkedLocation }));
+        }
+        // Otherwise land on the first report the catalogue offers, so the page opens
+        // with a report on screen instead of a grid of buttons and nothing under it.
+        else if (descriptors.length > 0) setSelected((prev) => prev ?? descriptors[0]);
       } catch {
         addToast.error('Could not load the report catalogue.');
       }
@@ -98,6 +160,9 @@ export default function ReportsPage() {
 
   const load = useCallback(async () => {
     if (!selected) return;
+    // The explorer runs its own two-fetch discipline — the generic runner firing
+    // here too would pay for a full aggregate page nobody renders.
+    if (selected.code === 'assets-by-location') return;
     setLoading(true);
     try {
       const response = await runReport(selected.code, filter);
@@ -118,12 +183,14 @@ export default function ReportsPage() {
         // backend computes them because summing the visible page is the exact
         // wrong-number failure the design forbids.
         setMoneyTotals(envelope.moneyTotals ?? []);
+        setSummaryChips(envelope.summary ?? []);
       } else {
         const list = response?.data ?? [];
         setRows(list);
         setRowCount(list.length);
         setPageCount(1);
         setMoneyTotals([]);
+        setSummaryChips([]);
       }
     } catch {
       addToast.error('Could not run the report.');
@@ -138,9 +205,14 @@ export default function ReportsPage() {
 
   const pick = (descriptor: IReportDescriptor) => {
     setSelected(descriptor);
+    setCatalogueOpen(false);
     setRows([]);
     setRowCount(0);
+    setSummaryChips([]);
     setFilter({ pageNumber: 1, pageSize: DEFAULT_PAGE_SIZE });
+    // The URL follows the pick, dropping any stale locationId/unlocated from a
+    // previous report. Bare path — next/navigation applies basePath itself.
+    router.replace(`/reports?code=${descriptor.code}`, { scroll: false });
   };
 
   const exportXlsx = async () => {
@@ -204,7 +276,16 @@ export default function ReportsPage() {
           ? value
           : {
               value: value === '' ? null : value,
-              content: formatCell(value),
+              content:
+                key === 'availability' && typeof value === 'string' ? (
+                  <span
+                    className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${availabilityStyle(value)}`}
+                  >
+                    {value}
+                  </span>
+                ) : (
+                  formatCell(value)
+                ),
               type: cellType(value),
             };
     }
@@ -220,39 +301,84 @@ export default function ReportsPage() {
         </p>
       </div>
 
-      {/* Every report the caller's permissions allow, three across. */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {catalogue.map((descriptor) => {
-          const active = selected?.code === descriptor.code;
-          return (
-            <button
-              key={descriptor.code}
-              type="button"
-              onClick={() => pick(descriptor)}
-              className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
-                active
-                  ? 'border-primarycolor bg-primarycolor/10'
-                  : 'border-gray-200 bg-white hover:border-primarycolor/40 hover:bg-hoverColor'
-              }`}
-            >
-              <i
-                className={`icon icon-${REPORT_ICONS[descriptor.code] ?? 'bar-chart'} text-[17px] shrink-0 text-primarycolor`}
-              />
-              <span className="min-w-0 grow truncate text-sm font-medium text-secondaryColor">
-                {descriptor.name}
-              </span>
-              {/* The description lives here rather than under the grid, so picking a
-                  report does not shift the layout to make room for it. */}
-              <i
-                className="icon icon-info shrink-0 text-[15px] text-gray-300"
-                title={descriptor.description}
-              />
-            </button>
-          );
-        })}
-      </div>
-
+      {/* The chosen report as a compact bar; the full catalogue folds beneath it.
+          Landing from a deep link puts the report itself at the top of the screen —
+          thirteen buttons the caller has already chosen between are one click away. */}
       {selected && (
+        <div className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-2.5">
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primarycolor/10">
+            <i
+              className={`icon icon-${REPORT_ICONS[selected.code] ?? 'bar-chart'} text-[15px] text-primarycolor`}
+            />
+          </span>
+          <span className="min-w-0 truncate text-sm font-semibold text-secondaryColor">
+            {selected.name}
+          </span>
+          <i
+            className="icon icon-info shrink-0 text-[15px] text-gray-300"
+            title={selected.description}
+          />
+          <button
+            type="button"
+            onClick={() => setCatalogueOpen((open) => !open)}
+            aria-expanded={catalogueOpen}
+            className="ml-auto flex shrink-0 items-center gap-1.5 rounded-full border border-gray-300 px-3 py-1 text-xs font-medium text-secondaryColor hover:bg-hoverColor"
+          >
+            <i className="icon icon-modules text-[11px]" />
+            All reports
+            <i
+              className={`icon icon-right text-[9px] transition-transform ${
+                catalogueOpen ? 'rotate-90' : ''
+              }`}
+            />
+          </button>
+        </div>
+      )}
+
+      {/* Every report the caller's permissions allow, three across. */}
+      {(catalogueOpen || !selected) && (
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {catalogue.map((descriptor) => {
+            const active = selected?.code === descriptor.code;
+            return (
+              <button
+                key={descriptor.code}
+                type="button"
+                onClick={() => pick(descriptor)}
+                className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
+                  active
+                    ? 'border-primarycolor bg-primarycolor/10'
+                    : 'border-gray-200 bg-white hover:border-primarycolor/40 hover:bg-hoverColor'
+                }`}
+              >
+                <i
+                  className={`icon icon-${REPORT_ICONS[descriptor.code] ?? 'bar-chart'} text-[17px] shrink-0 text-primarycolor`}
+                />
+                <span className="min-w-0 grow truncate text-sm font-medium text-secondaryColor">
+                  {descriptor.name}
+                </span>
+                {/* The description lives here rather than under the grid, so picking a
+                    report does not shift the layout to make room for it. */}
+                <i
+                  className="icon icon-info shrink-0 text-[15px] text-gray-300"
+                  title={descriptor.description}
+                />
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* This report is not a table with filters — it is a place to explore. The
+          catalogue above still switches reports; everything below it is the explorer. */}
+      {selected?.code === 'assets-by-location' && (
+        <LocationExplorer
+          initialLocationId={filter.locationId ?? null}
+          companyKey={getActiveCompanyId() ?? 'default'}
+        />
+      )}
+
+      {selected && selected.code !== 'assets-by-location' && (
         <>
           <div className="mt-5 mb-4 flex flex-wrap items-end gap-4 rounded-xl border border-gray-200 bg-white px-5 py-4">
             {selected.supportsDateRange && (
@@ -285,6 +411,19 @@ export default function ReportsPage() {
                 options={[
                   { label: 'All years', value: '' },
                   ...years.map((y) => ({ label: y.code, value: y.code })),
+                ]}
+              />
+            )}
+            {selected.supportsLocation && (
+              <Select
+                label="Location"
+                value={filter.locationId ?? ''}
+                onChange={(e) =>
+                  setFilter((prev) => ({ ...prev, locationId: e.target.value || undefined, pageNumber: 1 }))
+                }
+                options={[
+                  { label: 'All locations', value: '' },
+                  ...locationOptions,
                 ]}
               />
             )}
@@ -335,6 +474,23 @@ export default function ReportsPage() {
             </Button>
           </div>
 
+          {summaryChips.length > 0 && (
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-secondaryColor px-3 py-1 text-xs font-semibold text-white">
+                {rowCount.toLocaleString()} asset{rowCount === 1 ? '' : 's'}
+              </span>
+              {summaryChips.map((chip) => (
+                <span
+                  key={chip.label}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ring-1 ring-inset ${availabilityStyle(chip.label)}`}
+                >
+                  {chip.label}
+                  <span className="font-semibold">{chip.count.toLocaleString()}</span>
+                </span>
+              ))}
+            </div>
+          )}
+
           <p className="mb-3 text-xs text-gray-500">{selected.description}</p>
 
           {/* Distinct key AND tableName per report code: CustomTable caches its column
@@ -381,7 +537,16 @@ export default function ReportsPage() {
               totalPages={pageCount}
               pageSize={filter.pageSize ?? DEFAULT_PAGE_SIZE}
               totalCount={rowCount}
-              updateFilters={(updates) => setFilter((prev) => ({ ...prev, ...updates }))}
+              updateFilters={(updates) =>
+                setFilter((prev) => ({
+                  ...prev,
+                  ...updates,
+                  // A page-size change re-slices the result set: staying on page 7 of a
+                  // now-5-page report would request past the end. Explicit page choices
+                  // (updates carrying pageNumber) are honoured untouched.
+                  pageNumber: updates.pageNumber ?? (updates.pageSize ? 1 : prev.pageNumber),
+                }))
+              }
             />
           )}
         </>

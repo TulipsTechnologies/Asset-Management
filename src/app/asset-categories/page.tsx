@@ -90,7 +90,7 @@ const TreeNode = ({
       style={{ paddingLeft: depth * 20 }}
     >
       <i
-        className={`icon ${depth === 0 ? 'icon-modules' : 'icon-arrow-right'} text-[11px] text-gray-400`}
+        className={`icon ${depth === 0 ? 'icon-modules' : 'icon-right'} text-[11px] text-gray-400`}
       />
       <span className="text-xs font-mono text-gray-400">
         {node.categoryCode}

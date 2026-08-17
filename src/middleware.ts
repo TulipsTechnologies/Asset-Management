@@ -1,18 +1,17 @@
 // src/middleware.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { isDevAuthBypass, isLocalHost } from '@/utils/constants';
+import { isDevAuthEnabled } from '@/utils/constants';
 
 /**
- * Resolve the shared HRM host the same way the client `getBaseUrl()` does:
- * localhost points at the dev HRM host, otherwise the request's own origin.
+ * The shared HRM hub, for the sign-in bounce only. Configured when the hub is
+ * elsewhere (a developer machine); otherwise the request's own origin, which is
+ * correct on every deployed host without knowing which one it is.
  */
-const getBaseUrl = (req: NextRequest): string => {
-  const host = req.headers.get('host');
-  if (isLocalHost(host)) {
-    return 'https://webdev.tulipshrm.com:4433';
-  }
+const getHubBaseUrl = (req: NextRequest): string => {
+  const configured = process.env.NEXT_PUBLIC_HUB_URL?.trim();
+  if (configured) return configured.replace(/\/+$/, '');
   const proto = req.headers.get('x-forwarded-proto') || 'https';
-  return `${proto}://${host ?? ''}`;
+  return `${proto}://${req.headers.get('host') ?? ''}`;
 };
 
 export async function middleware(req: NextRequest) {
@@ -23,9 +22,9 @@ export async function middleware(req: NextRequest) {
     // whatever we hand off as `redirect` lands inside the module again.
     const target = `${req.nextUrl.basePath}${req.nextUrl.pathname}${req.nextUrl.search}`;
 
-    // On localhost there is no hub cookie to inherit — send to the local
-    // token-paste screen instead of the remote sign-in.
-    if (isDevAuthBypass(req.headers.get('host'))) {
+    // With no hub cookie to inherit, send to the local token-paste screen
+    // instead of the remote sign-in. Enabled by configuration, not by host.
+    if (isDevAuthEnabled()) {
       // Clone nextUrl so basePath (/asset-management) is preserved.
       const devUrl = req.nextUrl.clone();
       devUrl.pathname = '/dev-auth';
@@ -34,7 +33,7 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(devUrl);
     }
 
-    const baseUrl = getBaseUrl(req);
+    const baseUrl = getHubBaseUrl(req);
     const currentUrl = `${baseUrl}${target}`;
     const signinUrl = `${baseUrl}${
       process.env.NEXT_PUBLIC_LOGOUT_URL
@@ -47,7 +46,7 @@ export async function middleware(req: NextRequest) {
 
 // New protected routes MUST be added to the matcher or they render unauthenticated.
 // Unauthenticated requests are bounced to the central hub sign-in
-// (getBaseUrl() + NEXT_PUBLIC_LOGOUT_URL), or to /dev-auth on localhost in dev.
+// (the hub base + NEXT_PUBLIC_LOGOUT_URL), or to /dev-auth when NEXT_PUBLIC_DEV_AUTH=true.
 export const config = {
   matcher: [
     '/dashboard',

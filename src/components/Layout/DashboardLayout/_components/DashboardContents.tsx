@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { useDashbordCtx } from '@tulipstechnologies/common/dist/contexts/DashboardContext';
 import {
@@ -16,7 +16,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/Providers/ToastProvider';
 import { useAppDispatch, useAppSelector } from '@/store';
 import { setAdminView } from '@/store/slice/AuthSlice';
-import { getBaseUrl, getMenusApiBaseUrl } from '@/utils/constants';
+import { getMenusApiBaseUrl } from '@/utils/constants';
 import { resolveSidebarActivePath } from '@/utils/sidebarActivePath';
 import {
   ASSET_ACTIVE_MATCH_GROUPS,
@@ -24,6 +24,7 @@ import {
 } from '@/utils/assetFallbackMenus';
 import { staticMenus } from '@/utils/staticMenus';
 import { headerStaticMenus } from '@/utils/headerStaticMenus';
+import ActiveCompanyBadge from '../../ActiveCompanyBadge';
 import Logo from '../../../../../public/logo.svg';
 
 const DashboardContents = ({ children }: { children: ReactNode }) => {
@@ -36,12 +37,26 @@ const DashboardContents = ({ children }: { children: ReactNode }) => {
   const { addToast } = useToast();
   const pathname = usePathname();
   const dispatch = useAppDispatch();
+  const headerHostRef = useRef<HTMLDivElement>(null);
 
   const { currentUser, adminView, profileImage, companyLogo } = useAppSelector(
     (state) => state.auth
   );
 
-  const baseUrl = getBaseUrl();
+  /**
+   * Where the shared chrome's menu links point.
+   *
+   * This is the ORIGIN SERVING THESE PAGES, not the hub. The sidebar composes
+   * `baseUrl + item.url`, and its items are this module's own routes, so the
+   * hub base sent every click to the hub — on a developer machine that meant
+   * leaving localhost for the WebDev sign-in on the first menu click.
+   *
+   * Deployed, the module and the hub share an origin, so this is the same
+   * string the hub base would have produced; only localhost, where they
+   * genuinely differ, changes behaviour. The hub base keeps its own jobs
+   * (sign-in, sign-out, the menus API) — mixing the two is what broke this.
+   */
+  const baseUrl = typeof window === 'undefined' ? '' : window.location.origin;
 
   const { userMenuList, adminMenuList } = useSidebarMenus({
     token,
@@ -80,6 +95,10 @@ const DashboardContents = ({ children }: { children: ReactNode }) => {
             : 'md:w-[calc(100vw-86px)]'
         } rounded-none md:rounded-xl overflow-hidden h-screen md:h-[calc(100vh-24px)] bg-white transition-all duration-300 ease-in-out`}
       >
+        {/* Anchor for the tenant badge, which portals into the shared Header's own row: that row
+            is this element's next sibling. Holding a handle this way rather than matching the
+            shared component's class names keeps the badge working when its styling changes. */}
+        <div ref={headerHostRef} className="hidden" aria-hidden />
         {token && (
           <Header
             addToast={addToast}
@@ -107,6 +126,7 @@ const DashboardContents = ({ children }: { children: ReactNode }) => {
             activeMatchGroups={ASSET_ACTIVE_MATCH_GROUPS}
           />
         )}
+        {token && <ActiveCompanyBadge headerHost={headerHostRef} />}
         <div
           className={`h-[calc(100vh-60px)] md:h-[calc(100vh-83px)] ${
             pathname === '/404' ? '' : 'overflow-y-auto overflow-x-hidden'

@@ -86,6 +86,6 @@ export const ASSET_MENU_ITEMS: IMenuItem[] = [
     iconSizeClass: 'text-[16px]',
     label: 'Settings',
     url: '/configuration',
-    matchUrls: ['/locations', '/vendors', '/asset-code-format'],
+    matchUrls: ['/locations', '/vendors', '/asset-code-format', '/asset-conditions'],
   },
 ];

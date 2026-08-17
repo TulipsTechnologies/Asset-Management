@@ -56,7 +56,11 @@ import {
   unwrapPaged,
 } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
-import { ASSET_CONDITIONS, CustodyStatusEnum } from '@/enum/assetEnums';
+import { CustodyStatusEnum } from '@/enum/assetEnums';
+import useAssetConditions from '@/hooks/useAssetConditions';
+import usePrintSheet, { usePrintIdentity } from '@/hooks/usePrintSheet';
+import CountSheet from '@/components/Print/CountSheet';
+import { groupForCountSheet, ICountSheetGroup } from '@/utils/printDocuments';
 import {
   AUDIT_CAMPAIGN_STATUS_BADGE_CLASSES,
   AUDIT_CAMPAIGN_STATUS_LABELS,
@@ -226,6 +230,23 @@ const CampaignDetailPage = () => {
   // Record modal (registered path: scan-resolved or re-scan)
   const [recordTarget, setRecordTarget] = useState<TRecordTarget | null>(null);
   const [recordForm, setRecordForm] = useState<TRecordForm>(emptyRecordForm);
+
+  // The count sheet. Held separately from the paged table below because the sheet must carry
+  // the WHOLE campaign, not the page on screen.
+  const [countSheetGroups, setCountSheetGroups] = useState<
+    ICountSheetGroup<IAssetAuditResult>[] | null
+  >(null);
+  const [countSheetTotal, setCountSheetTotal] = useState(0);
+  const [countSheetLoading, setCountSheetLoading] = useState(false);
+  const printIdentity = usePrintIdentity();
+  const { print: printSheet, PrintSheet } = usePrintSheet(!!countSheetGroups);
+
+  // includeId: re-opening a result recorded earlier must show the condition it actually
+  // holds, even if the company has since deactivated it. Without this the Select silently
+  // renders blank and a re-save would drop the observation.
+  const { options: conditionOptions, emptyText: conditionEmptyText } = useAssetConditions(
+    recordForm.foundConditionTypeId || undefined
+  );
   const [recordError, setRecordError] = useState('');
   const [recordSaving, setRecordSaving] = useState(false);
 
@@ -325,6 +346,63 @@ const CampaignDetailPage = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, resultFilters]);
+
+  /**
+   * Build and print the count sheet.
+   *
+   * THE WHOLE CAMPAIGN, NOT THE PAGE. The table below is paged at 25, and a count sheet
+   * listing 25 of 300 is worse than no count sheet at all — it tells a counter the floor is
+   * finished. The endpoint caps a page at 500, so this walks every page and stops only when
+   * it has them all; the printed footer states the total so the sheet can be checked against
+   * the campaign at a glance.
+   */
+  const printCountSheet = async () => {
+    if (!id || countSheetLoading) return;
+    setCountSheetLoading(true);
+    try {
+      const rows: IAssetAuditResult[] = [];
+      let pageNumber = 1;
+      let pageCount = 1;
+
+      do {
+        const response = await getResults(id, { pageNumber, pageSize: 500 });
+        if (!response?.success) {
+          addToast.error(response?.message || 'Could not load the full campaign.');
+          return;
+        }
+        const paged = unwrapPaged<IAssetAuditResult>(response);
+        rows.push(...paged.items);
+        pageCount = paged.pageCount || 1;
+        pageNumber += 1;
+        // A page that comes back empty would otherwise spin forever on a bad count.
+        if (paged.items.length === 0) break;
+      } while (pageNumber <= pageCount);
+
+      if (rows.length === 0) {
+        addToast.error('This campaign has no items to count yet.');
+        return;
+      }
+
+      setCountSheetTotal(rows.length);
+      setCountSheetGroups(groupForCountSheet(rows));
+    } catch {
+      addToast.error('Could not prepare the count sheet.');
+    } finally {
+      setCountSheetLoading(false);
+    }
+  };
+
+  // Print on the render AFTER the sheet mounts — calling it inline races the browser's
+  // document snapshot and prints a blank page.
+  useEffect(() => {
+    if (!countSheetGroups) return;
+    // setTimeout, NOT requestAnimationFrame: rAF never fires while the document is
+    // hidden, so a user who switches tab straight after clicking would get no print
+    // at all and no error either. A timer fires regardless of visibility.
+    const timer = setTimeout(() => printSheet(), 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countSheetGroups]);
 
   const loadDiscrepancies = useCallback(async () => {
     if (!id) return;
@@ -1029,6 +1107,21 @@ const CampaignDetailPage = () => {
         className="mb-0"
         actions={
           <>
+            {/* Not on a Draft campaign: expected rows are materialised when the campaign
+                starts, so a Draft count sheet would be empty and read as a broken feature. */}
+            {campaign.status !== AuditCampaignStatusEnum.Draft &&
+              campaign.status !== AuditCampaignStatusEnum.Cancelled && (
+                <Button
+                  variant="toolbar"
+                  onClick={printCountSheet}
+                  disabled={countSheetLoading}
+                >
+                  <i className="icon icon-print text-xs" />
+                  <span>
+                    {countSheetLoading ? 'Preparing…' : 'Print Count Sheet'}
+                  </span>
+                </Button>
+              )}
             {campaign.status === AuditCampaignStatusEnum.Draft && (
               <Button
                 variant="toolbar"
@@ -1519,10 +1612,8 @@ const CampaignDetailPage = () => {
               label="Found Condition"
               placeholder="(not observed)"
               disabled={recordForm.notFound}
-              options={ASSET_CONDITIONS.map((c) => ({
-                value: c.id,
-                label: c.name,
-              }))}
+              options={conditionOptions}
+              emptyText={conditionEmptyText}
               value={recordForm.foundConditionTypeId}
               onChange={(e) =>
                 setRecordForm((prev) => ({
@@ -2060,6 +2151,22 @@ const CampaignDetailPage = () => {
         }
         onClose={() => setApproveOpen(false)}
       />
+
+      {/* Landscape: ten columns, four of them left blank for a pen. */}
+      {countSheetGroups && (
+        <PrintSheet landscape>
+          <CountSheet
+            companyName={printIdentity.companyName}
+            generatedBy={printIdentity.userName}
+            generatedOn={new Date()}
+            campaignName={campaign.name}
+            campaignReference={campaign.id}
+            scopeSummary={scopesSummary}
+            groups={countSheetGroups}
+            totalRows={countSheetTotal}
+          />
+        </PrintSheet>
+      )}
     </div>
   );
 };

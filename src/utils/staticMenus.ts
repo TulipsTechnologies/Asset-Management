@@ -56,4 +56,5 @@ export const staticMenus: IStaticMenu[] = [
   { label: 'Locations', iconName: 'icon-move', iconSizeClass: 'text-lg', url: '/locations' },
   { label: 'Vendors', iconName: 'icon-briefcase', iconSizeClass: 'text-lg', url: '/vendors' },
   { label: 'Asset Code Format', iconName: 'icon-documents', iconSizeClass: 'text-lg', url: '/asset-code-format' },
+  { label: 'Asset Conditions', iconName: 'icon-dials', iconSizeClass: 'text-lg', url: '/asset-conditions' },
 ];

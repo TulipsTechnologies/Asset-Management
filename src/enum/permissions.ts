@@ -1,42 +1,53 @@
 /**
- * Asset Management permission ids — MUST match the implicit int values of
- * TulipsHRM.AssetManagement.Domain.Enums.Permissions (append-only enum).
- * The JWT `permissions` claim carries these as a CSV of ints.
+ * Asset Management permission ids — MUST match
+ * TulipsHRM.AssetManagement.Permissions.PermissionEnum. The AssetAuthToken's
+ * `permissions` claim carries these as a CSV of ints.
+ *
+ * These are the SHARED-CONTRACT ids (1600+), not the module's old domain ids. The two
+ * enums were merged into one contract and the shared members moved 27..60 → 1600..1633;
+ * this mirror still carried the old numbers afterwards, so every gate below silently
+ * evaluated false — the System Test and Visual Regression sections disappeared for users
+ * who did hold the permission. A stale mirror fails closed and silently, which is why the
+ * values are pinned here rather than derived from anything.
+ *
+ * Deliberately a SUBSET: internal-user administration ids exist in the backend enum but
+ * are not this frontend's business.
  */
 export enum Permission {
   TotalAccess = 1,
 
-  ViewAssets = 27,
-  ViewAllAssets = 28,
-  ManageAssets = 29,
-  DeleteDraftAssets = 30,
-  ExportAssets = 31,
-  ImportAssets = 32,
-  AssignAssets = 33,
-  ReturnAssets = 34,
-  TransferAssets = 35,
-  AuditAssets = 36,
-  RequestAssetMaintenance = 37,
-  ManageWorkOrders = 38,
-  ViewDepreciation = 39,
-  RunDepreciation = 40,
-  ApproveDepreciation = 41,
-  RequestAssetDisposal = 42,
-  ApproveAssetDisposal = 43,
-  ViewAssetReports = 44,
-  ManageAssetSettings = 45,
-  ViewAssetAuditLogs = 46,
-  ResetCompanyData = 47,
-  /** §12.15: pinned to 56 — the backend enum appends it after ReviewTaxDepreciation (55). */
-  ManageSystemTest = 56,
+  ViewAssets = 1600,
+  ViewAllAssets = 1601,
+  ManageAssets = 1602,
+  DeleteDraftAssets = 1603,
+  ExportAssets = 1604,
+  ImportAssets = 1605,
+  AssignAssets = 1606,
+  ReturnAssets = 1607,
+  TransferAssets = 1608,
+  AuditAssets = 1609,
+  RequestAssetMaintenance = 1610,
+  ManageWorkOrders = 1611,
+  ViewDepreciation = 1612,
+  RunDepreciation = 1613,
+  ApproveDepreciation = 1614,
+  RequestAssetDisposal = 1615,
+  ApproveAssetDisposal = 1616,
+  ViewAssetReports = 1617,
+  ManageAssetSettings = 1618,
+  ViewAssetAuditLogs = 1619,
+  ResetCompanyData = 1620,
 
-  // Visual Regression framework (visual design §5, appended 57–60). Deliberately
-  // separate from ManageSystemTest: the VisualRegressionController carries these at
-  // method level so reviewers do not need the destructive framework permission.
-  ViewVisualRegression = 57,
-  RunVisualRegression = 58,
-  ApproveVisualBaseline = 59,
-  ManageVisualExceptions = 60,
+  ManageSystemTest = 1629,
+
+  ViewVisualRegression = 1630,
+  RunVisualRegression = 1631,
+  ApproveVisualBaseline = 1632,
+  ManageVisualExceptions = 1633,
+
+  /** Warranty, insurance and claims (§9). */
+  ViewAssetCoverage = 1634,
+  ManageAssetCoverage = 1635,
 }
 
 /** OR semantics, TotalAccess short-circuits — mirrors the backend check. */

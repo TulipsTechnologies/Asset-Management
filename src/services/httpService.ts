@@ -1,5 +1,5 @@
 import { TContentType } from "@/interface/IHttpService";
-import { buildApiUrl, getApiBaseUrl } from "@/utils/constants";
+import { buildApiUrl } from "@/utils/constants";
 import cookies from "js-cookie";
 import {
   ASSET_LOGIN_ENDPOINT,
@@ -107,19 +107,22 @@ export const requestApi = async ({
   if (externalApi) {
     url = apiEndpoint;
   } else {
-    url = buildApiUrl(apiEndpoint, baseUrl);
+    // `baseUrl` overrides the configured base wholesale — it is never prepended
+    // to it, so an override can only replace an origin, never stack onto one.
+    url = baseUrl ? `${baseUrl.replace(/\/+$/, '')}${
+      apiEndpoint.startsWith('/') ? '' : '/'
+    }${apiEndpoint}` : buildApiUrl(apiEndpoint);
   }
 
   let res: Response;
   try {
     res = await fetch(url, options);
   } catch {
-    // Network-level failure: API down, wrong NEXT_PUBLIC_API_BASE, or CORS.
-    // Surface it as a normal envelope so callers show a message instead of
-    // throwing an unhandled "TypeError: Failed to fetch".
-    const message = `Unable to reach the server at ${
-      baseUrl ?? getApiBaseUrl()
-    }. Check that the API is running and reachable.`;
+    // Network-level failure: API down, misconfigured NEXT_PUBLIC_ASSET_API_URL,
+    // or CORS. Surface it as a normal envelope so callers show a message instead
+    // of throwing an unhandled "TypeError: Failed to fetch". The resolved URL is
+    // named, not the base, so a wrong value is visible rather than inferred.
+    const message = `Unable to reach the server at ${url}. Check that the API is running and reachable.`;
 
     if (returnBlob) throw new Error(message);
 

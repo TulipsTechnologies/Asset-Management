@@ -8,10 +8,14 @@ import Modal from '@/components/UI/Modal';
 import TextArea from '@/components/UI/TextArea';
 import AssetDocumentsSection from './_components/AssetDocumentsSection';
 import ProfileHeader from '@/components/UI/ProfileHeader';
+import { useAssetPrimaryPhoto } from '@/hooks/useAssetPrimaryPhoto';
 import PageToolbar from '@/components/UI/PageToolbar';
 import InfoCard, { InfoCardGrid, InfoField } from '@/components/UI/InfoCard';
 import AssetDepreciationSection from './_components/AssetDepreciationSection';
 import AssetTaxProfileSection from './_components/AssetTaxProfileSection';
+import AssetCoverageSection from './_components/AssetCoverageSection';
+import { Permission } from '@/enum/permissions';
+import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { IAsset } from '@/interface/IAsset';
 import { IAssetAssignment } from '@/interface/IAssetAssignment';
 import {
@@ -98,6 +102,10 @@ const AssetDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { addToast } = useToast();
+  const { can } = useUserPermissions();
+
+  // Fetched through the authenticated document endpoint — asset photos are not reachable by URL.
+  const primaryPhotoUrl = useAssetPrimaryPhoto(id);
 
   const [asset, setAsset] = useState<IAsset | null>(null);
   const [loading, setLoading] = useState(true);
@@ -300,6 +308,7 @@ const AssetDetailPage = () => {
         }
       />
       <ProfileHeader
+        photoUrl={primaryPhotoUrl}
         fallback={<i className="icon icon-briefcase text-2xl"></i>}
         title={asset.assetCode}
         titleBadges={
@@ -390,6 +399,11 @@ const AssetDetailPage = () => {
                 .join(' ')}
             />
             <InfoField
+              label="Dimension"
+              icon="expand"
+              value={asset.dimension}
+            />
+            <InfoField
               label="Parent Asset"
               icon="expand"
               value={asset.parentAssetCode}
@@ -475,27 +489,18 @@ const AssetDetailPage = () => {
 
           <AssetTaxProfileSection assetId={asset.id} />
 
-          <InfoCard title="Warranty & Insurance" icon="umbrella">
-            <InfoField
-              label="Warranty"
-              icon="certificate"
-              value={
-                asset.warrantyStartDate || asset.warrantyEndDate
-                  ? `${formatDate(asset.warrantyStartDate) ?? '…'} → ${formatDate(asset.warrantyEndDate) ?? '…'}`
-                  : null
-              }
+          {/* Supersedes the old summary-only card (§9): it shows warranties, policies
+              and claims, and falls back to the asset's own summary dates for an asset
+              that has none — so nothing that used to be visible disappeared. */}
+          {/* Gated on the read permission. Without this a user on a role that lacks it
+              gets a permanent red "could not be loaded" banner where the old summary card
+              used to be — a 403 rendered as a fault. */}
+          {can(Permission.ViewAssetCoverage, Permission.ManageAssetCoverage) && (
+            <AssetCoverageSection
+              assetId={asset.id}
+              canManage={can(Permission.ManageAssetCoverage)}
             />
-            <InfoField
-              label="Insurance Policy"
-              icon="lock"
-              value={asset.insurancePolicyNumber}
-            />
-            <InfoField
-              label="Insurance Expiry"
-              icon="calendar"
-              value={formatDate(asset.insuranceExpiryDate)}
-            />
-          </InfoCard>
+          )}
 
           <InfoCard title="Location & Custody" icon="marker">
             <InfoField
