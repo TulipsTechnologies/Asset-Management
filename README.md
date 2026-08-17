@@ -75,16 +75,32 @@ above) or an `AssetAuthToken` obtained straight from the module's own
 ## @tulipstechnologies/common dependency
 
 The common component library is consumed as an npm package, but this repo does
-not require registry access to install: the package is vendored as a tarball
-(`vendor/tulipstechnologies-common-1.10.45.tgz`) and referenced via a `file:`
-dependency in `package.json`. To switch to the GitHub Packages registry,
-change the dependency to a semver range and export `NPM_TOKEN` (see `.npmrc`).
+not require registry access to install: the package is vendored as a tarball in
+the repo root (`tulipstechnologies-common-1.10.54.tgz`) and referenced via a
+`file:` dependency in `package.json` — the same arrangement the
+vehicle-management and recruitment modules use. To switch to the GitHub Packages
+registry, change the dependency to a semver range and export `NPM_TOKEN` (see
+`.npmrc`).
+
+To refresh the tarball after changing common source:
+
+```bash
+cd ../common-module && npm run sync:tgz
+# or full workspace sync (dist + tgz): npm run sync:local
+```
+
+That packs `common-module`, copies the tarball here, rewrites the `file:`
+dependency if the version changed, and runs `npm install --legacy-peer-deps`.
+This repo is registered in both `sync-tgz.sh` and `sync-dist.sh`, so it is
+refreshed alongside the other modules.
 
 `legacy-peer-deps=true` is set because common declares peer react ^18
 while this app runs react 19 — the same combination the employee module runs
 in production. **The "version" in `package.json` is a filename**, so `npm update`
-and `npm outdated` will never bump it; upgrading means bumping and building in
-`common-module`, then swapping the tarball here and reinstalling.
+and `npm outdated` will never bump it, and a stale committed tarball silently
+ships stale shared UI. Hand-editing the version string without placing the
+matching tarball breaks install. The tarball is a binary blob in git, so merge
+conflicts on it cannot be resolved by hand — take one side and re-sync.
 
 The app shell comes from this package. `src/components/Layout/DashboardLayout/`
 composes `DashboardCtxProvider` + `MaintenanceModeProvider` around the shared
