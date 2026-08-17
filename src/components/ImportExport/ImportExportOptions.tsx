@@ -6,6 +6,7 @@ import Button from '@/components/UI/Button';
 import CustomMenuItem from '@/components/UI/CustomMenuItem';
 import Dropdown from '@/components/UI/Dropdown';
 import Modal from '@/components/UI/Modal';
+import PhotoImportModal from './PhotoImportModal';
 import {
   downloadExport,
   downloadImportTemplate,
@@ -101,6 +102,9 @@ const ImportExportOptions = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [importOpen, setImportOpen] = useState(false);
+  /** Bulk photo attachment lives on the same Options menu, assets only — it is the only
+   *  entity with anywhere to put a photo. */
+  const [photoOpen, setPhotoOpen] = useState(false);
   const [fileName, setFileName] = useState('');
   const [bytes, setBytes] = useState<Blob | null>(null);
   const [busy, setBusy] = useState(false);
@@ -301,9 +305,24 @@ const ImportExportOptions = ({
           label="Import"
           onClick={() => setImportOpen(true)}
           icon={<i className="icon icon-import text-sm" />}
+          border={entity === 'assets'}
           className="!py-2"
         />
+        {entity === 'assets' && (
+          <CustomMenuItem
+            label="Import Photos"
+            onClick={() => setPhotoOpen(true)}
+            icon={<i className="icon icon-file text-sm" />}
+            className="!py-2"
+          />
+        )}
       </Dropdown>
+
+      <PhotoImportModal
+        isOpen={photoOpen}
+        onClose={() => setPhotoOpen(false)}
+        onImported={onImported}
+      />
 
       <Modal isOpen={importOpen} onClose={busy ? () => undefined : close} showCloseBtn={!busy} size="3xl">
         <div className="p-6">

@@ -182,3 +182,87 @@ export const previewImport = (
     body: asForm(bytes, name, overrides, importId, updateExisting),
     completeData: true,
   });
+
+/* ------------------------------------------------------- bulk photos (ZIP by asset code) */
+
+/** Why one file in the archive will not be attached. */
+export interface IPhotoImportIssue {
+  fileName: string;
+  /** The code the name resolved to, or "" when it resolved to nothing. */
+  assetCode: string;
+  reason: string;
+}
+
+/** One photo the import WILL attach — the consent surface. */
+export interface IPlannedPhotoBinding {
+  fileName: string;
+  assetCode: string;
+  assetName: string;
+  isPrimary: boolean;
+  /** True when this replaces a primary photo the asset already had. */
+  demotesExistingPrimary: boolean;
+  sizeBytes: number;
+}
+
+export interface IPhotoImportResult {
+  /** False means NOTHING was written. Always false on a check. */
+  imported: boolean;
+  preview: boolean;
+  /**
+   * ECHO of the request flag. The confirm sends THIS back, never the checkbox's own state,
+   * so the previewed plan and the imported plan cannot disagree about the mode.
+   */
+  replaceExistingPrimary: boolean;
+  filesRead: number;
+  attached: number;
+  wouldAttach: number;
+  assetsAffected: number;
+  primariesReplaced: number;
+  plan: IPlannedPhotoBinding[];
+  /** Excluded files with reasons. Not failures — the import proceeds without them. */
+  issues: IPhotoImportIssue[];
+  /** Anything here means nothing was written. */
+  problems: string[];
+  warnings: string[];
+}
+
+const asPhotoForm = (
+  bytes: Blob,
+  name: string,
+  replaceExistingPrimary: boolean,
+  importId?: string
+) => {
+  const formData = new FormData();
+  formData.append('file', bytes, name);
+  if (replaceExistingPrimary) formData.append('replaceExistingPrimary', 'true');
+  if (importId) formData.append('importId', importId);
+  return formData;
+};
+
+/** Plan only — resolves every file name against the register and writes nothing. */
+export const previewPhotoImport = (
+  bytes: Blob,
+  name: string,
+  replaceExistingPrimary: boolean,
+  importId?: string
+): Promise<IResponse<IPhotoImportResult>> =>
+  requestApi({
+    apiEndpoint: '/DataExchange/import/asset-photos/preview',
+    method: 'POST',
+    body: asPhotoForm(bytes, name, replaceExistingPrimary, importId),
+    completeData: true,
+  });
+
+/** All-or-nothing over the plan the check showed. Re-posting the same archive is a no-op. */
+export const importPhotos = (
+  bytes: Blob,
+  name: string,
+  replaceExistingPrimary: boolean,
+  importId?: string
+): Promise<IResponse<IPhotoImportResult>> =>
+  requestApi({
+    apiEndpoint: '/DataExchange/import/asset-photos',
+    method: 'POST',
+    body: asPhotoForm(bytes, name, replaceExistingPrimary, importId),
+    completeData: true,
+  });
