@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { useId } from 'react';
+import { FIELD_PLACEHOLDER_TEXT_CLASSES } from '@tulipstechnologies/common';
 
 export interface ISelectOption {
   value: string;
@@ -257,7 +258,7 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
             error ? 'border-red-500' : 'border-gray-300'
           } ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
         >
-          <span className={`truncate ${selected ? '' : 'text-gray-400'}`}>
+          <span className={`truncate ${selected ? '' : FIELD_PLACEHOLDER_TEXT_CLASSES}`}>
             {selected?.label ?? placeholder ?? ''}
           </span>
           <i
@@ -295,7 +296,7 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
                     onKeyDown={onSearchKeyDown}
                     placeholder="Search…"
                     aria-label={typeof label === 'string' && label ? `Search ${label}` : 'Search options'}
-                    className="w-full bg-transparent text-sm outline-none placeholder:text-gray-400"
+                    className="w-full bg-transparent text-sm outline-none"
                   />
                   {query && (
                     <button
