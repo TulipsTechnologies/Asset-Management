@@ -2,9 +2,9 @@
 //
 // Custom server for iisnode, mirroring the sibling TulipsHRM Next.js apps'
 // setup. Also reverse-proxies /asset-management/api/* to the AssetManagement
-// API (/api/*) so the relative NEXT_PUBLIC_API_BASE=/asset-management keeps
-// resolving same-origin when this app is served from its own subdomain rather
-// than behind the gateway's path-based proxy.
+// API (/api/*) so the relative NEXT_PUBLIC_ASSET_API_URL=/asset-management/api
+// keeps resolving same-origin when this app is served from its own subdomain
+// rather than behind the gateway's path-based proxy.
 const http = require('http');
 const { createServer } = require('http');
 const { parse } = require('url');

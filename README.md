@@ -25,19 +25,23 @@ npx tsc --noEmit   # type check
 
 | Key | Meaning |
 |---|---|
-| `NEXT_PUBLIC_API_BASE` | Module path prefix — `/asset-management`. Matches `basePath` and the `server.js` proxy prefix. **Not** an absolute origin. |
-| `NEXT_PUBLIC_ASSET_API_URL` | Dev only, **unset by default** — localhost then talks to the shared webdev gateway, so no local backend is needed. Set it to a local Asset API origin (`http://localhost:5199`) to route calls through the `next dev` rewrite instead. |
+| `NEXT_PUBLIC_ASSET_API_URL` | The Asset Management API base — the single source every API URL is built from. A **path** (`/asset-management/api`, the production value) keeps the browser same-origin and lets the server in front route it. An **absolute URL** is used verbatim and the browser calls it cross-origin; `.env.development` uses `https://webdev.tulipshrm.com:4433/asset-management/api` so a developer machine needs no local backend. |
+| `ASSET_API_PROXY_TARGET` | **Server-side only** (no `NEXT_PUBLIC_`) — where `/asset-management/api/*` is forwarded, by the `next dev` rewrite and by `server.js` under IIS. Consulted only when the base above is a path; an absolute base bypasses this hop. |
+| `NEXT_PUBLIC_HUB_URL` | Optional absolute URL of the HRM hub (sign-in/sign-out). Unset → the current origin, or `https://webdev.tulipshrm.com:4433` on localhost. |
+| `NEXT_PUBLIC_DEV_AUTH` | `true` enables the `/dev-auth` token-paste screen. An explicit flag — never inferred from the hostname, so a deployment cannot fall into it by accident. |
 | `NEXT_PUBLIC_LOGOUT_URL` | Sign-in/sign-out path on the HRM hub (`/signin`). |
-| `NEXT_PUBLIC_ENV` | `development` enables the `/dev-auth` bypass on localhost. |
 | `NEXT_DEFAULT_ITEM_COUNT` | Default page size (25). |
 
 **There are two distinct base URLs** — see `src/utils/constants.ts`, and don't
-mix them up:
+mix them up. Conflating them is what produced URLs of the form
+`https://webdev.tulipshrm.com:4433http://localhost:5199/api/…`:
 
-- `getBaseUrl()` — the **HRM hub** (sign-in/sign-out). Localhost →
-  `https://webdev.tulipshrm.com:4433`, otherwise the current origin.
-- `getApiBaseUrl()` / `buildApiUrl()` — the **Asset Management API**. Final
-  shape: `{origin}/asset-management/api{endpoint}`.
+- `getHubBaseUrl()` (alias: `getBaseUrl()`) — the **HRM hub**, for sign-in and
+  sign-out only. Never a component of an API URL.
+- `API_BASE` / `buildApiUrl()` — the **Asset Management API**, resolved once at
+  module load from `NEXT_PUBLIC_ASSET_API_URL`. Takes no origin argument, so an
+  origin can never be prepended to a value that already has one. Covered by
+  `src/utils/__tests__/apiConfig.test.ts`.
 
 ### Auth — three cookies, two tokens
 
@@ -56,9 +60,17 @@ and fires API calls, and decodes UI permissions from the `AssetAuthToken` (the
 hub token carries HRM permissions, not this module's). On a 401 `requestApi`
 re-exchanges **once** and silently replays the request.
 
-Unauthenticated requests are bounced to the hub sign-in — except on localhost
-with `NEXT_PUBLIC_ENV=development`, where the middleware routes to
-**`/dev-auth`**, a token-paste screen for pasting an `AuthToken` from webdev.
+Bootstrap passes `force` whenever `AuthToken` decodes as a JWT, so every real
+session re-mints its module token and can never carry stale permissions forward.
+The one exception is the `/dev-auth` module-token route below, which writes a
+non-JWT placeholder into `AuthToken`: there is no credential to exchange, so
+forcing would only discard a working token.
+
+Unauthenticated requests are bounced to the hub sign-in — except when
+`NEXT_PUBLIC_DEV_AUTH=true`, where the middleware routes to **`/dev-auth`**. That
+screen takes either an `AuthToken` copied from webdev (normal route, exchanged as
+above) or an `AssetAuthToken` obtained straight from the module's own
+`POST /AppUsers/Login`, for when the hub is unreachable.
 
 ## @tulipstechnologies/common dependency
 
@@ -134,8 +146,13 @@ Conventions:
 
 `server.js` + `web.config` run the app under IIS/iisnode. Beyond the standard
 Next custom-server scaffold, `server.js` reverse-proxies `/asset-management/api/*`
-to the Asset Management API so the relative `NEXT_PUBLIC_API_BASE` keeps
-resolving same-origin. The target defaults to `localhost:5199` and is
-overridable with `ASSET_API_HOST` / `ASSET_API_PORT` — **set these to match the
-API on the server**. The dev-only `rewrites()` in `next.config.ts` mirrors the
-proxy for `next dev`, gated on `NEXT_PUBLIC_ASSET_API_URL`.
+to the Asset Management API so the relative `NEXT_PUBLIC_ASSET_API_URL` keeps
+resolving same-origin. The target defaults to `localhost:5199` and is overridable
+with `ASSET_API_PROXY_TARGET` (legacy `ASSET_API_HOST` / `ASSET_API_PORT` are
+still honoured) — **set this to match the API on the server**. The dev-only
+`rewrites()` in `next.config.ts` mirrors the proxy for `next dev`, reading the
+same `ASSET_API_PROXY_TARGET`.
+
+Note `server.js` parses that variable for host and port only and discards any
+path, so a proxy target carrying a path prefix works under `next dev` but not
+under IIS.

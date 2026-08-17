@@ -10,7 +10,7 @@ import {
 
 /**
  * Same requestApi conventions as the employee module, pointed at the
- * AssetManagement API (same-origin + NEXT_PUBLIC_API_BASE + '/api').
+ * AssetManagement API — see `API_BASE` / `buildApiUrl` in utils/constants.
  */
 export const requestApi = async ({
   apiEndpoint,

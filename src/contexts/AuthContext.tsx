@@ -350,17 +350,20 @@ export const AuthProvider: FC<{ children: ReactNode }> = ({ children }) => {
       // Exchange the HRM AuthToken for the asset-module token before any page
       // mounts and fires asset API calls.
       //
-      // Deployed, always re-exchange: the hub token is the source of truth and a
-      // carried-over AssetAuthToken could hold stale permissions.
+      // ALWAYS re-exchange when there is a real hub token: it is the source of
+      // truth, and a carried-over AssetAuthToken could hold stale permissions.
+      // Every genuine session — deployed or local — takes this branch.
       //
-      // Under dev auth, honour an AssetAuthToken that is already present instead.
-      // A developer whose hub SSO is unavailable — a signing-key mismatch against
-      // the environment that issued the hub token, say — can still obtain a module
-      // token directly and work, where forcing the exchange would discard it and
-      // fail on the very call that is broken. The dev-auth screen's "Clear cookies"
-      // is how you get rid of one that has gone stale.
+      // The condition is on the token's SHAPE, not on an environment flag, and it
+      // is not the same thing as forcing unconditionally. The dev-auth screen has a
+      // second route in that writes the non-JWT DEV_AUTH_PLACEHOLDER_TOKEN into
+      // AuthToken and puts a directly-obtained module token in AssetAuthToken; the
+      // middleware only checks that the cookie EXISTS. Forcing there would clear
+      // that module token, POST the placeholder to an endpoint that cannot
+      // authenticate it, and leave the failure card up permanently. A placeholder
+      // is not a credential, so there is nothing to re-exchange for.
       const { token: assetToken, companyId, error } = await ensureAssetToken(
-        !isDevAuthEnabled()
+        Boolean(parseJwt(cookieToken))
       );
       if (!assetToken) {
         const message =
