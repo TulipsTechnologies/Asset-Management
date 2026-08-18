@@ -281,11 +281,11 @@ const Dropdown = forwardRef<DropdownRef, DropdownProps>(
     useEffect(() => {
       if (isOpen) {
         window.addEventListener("resize", debouncedUpdate);
-        window.addEventListener("scroll", debouncedUpdate);
+        window.addEventListener("scroll", debouncedUpdate, true);
 
         return () => {
           window.removeEventListener("resize", debouncedUpdate);
-          window.removeEventListener("scroll", debouncedUpdate);
+          window.removeEventListener("scroll", debouncedUpdate, true);
         };
       }
     }, [isOpen, debouncedUpdate]);

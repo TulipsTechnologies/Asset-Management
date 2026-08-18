@@ -1,5 +1,6 @@
-import { ReactNode, useState, useRef, useEffect, RefObject, FC } from "react";
+import { ReactNode, useState, useRef, useCallback, RefObject, FC } from "react";
 import { createPortal } from "react-dom";
+import useAnchoredReposition from "@/hooks/useAnchoredReposition";
 
 interface TooltipProps {
   text: string | ReactNode;
@@ -110,12 +111,16 @@ const Tooltip: FC<TooltipProps> = ({
     setIsVisible(false);
   };
 
-  useEffect(() => {
-    if (isVisible && triggerRef.current) {
-      const rect = triggerRef.current.getBoundingClientRect();
-      setTooltipPosition(calculatePosition(rect));
-    }
-  }, [isVisible, position]);
+  const updateTooltipPosition = useCallback(() => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setTooltipPosition(calculatePosition(rect));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [position]);
+
+  // The tooltip is portaled to `document.body` and positioned in viewport
+  // coordinates, so it has to be re-anchored whenever anything scrolls.
+  useAnchoredReposition(isVisible, updateTooltipPosition);
 
   return (
     <div
@@ -131,7 +136,7 @@ const Tooltip: FC<TooltipProps> = ({
         createPortal(
           <div
             ref={tooltipRef}
-            className={`absolute z-[1200]`}
+            className={`fixed z-[1200]`}
             style={{
               top: tooltipPosition.top,
               left: tooltipPosition.left,

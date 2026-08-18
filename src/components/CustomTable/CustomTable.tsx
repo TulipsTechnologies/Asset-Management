@@ -9,6 +9,7 @@ import {
 import dynamic from 'next/dynamic';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { CustomTableProps, ICacheData, RowWithFieldProps, TTableColumn } from './CustomTableInterface';
+import { clampColumnWidth, getColumnMinWidth } from './columnResizeUtils';
 import { sortDate, sortNumber, sortString } from './utils';
 import SelectionBar from './SelectionBar';
 import Tooltip from '../UI/Tooltip';
@@ -201,7 +202,14 @@ const CustomTable = ({
         return prevColumns.map((col) => {
           const saved = savedByKey.get(col.key);
           return saved
-            ? { ...col, width: saved.width, locked: saved.locked, visible: saved.visible }
+            ? {
+                ...col,
+                // Clamp saved widths too, so a column stored below the floor by
+                // an older build recovers on load rather than needing a migration.
+                width: clampColumnWidth(saved.width, col.width, undefined, col.key),
+                locked: saved.locked,
+                visible: saved.visible,
+              }
             : col;
         });
       }
@@ -212,7 +220,9 @@ const CustomTable = ({
           const prevCol = prevColumns.find((col) => col.key === item.key)!;
           return {
             ...prevCol,
-            width: item.width,
+            // Clamp saved widths too, so a column stored below the floor by an
+            // older build recovers on load rather than needing a migration.
+            width: clampColumnWidth(item.width, prevCol.width, undefined, item.key),
             locked: item.locked,
             visible: item.visible,
           };
@@ -460,16 +470,18 @@ const CustomTable = ({
     );
   };
 
-  const handleResize = (columnKey: string, deltaX: number) => {
+  const handleResize = (columnKey: string, newWidth: number) => {
     setColumns((prevColumns) =>
       prevColumns.map((col) => {
-        const defaultWidth = initialColumns.find(
+        if (col.key !== columnKey) return col;
+        const design = initialColumns.find(
           (init) => init.key === columnKey,
         )?.width;
-
-        return col.key === columnKey
-          ? { ...col, width: Math.max(defaultWidth ?? 80, col.width + deltaX) }
-          : col;
+        const width = Math.max(
+          getColumnMinWidth(design, undefined, col.key),
+          Math.round(newWidth),
+        );
+        return width === col.width ? col : { ...col, width };
       }),
     );
   };
@@ -483,12 +495,15 @@ const CustomTable = ({
     e: React.MouseEvent<HTMLDivElement, MouseEvent>,
     columnKey: string,
   ) => {
-    let initialX = e.clientX;
+    // Track the drag against a fixed origin rather than accumulating per-move
+    // deltas: once the width is held at the floor, incremental deltas are
+    // swallowed and the handle drifts away from the cursor.
+    const initialX = e.clientX;
+    const startWidth =
+      columns.find((col) => col.key === columnKey)?.width ?? 200;
 
     const onMouseMove = (moveEvent: MouseEvent) => {
-      const deltaX = moveEvent.clientX - initialX;
-      handleResize(columnKey, deltaX);
-      initialX = moveEvent.clientX;
+      handleResize(columnKey, startWidth + (moveEvent.clientX - initialX));
     };
 
     const onMouseUp = () => {
