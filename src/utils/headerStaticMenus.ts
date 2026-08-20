@@ -21,7 +21,6 @@ export const headerOnlyStaticMenus: IStaticMenu[] = [
   { label: 'Developer Sign In', iconName: 'icon-users', iconSizeClass: 'text-lg', url: '/dev-auth' },
 
   // Settings-hub cards with no sidebar entry of their own
-  { label: 'Master Data Reset', iconName: 'icon-setting', iconSizeClass: 'text-lg', url: '/master-data-reset' },
   { label: 'System Test & Demo', iconName: 'icon-clipboard', iconSizeClass: 'text-lg', url: '/system-test' },
   { label: 'System Test — Demo', iconName: 'icon-clipboard', iconSizeClass: 'text-lg', url: '/system-test/demo' },
   { label: 'System Test — Health', iconName: 'icon-clipboard', iconSizeClass: 'text-lg', url: '/system-test/health' },

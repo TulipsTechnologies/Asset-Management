@@ -1,7 +1,16 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  CSSProperties,
+  PointerEvent as ReactPointerEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useRouter } from 'next/navigation';
+import { useDashbordCtx } from '@tulipstechnologies/common/dist/contexts/DashboardContext';
 import Link from 'next/link';
 import { useToast } from '@/components/Providers/ToastProvider';
 import Button from '@/components/UI/Button';
@@ -54,7 +63,9 @@ import LocationAssetCards, {
 const REPORT_CODE = 'assets-by-location';
 const VIEW_VALUES = ['cards', 'table'] as const;
 type TAssetView = (typeof VIEW_VALUES)[number];
-const VIEW_STORAGE_KEY = 'reports.assetsByLocation.view';
+// v2: table is the new default; the bump retires any stale 'cards' preference so the
+// default actually shows. A user who picks Cards again still has it remembered from here on.
+const VIEW_STORAGE_KEY = 'reports.assetsByLocation.view.v2';
 const RECENT_LIMIT = 5;
 
 const VIEW_OPTIONS: IViewOption<TAssetView>[] = [
@@ -115,7 +126,58 @@ const LocationExplorer = ({
   const [summary, setSummary] = useState<ILocationSummary | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
 
-  const [view, setView] = useState<TAssetView>('cards');
+  const [view, setView] = useState<TAssetView>('table');
+
+  // The full-page explorer is wide (location tree + summary + table). Collapse the app's
+  // left menu while it is open and restore it on the way out, so the report gets the room.
+  // Guarded by `embedded` so the dashboard's inline band never touches the chrome.
+  const { setIsMenuExtended } = useDashbordCtx();
+  useEffect(() => {
+    if (embedded) return;
+    setIsMenuExtended(false);
+    return () => setIsMenuExtended(true);
+  }, [embedded, setIsMenuExtended]);
+
+  // Resizable tree panel — the operator drags the divider to widen it and read long
+  // location names; the chosen width is remembered. lg+ only (mobile uses the tree drawer).
+  const [treeWidth, setTreeWidth] = useState(320);
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem('reports.assetsByLocation.treeWidth');
+      if (raw) setTreeWidth(Math.min(560, Math.max(260, Number(raw) || 320)));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const startTreeResize = useCallback(
+    (e: ReactPointerEvent) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startW = treeWidth;
+      let latest = startW;
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'col-resize';
+      const onMove = (ev: PointerEvent) => {
+        latest = Math.min(560, Math.max(260, startW + (ev.clientX - startX)));
+        setTreeWidth(latest);
+      };
+      const onUp = () => {
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+        document.body.style.userSelect = '';
+        document.body.style.cursor = '';
+        try {
+          window.localStorage.setItem('reports.assetsByLocation.treeWidth', String(latest));
+        } catch {
+          /* ignore */
+        }
+      };
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+    },
+    [treeWidth]
+  );
+
   /** Set when the user asks for assets on a parent — otherwise parents show the map.
    *  A deep link carrying a filter is such an ask: the caller wants the rows. */
   const [forceAssets, setForceAssets] = useState(() => {
@@ -685,9 +747,22 @@ const LocationExplorer = ({
 
   return (
     <div className="mt-4">
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <aside className="hidden max-h-[calc(100vh-230px)] rounded-xl border border-gray-200 bg-white lg:flex lg:flex-col">
+      <div
+        className="grid grid-cols-1 gap-4 lg:grid-cols-[var(--tree-w)_minmax(0,1fr)]"
+        style={{ '--tree-w': `${treeWidth}px` } as CSSProperties}
+      >
+        <aside className="relative hidden max-h-[calc(100vh-230px)] rounded-xl border border-gray-200 bg-white lg:flex lg:flex-col">
           {treePane}
+          {/* Drag to widen the tree and read long location names; the width is remembered. */}
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            onPointerDown={startTreeResize}
+            title="Drag to resize — widen to read long location names"
+            className="group absolute -right-2.5 top-0 z-10 hidden h-full w-5 cursor-col-resize items-center justify-center lg:flex"
+          >
+            <span className="h-12 w-1 rounded-full bg-gray-200 transition-colors group-hover:bg-blue-400" />
+          </div>
         </aside>
 
         <section className="min-w-0 space-y-4">

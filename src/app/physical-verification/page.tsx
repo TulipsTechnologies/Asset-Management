@@ -569,7 +569,7 @@ const PhysicalVerificationPage = () => {
               maxLength={200}
               placeholder="Q3 head-office audit…"
             />
-            <div className="grid grid-cols-2 gap-x-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-5">
               <Input
                 label="Scheduled From"
                 type="date"
@@ -624,10 +624,10 @@ const PhysicalVerificationPage = () => {
             </div>
             <div className="space-y-4">
               {form.scopes.map((row, index) => (
-                <div key={index} className="flex items-end gap-x-4">
+                <div key={index} className="flex flex-col sm:flex-row sm:items-end gap-y-3 sm:gap-x-4">
                   <Select
                     label="Scope Type"
-                    className="w-44"
+                    className="w-full sm:w-44"
                     placeholder="Select type"
                     options={AUDIT_SCOPE_TYPE_OPTIONS.map((t) => ({
                       value: String(t),

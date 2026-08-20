@@ -1177,7 +1177,7 @@ const CampaignDetailPage = () => {
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-y-2">
         <div>
-          <h1 className="text-lg font-semibold text-secondaryColor flex items-center gap-3">
+          <h1 className="text-lg font-semibold text-secondaryColor flex flex-wrap items-center gap-x-3 gap-y-1">
             {campaign.name}
             <span
               className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${

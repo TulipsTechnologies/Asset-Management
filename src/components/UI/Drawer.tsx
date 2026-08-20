@@ -42,7 +42,7 @@ const Drawer: FC<DrawerProps> = ({ isOpen, onClose, children, excludeButtonRef }
 
   return (
     <div
-      className={`fixed top-0 right-0 h-full overflow-y-auto bg-white shadow-lg transition-transform duration-300 ease-in-out z-50 transform ${
+      className={`fixed top-0 right-0 h-full max-w-[calc(100vw-1rem)] overflow-y-auto bg-white shadow-lg transition-transform duration-300 ease-in-out z-50 transform ${
         isOpen ? 'translate-x-0' : 'translate-x-full'
       }`}
     >

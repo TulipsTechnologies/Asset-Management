@@ -126,7 +126,7 @@ const GroupRow = ({
 
         {/* The pseudo "(No location)" row is a bucket, not a building — it gets the
             room marker whatever its depth. */}
-        <LocationTypeIcon tier={tier} compact pseudo={!node.id} />
+        <LocationTypeIcon tier={tier} compact pseudo={!node.id} hueKey={node.id ?? node.name} />
 
         <button
           type="button"
@@ -152,7 +152,7 @@ const GroupRow = ({
           {node.topCategories.map((c) => `${c.name} ${c.count}`).join(' · ')}
         </span>
 
-        <span className="ml-auto flex w-28 shrink-0 justify-end opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+        <span className="ml-auto flex w-0 sm:w-28 shrink-0 justify-end opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
           {node.rollup > 0 && (
             <button
               type="button"

@@ -194,7 +194,7 @@ const AssetCodeFormatPage = () => {
               Example
             </p>
             <p
-              className={`mt-1 font-mono text-2xl ${
+              className={`mt-1 font-mono text-xl sm:text-2xl break-all ${
                 previewTooLong ? 'text-red-600' : 'text-secondaryColor'
               }`}
             >

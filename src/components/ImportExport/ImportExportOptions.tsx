@@ -390,45 +390,6 @@ const ImportExportOptions = ({
             }}
           />
 
-          {/*
-            One bar for both phases. It shows a real percentage once the server knows the
-            row count, and stays an indeterminate "working" state before that — a bar that
-            invents a number while the file is still being read would be lying.
-          */}
-          {busy && (
-            <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-              <div className="flex items-baseline justify-between gap-3">
-                <p className="text-sm text-gray-700">
-                  {progress?.phase === 'Importing'
-                    ? 'Importing rows…'
-                    : 'Checking the file…'}
-                </p>
-                {progress && progress.total > 0 && (
-                  <p className="text-xs text-gray-500 tabular-nums">
-                    {progress.done.toLocaleString()} / {progress.total.toLocaleString()}
-                    {' · '}
-                    {progress.percent}%
-                  </p>
-                )}
-              </div>
-              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-gray-200">
-                {progress && progress.total > 0 ? (
-                  <div
-                    className="h-full rounded-full bg-primarycolor transition-[width] duration-300 ease-out"
-                    style={{ width: `${progress.percent}%` }}
-                  />
-                ) : (
-                  <div className="h-full w-1/3 animate-pulse rounded-full bg-primarycolor/60" />
-                )}
-              </div>
-              {progress?.phase === 'Importing' && (
-                <p className="mt-2 text-xs text-gray-500">
-                  Everything lands together — leave this open until it finishes.
-                </p>
-              )}
-            </div>
-          )}
-
           {/* ---------------- the check's verdict ---------------- */}
           {preview && (
             <div className="mt-4 space-y-3">
@@ -741,6 +702,47 @@ const ImportExportOptions = ({
                     <span>Download assigned codes</span>
                   </button>
                 </div>
+              )}
+            </div>
+          )}
+
+          {/*
+            One bar for both phases. It shows a real percentage once the server knows the
+            row count, and stays an indeterminate "working" state before that — a bar that
+            invents a number while the file is still being read would be lying.
+            Placed just above the action row so the progress sits directly under the
+            Import button the operator pressed, instead of at the top of the modal.
+          */}
+          {busy && (
+            <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+              <div className="flex items-baseline justify-between gap-3">
+                <p className="text-sm text-gray-700">
+                  {progress?.phase === 'Importing'
+                    ? 'Importing rows…'
+                    : 'Checking the file…'}
+                </p>
+                {progress && progress.total > 0 && (
+                  <p className="text-xs text-gray-500 tabular-nums">
+                    {progress.done.toLocaleString()} / {progress.total.toLocaleString()}
+                    {' · '}
+                    {progress.percent}%
+                  </p>
+                )}
+              </div>
+              <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                {progress && progress.total > 0 ? (
+                  <div
+                    className="h-full rounded-full bg-primarycolor transition-[width] duration-300 ease-out"
+                    style={{ width: `${progress.percent}%` }}
+                  />
+                ) : (
+                  <div className="h-full w-1/3 animate-pulse rounded-full bg-primarycolor/60" />
+                )}
+              </div>
+              {progress?.phase === 'Importing' && (
+                <p className="mt-2 text-xs text-gray-500">
+                  Everything lands together — leave this open until it finishes.
+                </p>
               )}
             </div>
           )}

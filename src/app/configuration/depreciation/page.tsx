@@ -474,7 +474,8 @@ export default function DepreciationConfigurationPage() {
         </div>
 
         {selectedYearId && periods.length > 0 && (
-          <table className="mt-4 w-full text-sm">
+          <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[620px] text-sm">
             <thead className="bg-gray-50 text-left text-xs text-gray-600">
               <tr>
                 <th className="px-3 py-2">#</th>
@@ -529,6 +530,7 @@ export default function DepreciationConfigurationPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </section>
 
@@ -549,7 +551,8 @@ export default function DepreciationConfigurationPage() {
         )}
 
         {mappings.length > 0 && (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-sm">
             <thead className="bg-gray-50 text-left text-xs text-gray-600">
               <tr>
                 <th className="px-3 py-2">Scope</th>
@@ -594,6 +597,7 @@ export default function DepreciationConfigurationPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </section>
 
@@ -605,7 +609,7 @@ export default function DepreciationConfigurationPage() {
             The previous policy is retired, not overwritten. The currency cannot change while
             capitalized assets are on the register.
           </p>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Threshold"
               type="number"
@@ -651,7 +655,7 @@ export default function DepreciationConfigurationPage() {
             month against the published patro before saving. Month lengths of 29–32 days are
             all legitimate.
           </p>
-          <div className="grid grid-cols-3 items-end gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 items-end gap-4">
             <Input
               label="Year Code"
               placeholder="2084/85"
@@ -670,8 +674,8 @@ export default function DepreciationConfigurationPage() {
           </div>
 
           {periodDrafts.length > 0 && (
-            <div className="mt-4 max-h-80 overflow-y-auto">
-              <table className="w-full text-sm">
+            <div className="mt-4 max-h-80 overflow-auto">
+              <table className="w-full min-w-[520px] text-sm">
                 <thead className="sticky top-0 bg-gray-100 text-left text-xs text-gray-600">
                   <tr>
                     <th className="px-2 py-2">#</th>
@@ -730,7 +734,7 @@ export default function DepreciationConfigurationPage() {
             Proceeds must have their own account — debiting them against the cost account
             would leave part of a disposed asset&apos;s cost on the balance sheet.
           </p>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Select
               label="Scope"
               value={mappingForm.assetCategoryId}

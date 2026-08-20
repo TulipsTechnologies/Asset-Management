@@ -9,7 +9,7 @@ import { useActiveCompany } from '@/hooks/useActiveCompany';
  *
  * The module scopes every request to a cookie the operator cannot see, and the two failure modes
  * it protects against look identical to working normally: reading another company's register, and
- * changing it. This module's Master Data Reset wiped the real tenant twice.
+ * changing it. The register-clearing reset (now under System Test & Demo) wiped the real tenant twice.
  *
  * PORTALLED into the shared Header's own row, because that component takes a fixed prop list with
  * no slot for host content. Portalling rather than positioning absolutely over it is what keeps

@@ -61,7 +61,6 @@ const HUBS: IHub[] = [
       { url: '/locations', label: 'Locations' },
       { url: '/vendors', label: 'Vendors' },
       { url: '/configuration/depreciation', label: 'Depreciation Setup' },
-      { url: '/master-data-reset', label: 'Master Data Reset' },
       { url: '/system-test', label: 'System Test & Demo' },
     ],
   },

@@ -479,12 +479,12 @@ const LocationsPage = () => {
   if (view === 'tree') {
     return (
       <div className="px-4 mt-2">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between">
           <Button onClick={openCreate}>
             <i className="icon icon-plus text-xs"></i>
             <span>Add Location</span>
           </Button>
-          <div className="flex items-center gap-2">{headerRight}</div>
+          <div className="flex flex-wrap items-center gap-2">{headerRight}</div>
         </div>
 
         <div className="mt-3 rounded-xl border border-gray-200 bg-white p-4">

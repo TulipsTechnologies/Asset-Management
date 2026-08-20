@@ -87,12 +87,12 @@ export const Tabs: FC<TabsProps> = ({
 
   return (
     <div className={`tabs-container ${className}`}>
-      <div className={`tab-list flex border-b gap-x-10 ${containerClassName}`}>
+      <div className={`tab-list flex border-b gap-x-6 sm:gap-x-10 overflow-x-auto ${containerClassName}`}>
         {tabs.map((tab) => (
           <button
             type="button"
             key={tab.id}
-            className={`tab-item pb-3 border-b-2 ${
+            className={`tab-item shrink-0 whitespace-nowrap pb-3 border-b-2 ${
               tab.id === activeTabId
                 ? `border-primarycolor ${tabButtonActiveClassName}`
                 : `text-gray-500 border-transparent ${tabButtonInactiveClassName}`

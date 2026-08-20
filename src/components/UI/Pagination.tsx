@@ -75,7 +75,7 @@ const Pagination: FC<PaginationProps> = ({
           pageSize={pageSize || Number(process.env.NEXT_DEFAULT_ITEM_COUNT)}
         />
       )}
-      <div className="flex justify-end ">
+      <div className="flex flex-wrap justify-center gap-y-2 sm:justify-end">
         <button
           onClick={() => updateFilters({ pageNumber: 1 })}
           className={`rounded-full w-8 h-8 flex justify-center items-center px-1.5 py-1 text-sm border mx-0.5 sm:mx-1 hover:bg-bgBtnGray ${

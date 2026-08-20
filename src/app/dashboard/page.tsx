@@ -262,7 +262,7 @@ const AttentionQueue = ({
               <i className={`icon icon-${kind.iconName} text-base ${kind.iconColor}`}></i>
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-secondaryColor truncate">{item.name}</p>
+              <p className="text-sm font-semibold text-secondaryColor line-clamp-2 lg:line-clamp-1">{item.name}</p>
               <p className="flex items-center gap-1.5 mt-0.5 min-w-0">
                 {/* The kind label is metadata, not signal — the tinted icon circle and
                     the age badge carry the color; five chip palettes per row was a
@@ -350,7 +350,7 @@ const InFlightStrip = ({
    * DOM order, not grid rows, so on the two-column layout it drew a rule above the second
    * cell of the first row — a stray line between two side-by-side tiles.
    */
-  <div className="grid grid-cols-2 gap-1 lg:grid-cols-4 lg:gap-0 lg:divide-x lg:divide-gray-100">
+  <div className="grid grid-cols-1 gap-1 sm:grid-cols-2 lg:grid-cols-4 lg:gap-0 lg:divide-x lg:divide-gray-100">
     {items.map((item) => (
       <button
         key={item.label}

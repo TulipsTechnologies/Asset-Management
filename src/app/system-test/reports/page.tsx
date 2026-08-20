@@ -244,7 +244,7 @@ const ReportsContent = () => {
               <RunExportButtons run={detail} />
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-4 rounded-lg bg-gray-50 p-4 sm:grid-cols-4">
+            <div className="mt-4 grid grid-cols-1 gap-4 rounded-lg bg-gray-50 p-4 sm:grid-cols-2 lg:grid-cols-4">
               <DetailField label="Module" value={detail.moduleKey || 'All modules'} />
               <DetailField label="Started" value={stamp(detail.startedOn)} />
               <DetailField label="Completed" value={stamp(detail.completedOn)} />

@@ -22,6 +22,8 @@ import {
 const assetFilterQuery = (filter: IAssetFilter) => ({
   ...sortQuery(filter),
   Search: filter.search,
+  AssetName: filter.assetName,
+  CustodianId: filter.custodianId,
   AssetCategoryId: filter.assetCategoryId,
   LifecycleStatus: filter.lifecycleStatus,
   CustodyStatus: filter.custodyStatus,

@@ -13,6 +13,7 @@ import {
   StatusBadge,
   money,
 } from './AssetViewShared';
+import AssetPhotoThumb from './AssetPhotoThumb';
 
 /**
  * The same page of assets the table renders, laid out as cards. It reads the identical
@@ -58,10 +59,16 @@ const AssetCardView = ({ assets, loading, actions, onOpen }: IProps) => {
           className="group relative flex flex-col rounded-2xl border border-gray-100 bg-white shadow-sm p-4 transition-shadow hover:shadow-md"
         >
           <div className="flex items-start justify-between gap-2">
+            <AssetPhotoThumb
+              assetId={asset.id}
+              assetCode={asset.assetCode}
+              assetName={asset.assetName}
+              size="md"
+            />
             <button
               type="button"
               onClick={() => onOpen(asset)}
-              className="min-w-0 text-left"
+              className="min-w-0 flex-1 text-left"
             >
               <p className="text-sm font-bold text-primarycolor truncate">
                 {asset.assetCode}

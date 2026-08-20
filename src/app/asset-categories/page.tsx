@@ -700,7 +700,7 @@ const AssetCategoriesPage = () => {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="truncate text-lg font-semibold text-secondaryColor">
+                  <h2 className="break-words text-lg font-semibold text-secondaryColor">
                     {viewing?.name}
                   </h2>
                   <span

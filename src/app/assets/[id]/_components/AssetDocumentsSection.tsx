@@ -7,6 +7,7 @@ import ConfirmationModal from '@/components/UI/ConfirmationModel';
 import CustomCheckbox from '@/components/UI/CustomCheckBox';
 import Input from '@/components/UI/Input';
 import Modal from '@/components/UI/Modal';
+import ImageLightbox from '@/components/UI/ImageLightbox';
 import Select from '@/components/UI/Select';
 import { IAssetDocument } from '@/interface/IAssetDocument';
 import {
@@ -102,6 +103,42 @@ const AssetDocumentsSection = ({
     }
   };
 
+  /**
+   * An image opened full size. The bytes come through the authenticated endpoint exactly as
+   * a download does — the blob URL is revoked when the viewer closes so a long session
+   * browsing documents does not accumulate them.
+   */
+  const [viewing, setViewing] = useState<{ url: string; label: string } | null>(null);
+  const [viewingId, setViewingId] = useState<string | null>(null);
+
+  const isImageDoc = (doc: IAssetDocument) =>
+    doc.documentType === AssetDocumentTypeEnum.Photo ||
+    (doc.contentType ?? '').toLowerCase().startsWith('image/') ||
+    /\.(png|jpe?g|gif|webp|bmp|avif)$/i.test(doc.fileName ?? '');
+
+  const handleView = async (doc: IAssetDocument) => {
+    setViewingId(doc.id);
+    try {
+      const res = await downloadAssetDocument(doc.id);
+      if (!res?.ok) throw new Error('download failed');
+      const blob = await res.blob();
+      setViewing({
+        url: URL.createObjectURL(blob),
+        label: doc.title || doc.fileName,
+      });
+    } catch (error) {
+      console.error('Error opening image:', error);
+      addToast.error('Failed to open the image');
+    } finally {
+      setViewingId(null);
+    }
+  };
+
+  const closeViewer = () => {
+    if (viewing) URL.revokeObjectURL(viewing.url);
+    setViewing(null);
+  };
+
   const handleDownload = async (doc: IAssetDocument) => {
     setDownloadingId(doc.id);
     try {
@@ -172,6 +209,15 @@ const AssetDocumentsSection = ({
               )}
               <span className="text-gray-400">{formatDate(doc.uploadedOn)}</span>
               <span className="ml-auto flex items-center gap-3">
+                {isImageDoc(doc) && (
+                  <button
+                    onClick={() => handleView(doc)}
+                    disabled={viewingId === doc.id}
+                    className="text-xs text-blue-600 hover:underline disabled:opacity-50"
+                  >
+                    {viewingId === doc.id ? 'Opening…' : 'View'}
+                  </button>
+                )}
                 <button
                   onClick={() => handleDownload(doc)}
                   disabled={downloadingId === doc.id}
@@ -191,6 +237,15 @@ const AssetDocumentsSection = ({
             </div>
           ))}
         </div>
+      )}
+
+      {viewing && (
+        <ImageLightbox
+          src={viewing.url}
+          alt={viewing.label}
+          caption={viewing.label}
+          onClose={closeViewer}
+        />
       )}
 
       {/* Upload modal */}

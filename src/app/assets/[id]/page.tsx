@@ -8,7 +8,8 @@ import Modal from '@/components/UI/Modal';
 import TextArea from '@/components/UI/TextArea';
 import AssetDocumentsSection from './_components/AssetDocumentsSection';
 import ProfileHeader from '@/components/UI/ProfileHeader';
-import { useAssetPrimaryPhoto } from '@/hooks/useAssetPrimaryPhoto';
+import ImageLightbox from '@/components/UI/ImageLightbox';
+import { useAssetPhoto } from '@/components/Assets/assetPhoto';
 import PageToolbar from '@/components/UI/PageToolbar';
 import InfoCard, { InfoCardGrid, InfoField } from '@/components/UI/InfoCard';
 import AssetDepreciationSection from './_components/AssetDepreciationSection';
@@ -104,8 +105,9 @@ const AssetDetailPage = () => {
   const { addToast } = useToast();
   const { can } = useUserPermissions();
 
-  // Fetched through the authenticated document endpoint — asset photos are not reachable by URL.
-  const primaryPhotoUrl = useAssetPrimaryPhoto(id);
+  // Fetched through the authenticated document endpoint. Shares the module-level cache with
+  // the card grids, so arriving from a card that already showed the photo paints instantly.
+  const primaryPhotoUrl = useAssetPhoto(id);
 
   const [asset, setAsset] = useState<IAsset | null>(null);
   const [loading, setLoading] = useState(true);
@@ -116,6 +118,8 @@ const AssetDetailPage = () => {
   const [retiring, setRetiring] = useState(false);
   // Release / recommission modal (the only audited exits from a hold)
   const [activeTab, setActiveTab] = useState<'overview' | 'assignments' | 'documents'>('overview');
+  /** The header photo, opened full size. */
+  const [photoZoomed, setPhotoZoomed] = useState(false);
   const [holdAction, setHoldAction] = useState<THoldAction | null>(null);
   const [holdReason, setHoldReason] = useState('');
   const [holdSaving, setHoldSaving] = useState(false);
@@ -309,6 +313,7 @@ const AssetDetailPage = () => {
       />
       <ProfileHeader
         photoUrl={primaryPhotoUrl}
+        onPhotoClick={primaryPhotoUrl ? () => setPhotoZoomed(true) : undefined}
         fallback={<i className="icon icon-briefcase text-2xl"></i>}
         title={asset.assetCode}
         titleBadges={
@@ -609,11 +614,19 @@ const AssetDetailPage = () => {
 
       {activeTab === 'documents' && (
         <div className="max-w-5xl">
-          <AssetDocumentsSection
-            assetId={asset.id}
-            readOnly={asset.lifecycleStatus === LifecycleStatusEnum.Disposed}
-          />
+          {/* Read-only on the view page: photos & documents are listed and downloadable,
+              but adding/removing them is done from the Edit page. */}
+          <AssetDocumentsSection assetId={asset.id} readOnly />
         </div>
+      )}
+
+      {photoZoomed && (
+        <ImageLightbox
+          src={primaryPhotoUrl}
+          alt={`${asset.assetCode} — ${asset.assetName}`}
+          caption={`${asset.assetCode} · ${asset.assetName}`}
+          onClose={() => setPhotoZoomed(false)}
+        />
       )}
 
       {/* Retire confirmation modal */}

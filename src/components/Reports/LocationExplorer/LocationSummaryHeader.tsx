@@ -246,7 +246,7 @@ const LocationSummaryHeader = ({
           {summary.totals.length > 0 && (
             <p className="text-xs text-gray-500">
               {summary.totals.map((total) => (
-                <span key={total.currencyId} className="ml-2">
+                <span key={total.currencyId} className="ml-2 font-medium text-amber-600">
                   {/* "?" is the backend's bucket for assets with no currency recorded —
                       say that, rather than printing a question mark at the operator. */}
                   {money(total.total, total.currencyId === '?' ? null : total.currencyId)}
