@@ -22,9 +22,29 @@ export const money = (value?: number | null, currency?: string | null) =>
       })}${currency ? ` ${currency}` : ''}`
     : '—';
 
-/** Register dates carry no time of day — show the date the operator entered, nothing more. */
-export const shortDate = (value?: string | null) =>
-  value ? new Date(value).toLocaleDateString() : '—';
+/**
+ * Register dates carry no time of day — show the date the operator entered, nothing more.
+ *
+ * FORMAT IS EXPLICIT, not the locale default. Bare toLocaleDateString() renders "8/20/2026" on a
+ * US-locale machine and "20/8/2026" on most others: the same string means two different days
+ * depending on who is looking, which is not acceptable on a register where dates drive
+ * depreciation and warranty. "20 Aug 2026" cannot be misread, and it is the format the dashboard
+ * and the printed sheets already used — this makes the rest of the app agree with them instead
+ * of showing a second format on the next screen.
+ *
+ * Guards NaN so a malformed date shows the same em dash as a missing one rather than
+ * "Invalid Date".
+ */
+export const shortDate = (value?: string | null) => {
+  if (!value) return '—';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '—';
+  return parsed.toLocaleDateString(undefined, {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+};
 
 /** Compact form for dense surfaces — analytics tiles and chart labels. */
 export const compactMoney = (value: number, currency?: string | null) =>

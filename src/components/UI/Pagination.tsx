@@ -78,7 +78,7 @@ const Pagination: FC<PaginationProps> = ({
       <div className="flex flex-wrap justify-center gap-y-2 sm:justify-end">
         <button
           onClick={() => updateFilters({ pageNumber: 1 })}
-          className={`rounded-full w-8 h-8 flex justify-center items-center px-1.5 py-1 text-sm border mx-0.5 sm:mx-1 hover:bg-bgBtnGray ${
+          className={`rounded-full w-8 h-8 flex justify-center items-center px-1.5 py-1 text-sm border mx-0.5 sm:mx-1 hover:bg-gray-100 ${
             pageNumber === 1 ? 'cursor-not-allowed opacity-50' : ''
           }`}
           disabled={pageNumber === 1}
@@ -89,7 +89,7 @@ const Pagination: FC<PaginationProps> = ({
           onClick={() =>
             pageNumber > 1 && updateFilters({ pageNumber: pageNumber - 1 })
           }
-          className={`rounded-full w-8 h-8 flex justify-center items-center px-1.5 py-1 text-sm border mx-0.5 sm:mx-1 hover:bg-bgBtnGray ${
+          className={`rounded-full w-8 h-8 flex justify-center items-center px-1.5 py-1 text-sm border mx-0.5 sm:mx-1 hover:bg-gray-100 ${
             pageNumber === 1 ? 'cursor-not-allowed opacity-50' : ''
           }`}
           disabled={pageNumber === 1}
@@ -116,7 +116,7 @@ const Pagination: FC<PaginationProps> = ({
             pageNumber < totalPages &&
             updateFilters({ pageNumber: pageNumber + 1 })
           }
-          className={`rounded-full w-8 h-8 flex justify-center items-center px-1.5 py-1 text-sm border mx-0.5 sm:mx-1 hover:bg-bgBtnGray ${
+          className={`rounded-full w-8 h-8 flex justify-center items-center px-1.5 py-1 text-sm border mx-0.5 sm:mx-1 hover:bg-gray-100 ${
             pageNumber === totalPages || totalPages === 0
               ? 'cursor-not-allowed opacity-50'
               : ''
@@ -127,7 +127,7 @@ const Pagination: FC<PaginationProps> = ({
         </button>
         <button
           onClick={() => updateFilters({ pageNumber: totalPages })}
-          className={`rounded-full w-8 h-8 flex justify-center items-center px-1.5 py-1 text-sm border mx-0.5 sm:mx-1 hover:bg-bgBtnGray ${
+          className={`rounded-full w-8 h-8 flex justify-center items-center px-1.5 py-1 text-sm border mx-0.5 sm:mx-1 hover:bg-gray-100 ${
             pageNumber === totalPages || totalPages === 0
               ? 'cursor-not-allowed opacity-50'
               : ''

@@ -20,10 +20,23 @@ let inFlight: Promise<EnsureAssetTokenResult> | null = null;
 export const getAssetToken = (): string | null =>
   Cookies.get(ASSET_AUTH_TOKEN_COOKIE) ?? null;
 
+/**
+ * True unless we are on plain http, which in practice means localhost.
+ *
+ * The auth cookie was written without `secure`, so on any http hop the bearer token went out
+ * in clear text and a network attacker could lift a 7-day credential. It cannot simply be
+ * hard-coded to true: a `secure` cookie is silently DROPPED by the browser on http://localhost,
+ * which would break local development in a way that looks like a login bug rather than a cookie
+ * policy. Deriving it from the actual scheme gives production the protection and leaves dev working.
+ */
+const useSecureCookies = (): boolean =>
+  typeof window !== 'undefined' && window.location.protocol === 'https:';
+
 export const setAssetToken = (token: string): void => {
   Cookies.set(ASSET_AUTH_TOKEN_COOKIE, token, {
     path: '/',
     sameSite: 'lax',
+    secure: useSecureCookies(),
   });
 };
 
@@ -66,6 +79,7 @@ export const setActiveCompanyId = (companyId: string): void => {
   Cookies.set(ACTIVE_COMPANY_ID_COOKIE, companyId, {
     path: '/',
     sameSite: 'lax',
+    secure: useSecureCookies(),
     expires: ACTIVE_COMPANY_ID_DAYS,
   });
 };

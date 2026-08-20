@@ -58,6 +58,7 @@ import TaxRunModal from './_components/TaxRunModal';
 import OpeningBalanceImportModal from './_components/OpeningBalanceImportModal';
 import { NEPAL_TAX_CLASSES, TAX_ENTRY_PERIODS, TaxTreatmentEnum } from '@/interface/ITax';
 import { mergeTableFilters, unwrapPaged } from '@/utils/serviceUtils';
+import { shortDate } from '@/components/Assets/AssetViewShared';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import {
   AssetBookStatusEnum,
@@ -77,8 +78,10 @@ import {
 } from '@/enum/depreciationEnums';
 import useDebounce from '@/hooks/useDebounce';
 
-const formatDate = (value?: string | null) =>
-  value ? new Date(value).toLocaleDateString() : '—';
+// Delegates to the module's one date formatter. This was one of 18 identical local copies
+// rendering the locale default ("8/20/2026"), which reads as a different day outside the US
+// and disagreed with the dashboard and the printed sheets.
+const formatDate = (value?: string | null) => shortDate(value);
 
 const money = (amount?: number | null, currency?: string | null) =>
   amount == null

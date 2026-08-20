@@ -58,6 +58,7 @@ import {
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import { CustodyStatusEnum } from '@/enum/assetEnums';
 import useAssetConditions from '@/hooks/useAssetConditions';
+import { shortDate } from '@/components/Assets/AssetViewShared';
 import usePrintSheet, { usePrintIdentity } from '@/hooks/usePrintSheet';
 import CountSheet from '@/components/Print/CountSheet';
 import { groupForCountSheet, ICountSheetGroup } from '@/utils/printDocuments';
@@ -79,8 +80,10 @@ import {
 } from '@/enum/auditEnums';
 import useDebounce from '@/hooks/useDebounce';
 
-const formatDate = (value?: string | null) =>
-  value ? new Date(value).toLocaleDateString() : '—';
+// Delegates to the module's one date formatter. This was one of 18 identical local copies
+// rendering the locale default ("8/20/2026"), which reads as a different day outside the US
+// and disagreed with the dashboard and the printed sheets.
+const formatDate = (value?: string | null) => shortDate(value);
 
 const resultTypeBadge = (type: AuditResultTypeEnum) => (
   <span

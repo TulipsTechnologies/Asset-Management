@@ -53,11 +53,27 @@ a {
 button {
   appearance: none;
 }
-input,
-button {
-  &:focus {
-    outline: none;
-  }
+/*
+ * Focus visibility — WCAG 2.4.7.
+ *
+ * This used to be `input, button { &:focus { outline: none } }`, which removed the focus ring
+ * from every control in the app and put nothing back: a keyboard user had no way to tell where
+ * they were, across 226 <Button>s, 134 raw <button>s and every input.
+ *
+ * `:focus` is still silenced so a MOUSE click does not leave a ring behind — that is the
+ * cosmetic problem the original rule was really solving — and `:focus-visible` then restores a
+ * clear indicator for exactly the case that needs it: keyboard and other non-pointer focus.
+ * Applied to everything focusable, not just input/button, so links and custom widgets are
+ * covered too.
+ */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--primarycolor, #16a34a);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 @media (min-width: 759px) {
   main {

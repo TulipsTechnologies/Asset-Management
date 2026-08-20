@@ -1,6 +1,7 @@
 'use client';
 
 import { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { money, shortDate } from '@/components/Assets/AssetViewShared';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/Providers/ToastProvider';
 import ReasonBanner from '@/components/UI/ReasonBanner';
@@ -78,13 +79,20 @@ import {
 } from '@/enum/disposalEnums';
 import useDebounce from '@/hooks/useDebounce';
 
-const formatDate = (value?: string | null) =>
-  value ? new Date(value).toLocaleDateString() : '—';
+// Delegates to the module's one date formatter. This was one of 18 identical local copies
+// rendering the locale default ("8/20/2026"), which reads as a different day outside the US
+// and disagreed with the dashboard and the printed sheets.
+const formatDate = (value?: string | null) => shortDate(value);
 
+/**
+ * Money, through the module's one formatter.
+ *
+ * This was a local copy calling bare toLocaleString(), which uses the locale's DEFAULT
+ * fraction digits — so 1234.50 rendered as "1,234.5" and the paise silently disappeared on a
+ * financial figure. Delegating to `money` fixes the format and keeps every screen agreeing.
+ */
 const formatAmount = (amount?: number | null, currencyId?: string | null) =>
-  amount != null
-    ? `${amount.toLocaleString()}${currencyId ? ` ${currencyId}` : ''}`
-    : '—';
+  money(amount, currencyId);
 
 /** Today in the operator's own timezone — toISOString() would drift a day. */
 const todayLocal = () => {

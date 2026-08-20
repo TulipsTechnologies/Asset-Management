@@ -1,4 +1,4 @@
-import { useState, useEffect, forwardRef, TextareaHTMLAttributes, ChangeEvent } from 'react';
+import { useState, useEffect, useId, forwardRef, TextareaHTMLAttributes, ChangeEvent } from 'react';
 
 interface TextAreaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   label?: string;
@@ -48,11 +48,18 @@ const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
       adjustHeight(textarea);
     }, [value, ref]);
 
+    const generatedId = useId();
+    const textAreaId = props.id ?? generatedId;
+
     return (
       <div className={`flex flex-col ${className}`}>
         {label && (
           <label
-            htmlFor={props.id}
+            // The label pointed at props.id, and not one of this component's 49 call sites
+            // passes an id — so every one of them rendered a label associated with nothing:
+            // no screen-reader announcement, and clicking the label did not focus the field.
+            // useId supplies a stable, SSR-safe fallback, exactly as Input.tsx already does.
+            htmlFor={textAreaId}
             className="block text-sm font-medium text-gray-500 mb-1"
           >
             {label}
@@ -62,6 +69,7 @@ const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
 
         <textarea
           {...props}
+          id={textAreaId}
           ref={ref}
           value={value}
           onChange={handleInputChange}

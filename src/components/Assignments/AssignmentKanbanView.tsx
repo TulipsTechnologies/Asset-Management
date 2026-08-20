@@ -12,6 +12,7 @@ import {
 } from '@/services/assetAssignment.service';
 import { unwrapPaged } from '@/utils/serviceUtils';
 import { AssignmentStatusEnum } from '@/enum/assignmentEnums';
+import { shortDate } from '@/components/Assets/AssetViewShared';
 
 /**
  * The custody pipeline, left to right: what is free to issue, what is out, what is late
@@ -43,8 +44,10 @@ interface IColumnState {
   total: number;
 }
 
-const formatDate = (value?: string | null) =>
-  value ? new Date(value).toLocaleDateString() : '—';
+// Delegates to the module's one date formatter. This was one of 18 identical local copies
+// rendering the locale default ("8/20/2026"), which reads as a different day outside the US
+// and disagreed with the dashboard and the printed sheets.
+const formatDate = (value?: string | null) => shortDate(value);
 
 const daysBetween = (from: string, to: Date) =>
   Math.floor((to.getTime() - new Date(from).getTime()) / 86_400_000);

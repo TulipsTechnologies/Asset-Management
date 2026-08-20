@@ -34,8 +34,11 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     },
     ref,
   ) => {
+    // No `focus:outline-none` here: it beat the global rule and left all 7 variants with no
+    // focus indicator at all. The reset now silences the ring only for pointer focus and keeps
+    // it for :focus-visible, which is what a keyboard user needs.
     const baseStyles =
-      'inline-flex items-center justify-center transition duration-200 focus:outline-none gap-x-2 font-normal';
+      'inline-flex items-center justify-center transition duration-200 gap-x-2 font-normal';
 
     const variantStyles = {
       primary: 'rounded-full bg-primarycolor/90 text-white hover:bg-primarycolor/100',

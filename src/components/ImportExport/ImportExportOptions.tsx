@@ -211,6 +211,19 @@ const ImportExportOptions = ({
       if (res?.data) {
         setPreview(res.data);
         setResult(null);
+
+        // Drop corrections whose problem the re-check resolved. Without this, `fixes` only ever
+        // grows: a value the operator typed for a row that is no longer reported still travels
+        // in toOverrides() on the eventual import, silently rewriting a cell nobody was asked
+        // about. Keyed on the same row|column identity the inputs use.
+        const stillReported = new Set(
+          res.data.problems
+            .filter((problem) => !!problem.column)
+            .map((problem) => `${problem.row}|${problem.column}`)
+        );
+        setFixes((current) =>
+          Object.fromEntries(Object.entries(current).filter(([key]) => stillReported.has(key)))
+        );
       } else {
         addToast.error(res?.message || 'The file could not be checked.');
       }
@@ -239,6 +252,9 @@ const ImportExportOptions = ({
         if (res.data.imported) {
           setResult(res.data);
           setPreview(null);
+          // The corrections belonged to the file that just landed. Left behind, they would be
+          // applied again to whatever file the operator opens next in the same modal session.
+          setFixes({});
           addToast.success(res.message || 'Import complete.');
           onImported();
         } else {
@@ -466,7 +482,17 @@ const ImportExportOptions = ({
                         {preview.problems.map((p, i) => {
                           const fixKey = p.column ? `${p.row}|${p.column}` : null;
                           return (
-                            <tr key={i} className="border-t border-red-50 align-top">
+                            // Keyed by WHAT the row is, not where it sits. With key={i} the
+                            // normal fix -> re-check -> fix loop mis-assigns corrections: the
+                            // re-check returns a SHORTER problem list, React reuses the input
+                            // element that index now points at, and — because the field was
+                            // uncontrolled — the text typed for the old row is still in the DOM
+                            // and gets committed under the new row's fixKey. That silently
+                            // writes one row's value into a different row on import.
+                            <tr
+                              key={fixKey ?? `${p.row}|${p.problem}`}
+                              className="border-t border-red-50 align-top"
+                            >
                               <td className="px-3 py-2 text-gray-500 tabular-nums">{p.row}</td>
                               <td className="px-3 py-2 text-gray-700">{p.problem}</td>
                               <td className="px-3 py-2">
@@ -480,7 +506,12 @@ const ImportExportOptions = ({
                                       // The correction replaces the cell for BOTH the
                                       // re-check and the import — the file itself is
                                       // never modified.
-                                      defaultValue={fixes[fixKey] ?? p.currentValue ?? ''}
+                                      //
+                                      // CONTROLLED, deliberately: as an uncontrolled field the
+                                      // DOM held the previous row's text across a re-check and
+                                      // React had no way to correct it. State is now the single
+                                      // source of truth for what the operator will submit.
+                                      value={fixes[fixKey] ?? p.currentValue ?? ''}
                                       onChange={(e) =>
                                         setFixes((current) => ({
                                           ...current,

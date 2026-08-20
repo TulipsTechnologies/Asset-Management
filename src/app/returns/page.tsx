@@ -50,9 +50,12 @@ import {
 } from '@/enum/returnEnums';
 import useDebounce from '@/hooks/useDebounce';
 import RecoveryCasesTab from './RecoveryCasesTab';
+import { shortDate } from '@/components/Assets/AssetViewShared';
 
-const formatDate = (value?: string | null) =>
-  value ? new Date(value).toLocaleDateString() : '—';
+// Delegates to the module's one date formatter. This was one of 18 identical local copies
+// rendering the locale default ("8/20/2026"), which reads as a different day outside the US
+// and disagreed with the dashboard and the printed sheets.
+const formatDate = (value?: string | null) => shortDate(value);
 
 const localToday = () => new Date().toLocaleDateString('en-CA');
 
