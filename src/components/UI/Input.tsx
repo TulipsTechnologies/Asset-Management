@@ -38,6 +38,12 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
     // A label that names its control for assistive tech, not only visually (WCAG 1.3.1).
     const generatedId = useId();
     const inputId = props.id ?? generatedId;
+    // Validation state announced, not just coloured. A red bottom-border is invisible to a
+    // screen reader and to anyone who cannot distinguish the hue (WCAG 1.4.1 / 3.3.1); these
+    // tie the message to the field and mark the field itself invalid.
+    const errorId = `${inputId}-error`;
+    const helpId = `${inputId}-help`;
+    const describedBy = error ? errorId : helperText ? helpId : undefined;
 
     const togglePasswordVisibility = () => {
       setShowPassword((prev) => !prev);
@@ -65,6 +71,9 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             {...props}
           id={inputId}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={describedBy}
+            aria-required={required || undefined}
             type={isPasswordType && showPassword ? "text" : type}
             className={`w-full px-0 py-2 pr-10 border-b text-base bg-transparent ${inputClass} ${
               error ? "border-red-500" : "border-gray-300"
@@ -101,10 +110,14 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           )}
         </div>
 
-        {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
+        {error && (
+          <p id={errorId} role="alert" className="text-red-500 text-xs mt-1">
+            {error}
+          </p>
+        )}
 
         {!error && helperText && (
-          <p className="text-gray-500 text-xs mt-1 italic">{helperText}</p>
+          <p id={helpId} className="text-gray-500 text-xs mt-1 italic">{helperText}</p>
         )}
       </div>
     );

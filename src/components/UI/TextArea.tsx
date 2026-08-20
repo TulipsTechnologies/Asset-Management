@@ -50,6 +50,10 @@ const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
 
     const generatedId = useId();
     const textAreaId = props.id ?? generatedId;
+    // Same reasoning as Input: the error must be announced and associated, not only coloured.
+    const errorId = `${textAreaId}-error`;
+    const helpId = `${textAreaId}-help`;
+    const describedBy = error ? errorId : helperText ? helpId : undefined;
 
     return (
       <div className={`flex flex-col ${className}`}>
@@ -70,19 +74,26 @@ const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
         <textarea
           {...props}
           id={textAreaId}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy}
+          aria-required={required || undefined}
           ref={ref}
           value={value}
           onChange={handleInputChange}
           style={{ height }}
-          className={`w-full px-0 py-2 border-b bg-transparent overflow-hidden text-base focus:outline-none ${
+          className={`w-full px-0 py-2 border-b bg-transparent overflow-hidden text-base ${
             error ? 'border-red-500' : 'border-gray-300'
           } ${textAreaClassName}`}
         />
 
-        {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
+        {error && (
+          <p id={errorId} role="alert" className="text-red-500 text-xs mt-1">
+            {error}
+          </p>
+        )}
 
         {!error && helperText && (
-          <p className="text-gray-600 text-xs mt-1">{helperText}</p>
+          <p id={helpId} className="text-gray-500 text-xs mt-1 italic">{helperText}</p>
         )}
       </div>
     );

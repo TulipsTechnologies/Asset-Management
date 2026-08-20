@@ -127,7 +127,13 @@ const DashboardContents = ({ children }: { children: ReactNode }) => {
           />
         )}
         {token && <ActiveCompanyBadge headerHost={headerHostRef} />}
-        <div
+        {/* The one <main> in the app. Without a main landmark (and with the sidebar unwrapped)
+            a screen-reader user had nothing to jump to and no way to skip the whole menu tree
+            on any of the 37 routes — WCAG 2.4.1. tabIndex={-1} makes it a valid target for the
+            skip link in layout.tsx. */}
+        <main
+          id="main-content"
+          tabIndex={-1}
           className={`h-[calc(100vh-60px)] md:h-[calc(100vh-83px)] ${
             pathname === '/404' ? '' : 'overflow-y-auto overflow-x-hidden'
           }`}
@@ -141,7 +147,7 @@ const DashboardContents = ({ children }: { children: ReactNode }) => {
           ) : (
             children
           )}
-        </div>
+        </main>
       </div>
     </div>
   );

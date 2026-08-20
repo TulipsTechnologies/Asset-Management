@@ -176,7 +176,7 @@ const DevAuth = () => {
             rows={5}
             spellCheck={false}
             placeholder="eyJhbGciOi..."
-            className="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-xs text-gray-800 outline-none focus:border-primarycolor focus:ring-1 focus:ring-primarycolor"
+            className="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-xs text-gray-800 focus:border-primarycolor focus:ring-1 focus:ring-primarycolor"
           />
         </label>
 
@@ -190,7 +190,7 @@ const DevAuth = () => {
             rows={3}
             spellCheck={false}
             placeholder='{"userId":1,"fullName":"..."}'
-            className="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-xs text-gray-800 outline-none focus:border-primarycolor focus:ring-1 focus:ring-primarycolor"
+            className="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-xs text-gray-800 focus:border-primarycolor focus:ring-1 focus:ring-primarycolor"
           />
         </label>
 
@@ -255,7 +255,7 @@ const DevAuth = () => {
               rows={5}
               spellCheck={false}
               placeholder="eyJhbGciOi..."
-              className="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-xs text-gray-800 outline-none focus:border-primarycolor focus:ring-1 focus:ring-primarycolor"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-xs text-gray-800 focus:border-primarycolor focus:ring-1 focus:ring-primarycolor"
             />
           </label>
 
@@ -268,7 +268,7 @@ const DevAuth = () => {
               onChange={(e) => setCompanyInput(e.target.value)}
               spellCheck={false}
               placeholder="019fb760-a7bb-7692-a970-3c8ad1733849"
-              className="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-xs text-gray-800 outline-none focus:border-primarycolor focus:ring-1 focus:ring-primarycolor"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-xs text-gray-800 focus:border-primarycolor focus:ring-1 focus:ring-primarycolor"
             />
             <span className="block text-xs text-gray-500">
               Required for an internal account such as superadmin, which carries no

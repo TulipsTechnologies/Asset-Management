@@ -518,7 +518,7 @@ const ImportExportOptions = ({
                                           [fixKey]: e.target.value,
                                         }))
                                       }
-                                      className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm focus:border-primarycolor focus:outline-none"
+                                      className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm focus:border-primarycolor"
                                     />
                                   </div>
                                 ) : (

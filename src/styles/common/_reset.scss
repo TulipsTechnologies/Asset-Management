@@ -66,14 +66,13 @@ button {
  * Applied to everything focusable, not just input/button, so links and custom widgets are
  * covered too.
  */
+/*
+ * Only the mouse-focus half lives here. The visible ring itself is in styles/focus-ring.scss,
+ * which is imported after the vendored stylesheet — a rule at this point in the cascade cannot
+ * beat that sheet's `!important` focus-visible declaration no matter how it is written.
+ */
 :focus:not(:focus-visible) {
   outline: none;
-}
-
-:focus-visible {
-  outline: 2px solid var(--primarycolor, #16a34a);
-  outline-offset: 2px;
-  border-radius: 2px;
 }
 @media (min-width: 759px) {
   main {

@@ -1,4 +1,4 @@
-import { forwardRef, InputHTMLAttributes } from 'react';
+import { forwardRef, useId, InputHTMLAttributes } from 'react';
 
 interface ToggleSwitchProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -83,10 +83,17 @@ const ToggleSwitch = forwardRef<HTMLInputElement, ToggleSwitchProps>(
       }
     };
 
+    // The visible label wrapped nothing and had no htmlFor, and the second <label> that DOES
+    // wrap the input contains only decorative spans — so the input's accessible name computed
+    // to the EMPTY STRING at all 5 call sites: "checkbox, not checked", with no indication of
+    // what it controls. aria-label additionally covers CapitalizeForm, which passes no label.
+    const generatedId = useId();
+    const inputId = rest.id ?? generatedId;
+
     return (
       <div className="flex flex-col gap-1">
         {label && (
-          <label className="block text-sm font-medium text-gray-500 mb-1">
+          <label htmlFor={inputId} className="block text-sm font-medium text-gray-500 mb-1">
             {label}
             {required && <span className="text-red-500 ml-1">*</span>}
           </label>
@@ -97,6 +104,8 @@ const ToggleSwitch = forwardRef<HTMLInputElement, ToggleSwitchProps>(
         >
           <input
             type="checkbox"
+            id={inputId}
+            aria-label={typeof label === 'string' ? label : undefined}
             className="peer sr-only"
             disabled={disabled}
             ref={ref}
