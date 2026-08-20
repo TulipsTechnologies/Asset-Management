@@ -1,6 +1,22 @@
 const nextConfig = {
   basePath: "/asset-management",
   reactStrictMode: false,
+
+  // Turbopack (Next 15.5) cannot parse a UTF-8 BOM and dies at 1:1 on the vendor stylesheet.
+  //
+  // dart-sass prepends a BOM to COMPRESSED output whenever the CSS contains a non-ASCII
+  // character, and the vendor icon sheet's `content: "\e97f"` escapes compile to literal
+  // private-use glyphs. Turbopack's CSS parser does not skip the BOM, so the very first
+  // token fails and the error points at `globals.scss.css:1:1` — which is the sass
+  // transform's OUTPUT name, i.e. evidence that sass RAN, not that it was skipped.
+  //
+  // The variable is the file's CONTENT, not its location: a relative import, an app-owned
+  // wrapper and transpilePackages all fail identically. `charset: false` tells sass to emit
+  // no BOM; the glyphs themselves survive untouched.
+  //
+  // Note `next build` (webpack) stays GREEN through this — only `next dev` breaks — so a
+  // passing production build does not prove the dev server starts.
+  sassOptions: { charset: false },
   cleanDistDir: true,
   productionBrowserSourceMaps: true,
   experimental: {
