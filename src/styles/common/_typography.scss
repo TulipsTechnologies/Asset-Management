@@ -1,4 +1,8 @@
-@use '@/styles/abstracts' as *;
+// Relative, not the '@/' TS path alias: that alias is a bundler concern and
+// Turbopack does not apply it inside Sass, which breaks the relative @forward
+// chain in abstracts/_index.scss. A plain relative path resolves identically
+// under both bundlers.
+@use '../abstracts' as *;
 
 h2 {
   font-size: rem(20);

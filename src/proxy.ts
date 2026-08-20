@@ -1,4 +1,4 @@
-// src/middleware.ts
+// src/proxy.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { isDevAuthEnabled } from '@/utils/constants';
 
@@ -14,11 +14,11 @@ const getHubBaseUrl = (req: NextRequest): string => {
   return `${proto}://${req.headers.get('host') ?? ''}`;
 };
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const token = req.cookies.get('AuthToken')?.value;
 
   if (!token) {
-    // `nextUrl.pathname` excludes basePath in middleware — put it back, so
+    // `nextUrl.pathname` excludes basePath here — put it back, so
     // whatever we hand off as `redirect` lands inside the module again.
     const target = `${req.nextUrl.basePath}${req.nextUrl.pathname}${req.nextUrl.search}`;
 

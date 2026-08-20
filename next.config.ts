@@ -18,6 +18,12 @@ const nextConfig = {
     NEXT_PUBLIC_MAX_FILE_SIZE: "10",
   },
   images: {
+    // Next 16 changed three image defaults in ways that alter what the browser
+    // receives. These pin the Next 15 behaviour so the upgrade is visually inert;
+    // revisit them deliberately, not as a side effect of a version bump.
+    minimumCacheTTL: 60, // 16 raised this to 4h
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384], // 16 drops the 16
+    maximumRedirects: 0, // 16 allows 3; these are same-origin, so 0 matches today
     remotePatterns: [
       {
         protocol: "https",
