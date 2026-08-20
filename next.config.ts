@@ -14,8 +14,10 @@ const nextConfig = {
   // wrapper and transpilePackages all fail identically. `charset: false` tells sass to emit
   // no BOM; the glyphs themselves survive untouched.
   //
-  // Note `next build` (webpack) stays GREEN through this — only `next dev` breaks — so a
-  // passing production build does not prove the dev server starts.
+  // As of Next 16 Turbopack is the default bundler for `next build` too, so both paths now
+  // run the same CSS parser and this single line covers both. (Under Next 15 only `next dev`
+  // broke, because `next build` still ran webpack — that asymmetry is gone.) If the BOM ever
+  // resurfaces, `next build --webpack` is the escape hatch.
   sassOptions: { charset: false },
   cleanDistDir: true,
   productionBrowserSourceMaps: true,
