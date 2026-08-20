@@ -56,10 +56,10 @@ export const LIFECYCLE_LABELS: Record<number, string> = {
 };
 
 export const LIFECYCLE_BADGE_CLASSES: Record<number, string> = {
-  [LifecycleStatusEnum.Draft]: 'bg-gray-100 text-gray-700',
+  [LifecycleStatusEnum.Draft]: 'bg-gray-100 text-gray-800',
   [LifecycleStatusEnum.Active]: 'bg-green-100 text-green-800',
   [LifecycleStatusEnum.Retired]: 'bg-amber-100 text-amber-800',
-  [LifecycleStatusEnum.Disposed]: 'bg-red-100 text-red-700',
+  [LifecycleStatusEnum.Disposed]: 'bg-red-100 text-red-800',
 };
 
 export const CUSTODY_LABELS: Record<number, string> = {
@@ -71,11 +71,11 @@ export const CUSTODY_LABELS: Record<number, string> = {
 };
 
 export const CUSTODY_BADGE_CLASSES: Record<number, string> = {
-  [CustodyStatusEnum.Unassigned]: 'bg-gray-100 text-gray-700',
+  [CustodyStatusEnum.Unassigned]: 'bg-gray-100 text-gray-800',
   [CustodyStatusEnum.Reserved]: 'bg-blue-100 text-blue-800',
   [CustodyStatusEnum.Assigned]: 'bg-green-100 text-green-800',
   [CustodyStatusEnum.InTransfer]: 'bg-amber-100 text-amber-800',
-  [CustodyStatusEnum.Missing]: 'bg-red-100 text-red-700',
+  [CustodyStatusEnum.Missing]: 'bg-red-100 text-red-800',
 };
 
 export const OPERATIONAL_LABELS: Record<number, string> = {
@@ -100,9 +100,9 @@ export const VERIFICATION_LABELS: Record<number, string> = {
 };
 
 export const VERIFICATION_BADGE_CLASSES: Record<number, string> = {
-  [VerificationStatusEnum.NotVerified]: 'bg-gray-100 text-gray-700',
+  [VerificationStatusEnum.NotVerified]: 'bg-gray-100 text-gray-800',
   [VerificationStatusEnum.Verified]: 'bg-green-100 text-green-800',
-  [VerificationStatusEnum.Discrepancy]: 'bg-red-100 text-red-700',
+  [VerificationStatusEnum.Discrepancy]: 'bg-red-100 text-red-800',
 };
 
 export const OWNERSHIP_LABELS: Record<number, string> = {

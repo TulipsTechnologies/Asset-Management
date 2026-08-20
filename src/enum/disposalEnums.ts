@@ -44,10 +44,10 @@ export const DISPOSAL_METHOD_LABELS: Record<number, string> = {
 /** Loss and Theft red — they are the two that describe an asset nobody can produce. */
 export const DISPOSAL_METHOD_BADGE_CLASSES: Record<number, string> = {
   [DisposalMethodEnum.Sale]: 'bg-green-100 text-green-800',
-  [DisposalMethodEnum.Scrap]: 'bg-gray-100 text-gray-700',
-  [DisposalMethodEnum.Donation]: 'bg-blue-50 text-blue-700',
-  [DisposalMethodEnum.Loss]: 'bg-red-100 text-red-700',
-  [DisposalMethodEnum.Theft]: 'bg-red-100 text-red-700',
+  [DisposalMethodEnum.Scrap]: 'bg-gray-100 text-gray-800',
+  [DisposalMethodEnum.Donation]: 'bg-blue-50 text-blue-800',
+  [DisposalMethodEnum.Loss]: 'bg-red-100 text-red-800',
+  [DisposalMethodEnum.Theft]: 'bg-red-100 text-red-800',
   [DisposalMethodEnum.ReturnToSupplier]: 'bg-purple-100 text-purple-800',
   [DisposalMethodEnum.TradeIn]: 'bg-green-100 text-green-800',
   [DisposalMethodEnum.Destruction]: 'bg-amber-100 text-amber-800',
@@ -64,10 +64,10 @@ export const DISPOSAL_REQUEST_STATUS_LABELS: Record<number, string> = {
 
 export const DISPOSAL_REQUEST_STATUS_BADGE_CLASSES: Record<number, string> = {
   [DisposalRequestStatusEnum.Requested]: 'bg-amber-100 text-amber-800',
-  [DisposalRequestStatusEnum.Approved]: 'bg-blue-50 text-blue-700',
+  [DisposalRequestStatusEnum.Approved]: 'bg-blue-50 text-blue-800',
   [DisposalRequestStatusEnum.Executed]: 'bg-green-100 text-green-800',
-  [DisposalRequestStatusEnum.Rejected]: 'bg-red-100 text-red-700',
-  [DisposalRequestStatusEnum.Cancelled]: 'bg-gray-100 text-gray-600',
+  [DisposalRequestStatusEnum.Rejected]: 'bg-red-100 text-red-800',
+  [DisposalRequestStatusEnum.Cancelled]: 'bg-gray-100 text-gray-800',
 };
 
 /**

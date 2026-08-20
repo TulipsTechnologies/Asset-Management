@@ -84,7 +84,7 @@ const Panel = ({
     }`}
   >
     {title && (
-      <div className="flex items-center justify-between gap-2 mb-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
         <h2 className="text-sm font-bold text-secondaryColor flex items-center gap-2">
           {iconName && <i className={`icon icon-${iconName} text-sm text-gray-400`} />}
           {title}

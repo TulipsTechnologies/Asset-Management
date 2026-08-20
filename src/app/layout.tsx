@@ -29,7 +29,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${InterVar.variable} ${NotoDevanagari.variable} ${CustomIcons.variable} ${CommonIcons.variable} h-screen overflow-y-hidden`}
+        className={`${InterVar.variable} ${NotoDevanagari.variable} ${CustomIcons.variable} ${CommonIcons.variable} h-dvh overflow-y-hidden`}
       >
         <RootProvider>{children}</RootProvider>
       </body>

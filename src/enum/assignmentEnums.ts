@@ -27,6 +27,6 @@ export const ASSIGNMENT_STATUS_LABELS: Record<number, string> = {
 
 export const ASSIGNMENT_STATUS_BADGE_CLASSES: Record<number, string> = {
   [AssignmentStatusEnum.Open]: 'bg-green-100 text-green-800',
-  [AssignmentStatusEnum.Returned]: 'bg-gray-100 text-gray-600',
+  [AssignmentStatusEnum.Returned]: 'bg-gray-100 text-gray-800',
   [AssignmentStatusEnum.Transferred]: 'bg-amber-100 text-amber-800',
 };

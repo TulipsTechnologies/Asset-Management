@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/components/Providers/ToastProvider';
 import Button from '@/components/UI/Button';
 import CustomTable from '@/components/CustomTable/CustomTable';
+import TableToolbar from '@/components/CustomTable/TableToolbar';
 import ImportExportOptions from '@/components/ImportExport/ImportExportOptions';
 import {
   ITableFilters,
@@ -581,12 +582,10 @@ const AssetsPage = () => {
         />
       ) : (
         <>
-          <div className="flex flex-wrap justify-between items-center gap-x-4 gap-y-2 w-full mb-3">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">{toolbarLeft}</div>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 md:gap-x-8">
-              {filterControls}
-            </div>
-          </div>
+          <TableToolbar
+            tableHeaderLeft={toolbarLeft}
+            tableHeaderRight={filterControls}
+          />
 
           {view === 'card' && (
             <AssetCardView

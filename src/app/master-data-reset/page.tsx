@@ -158,7 +158,7 @@ const MasterDataResetPage = () => {
           </p>
         ) : (
           <>
-            <div className="mt-4 max-h-56 overflow-y-auto rounded-lg border border-gray-100">
+            <div className="mt-4 max-h-56 overflow-auto rounded-lg border border-gray-100">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 text-left">
                   <tr>

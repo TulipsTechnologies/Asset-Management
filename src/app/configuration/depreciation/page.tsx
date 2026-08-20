@@ -384,7 +384,7 @@ export default function DepreciationConfigurationPage() {
 
       {/* ------------------------------------------------ policy */}
       <section className="mb-6 rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
-        <div className="mb-2 flex items-center justify-between">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-y-2">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Capitalization Policy</h2>
           <Button onClick={() => setPolicyOpen(true)}>Set Policy</Button>
         </div>
@@ -408,7 +408,7 @@ export default function DepreciationConfigurationPage() {
 
       {/* ------------------------------------------------ fiscal years */}
       <section className="mb-6 rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
-        <div className="mb-2 flex items-center justify-between">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-y-2">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Fiscal Calendar</h2>
           {calendarOwnedByHrm ? (
             <span className="rounded bg-blue-50 px-2 py-1 text-xs text-blue-700">
@@ -474,7 +474,8 @@ export default function DepreciationConfigurationPage() {
         </div>
 
         {selectedYearId && periods.length > 0 && (
-          <table className="mt-4 w-full text-sm">
+          <div className="mt-4 overflow-x-auto">
+          <table className="w-full text-sm">
             <thead className="bg-gray-50 text-left text-xs text-gray-600">
               <tr>
                 <th className="px-3 py-2">#</th>
@@ -529,12 +530,13 @@ export default function DepreciationConfigurationPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </section>
 
       {/* ------------------------------------------------ account mappings */}
       <section className="mb-6 rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
-        <div className="mb-2 flex items-center justify-between">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-y-2">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500">GL Account Mappings</h2>
           <Button onClick={() => openMappingModal()}>New Mapping</Button>
         </div>
@@ -549,6 +551,7 @@ export default function DepreciationConfigurationPage() {
         )}
 
         {mappings.length > 0 && (
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 text-left text-xs text-gray-600">
               <tr>
@@ -594,6 +597,7 @@ export default function DepreciationConfigurationPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </section>
 
@@ -670,7 +674,7 @@ export default function DepreciationConfigurationPage() {
           </div>
 
           {periodDrafts.length > 0 && (
-            <div className="mt-4 max-h-80 overflow-y-auto">
+            <div className="mt-4 max-h-80 overflow-auto">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-gray-100 text-left text-xs text-gray-600">
                   <tr>

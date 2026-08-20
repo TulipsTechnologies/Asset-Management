@@ -338,7 +338,7 @@ const ImportExportOptions = ({
           </p>
 
           {!preview && !result && (
-            <div className="flex items-center justify-between rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 mb-4">
+            <div className="flex flex-wrap items-center justify-between gap-y-2 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 mb-4">
               <div className="flex items-center gap-3">
                 <i className="icon icon-file text-lg text-gray-400" />
                 <div>
@@ -492,7 +492,7 @@ const ImportExportOptions = ({
                       : `${preview.problems.length} problems block the import`}{' '}
                     — nothing has been written. Fixable cells can be corrected right here:
                   </p>
-                  <div className="max-h-72 overflow-y-auto rounded-lg border border-red-100">
+                  <div className="max-h-72 overflow-auto rounded-lg border border-red-100">
                     <table className="w-full text-sm">
                       <thead className="bg-red-50 text-left">
                         <tr>

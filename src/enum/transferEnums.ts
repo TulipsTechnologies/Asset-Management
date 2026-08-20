@@ -20,11 +20,11 @@ export const TRANSFER_STATUS_LABELS: Record<number, string> = {
 };
 
 export const TRANSFER_STATUS_BADGE_CLASSES: Record<number, string> = {
-  [TransferStatusEnum.Requested]: 'bg-blue-50 text-blue-700',
-  [TransferStatusEnum.Approved]: 'bg-indigo-50 text-indigo-700',
+  [TransferStatusEnum.Requested]: 'bg-blue-50 text-blue-800',
+  [TransferStatusEnum.Approved]: 'bg-indigo-50 text-indigo-800',
   [TransferStatusEnum.Dispatched]: 'bg-amber-100 text-amber-800',
   [TransferStatusEnum.Received]: 'bg-green-100 text-green-800',
-  [TransferStatusEnum.Cancelled]: 'bg-gray-100 text-gray-600',
+  [TransferStatusEnum.Cancelled]: 'bg-gray-100 text-gray-800',
 };
 
 export const ACTIVE_TRANSFER_STATUSES = [

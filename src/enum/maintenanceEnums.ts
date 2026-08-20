@@ -54,11 +54,11 @@ export const MAINTENANCE_REQUEST_TYPE_LABELS: Record<number, string> = {
 
 /** Breakdown red — it is the one type that writes the asset's status. */
 export const MAINTENANCE_REQUEST_TYPE_BADGE_CLASSES: Record<number, string> = {
-  [MaintenanceRequestTypeEnum.Corrective]: 'bg-blue-50 text-blue-700',
+  [MaintenanceRequestTypeEnum.Corrective]: 'bg-blue-50 text-blue-800',
   [MaintenanceRequestTypeEnum.Preventive]: 'bg-green-100 text-green-800',
-  [MaintenanceRequestTypeEnum.Breakdown]: 'bg-red-100 text-red-700',
+  [MaintenanceRequestTypeEnum.Breakdown]: 'bg-red-100 text-red-800',
   [MaintenanceRequestTypeEnum.Inspection]: 'bg-purple-100 text-purple-800',
-  [MaintenanceRequestTypeEnum.Calibration]: 'bg-gray-100 text-gray-700',
+  [MaintenanceRequestTypeEnum.Calibration]: 'bg-gray-100 text-gray-800',
 };
 
 export const MAINTENANCE_PRIORITY_LABELS: Record<number, string> = {
@@ -69,10 +69,10 @@ export const MAINTENANCE_PRIORITY_LABELS: Record<number, string> = {
 };
 
 export const MAINTENANCE_PRIORITY_BADGE_CLASSES: Record<number, string> = {
-  [MaintenancePriorityEnum.Low]: 'bg-gray-100 text-gray-600',
-  [MaintenancePriorityEnum.Medium]: 'bg-blue-50 text-blue-700',
+  [MaintenancePriorityEnum.Low]: 'bg-gray-100 text-gray-800',
+  [MaintenancePriorityEnum.Medium]: 'bg-blue-50 text-blue-800',
   [MaintenancePriorityEnum.High]: 'bg-amber-100 text-amber-800',
-  [MaintenancePriorityEnum.Critical]: 'bg-red-100 text-red-700',
+  [MaintenancePriorityEnum.Critical]: 'bg-red-100 text-red-800',
 };
 
 export const MAINTENANCE_REQUEST_STATUS_LABELS: Record<number, string> = {
@@ -84,9 +84,9 @@ export const MAINTENANCE_REQUEST_STATUS_LABELS: Record<number, string> = {
 
 export const MAINTENANCE_REQUEST_STATUS_BADGE_CLASSES: Record<number, string> = {
   [MaintenanceRequestStatusEnum.Open]: 'bg-amber-100 text-amber-800',
-  [MaintenanceRequestStatusEnum.Converted]: 'bg-blue-50 text-blue-700',
-  [MaintenanceRequestStatusEnum.Rejected]: 'bg-red-100 text-red-700',
-  [MaintenanceRequestStatusEnum.Cancelled]: 'bg-gray-100 text-gray-600',
+  [MaintenanceRequestStatusEnum.Converted]: 'bg-blue-50 text-blue-800',
+  [MaintenanceRequestStatusEnum.Rejected]: 'bg-red-100 text-red-800',
+  [MaintenanceRequestStatusEnum.Cancelled]: 'bg-gray-100 text-gray-800',
 };
 
 export const WORK_ORDER_STATUS_LABELS: Record<number, string> = {
@@ -98,9 +98,9 @@ export const WORK_ORDER_STATUS_LABELS: Record<number, string> = {
 
 export const WORK_ORDER_STATUS_BADGE_CLASSES: Record<number, string> = {
   [WorkOrderStatusEnum.Open]: 'bg-amber-100 text-amber-800',
-  [WorkOrderStatusEnum.InProgress]: 'bg-blue-50 text-blue-700',
+  [WorkOrderStatusEnum.InProgress]: 'bg-blue-50 text-blue-800',
   [WorkOrderStatusEnum.Completed]: 'bg-green-100 text-green-800',
-  [WorkOrderStatusEnum.Cancelled]: 'bg-gray-100 text-gray-600',
+  [WorkOrderStatusEnum.Cancelled]: 'bg-gray-100 text-gray-800',
 };
 
 export const WORK_ORDER_OUTCOME_LABELS: Record<number, string> = {
@@ -112,7 +112,7 @@ export const WORK_ORDER_OUTCOME_LABELS: Record<number, string> = {
 export const WORK_ORDER_OUTCOME_BADGE_CLASSES: Record<number, string> = {
   [WorkOrderOutcomeEnum.ReturnedToService]: 'bg-green-100 text-green-800',
   [WorkOrderOutcomeEnum.Quarantined]: 'bg-purple-100 text-purple-800',
-  [WorkOrderOutcomeEnum.OutOfService]: 'bg-gray-200 text-gray-700',
+  [WorkOrderOutcomeEnum.OutOfService]: 'bg-gray-100 text-gray-800',
 };
 
 /**

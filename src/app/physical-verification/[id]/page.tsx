@@ -1215,7 +1215,7 @@ const CampaignDetailPage = () => {
       </div>
 
       {/* Tab switcher: results vs discrepancies */}
-      <div className="flex border-b gap-x-10">
+      <div className="flex border-b gap-x-10 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {(
           [
             { id: 'results', label: 'Results' },
@@ -1227,7 +1227,7 @@ const CampaignDetailPage = () => {
             type="button"
             role="tab"
             aria-selected={activeTab === tab.id}
-            className={`pb-3 border-b-2 text-sm font-medium ${
+            className={`pb-3 border-b-2 text-sm font-medium whitespace-nowrap shrink-0 ${
               activeTab === tab.id
                 ? 'border-primarycolor text-secondaryColor'
                 : 'border-transparent text-gray-500'

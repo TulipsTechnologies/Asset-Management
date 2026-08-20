@@ -11,7 +11,9 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 import { CustomTableProps, ICacheData, RowWithFieldProps, TTableColumn } from './CustomTableInterface';
 import { clampColumnWidth, getColumnMinWidth } from './columnResizeUtils';
 import { sortDate, sortNumber, sortString } from './utils';
+import { useIsCompactViewport } from '@/hooks/useIsMobile';
 import SelectionBar from './SelectionBar';
+import TableToolbar from './TableToolbar';
 import Tooltip from '../UI/Tooltip';
 import Drawer from '../UI/Drawer';
 import BackButton from '../UI/BackButton';
@@ -89,6 +91,15 @@ const CustomTable = ({
   const [selectedIds, setSelectedIds] = useState<Set<string | number>>(
     new Set(),
   );
+
+  // Below `md` every *horizontal* pin is dropped — locked columns and the
+  // right-pinned actions column alike. A pinned column is 200px at minimum
+  // (columnResizeUtils.DEFAULT_MIN_COLUMN_WIDTH), so on a phone or small tablet
+  // it covers most of the width and hides the row content scrolling under it.
+  // The `md:hidden` card list already takes over below this width; keeping the
+  // two in step means the desktop grid is never rendered with pinned columns
+  // on a viewport too narrow for them.
+  const pinColumns = !useIsCompactViewport();
 
   const resolveRowId = (row: RowWithFieldProps, index: number) =>
     getRowId?.(row, index) ?? row.id ?? index;
@@ -563,7 +574,7 @@ const CustomTable = ({
   };
 
   const DrawerList = (
-    <div style={{ width: 320 }}>
+    <div className="w-[320px] max-w-[85vw]">
       <DragDropContext onDragEnd={handleDragEnd}>
         <Droppable droppableId="columns">
           {(provided) => (
@@ -718,15 +729,18 @@ const CustomTable = ({
         />
       )}
 
-      <div className="flex flex-wrap justify-between items-center gap-x-4 gap-y-2 w-full mb-3">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          {/* Leads the toolbar on every list, so the way back travels with the page rather
-              than with the app header — which the host supplies once this module is mounted
-              inside TulipsHRM. Renders nothing on a top-level page. */}
-          {showBack && <BackButton />}
-          {tableHeaderLeft}
-        </div>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 md:gap-x-8">
+      <TableToolbar
+        tableHeaderLeft={
+          <>
+            {/* Leads the toolbar on every list, so the way back travels with the page rather
+                than with the app header — which the host supplies once this module is mounted
+                inside TulipsHRM. Renders nothing on a top-level page. */}
+            {showBack && <BackButton />}
+            {tableHeaderLeft}
+          </>
+        }
+        tableHeaderRight={tableHeaderRight}
+        manageColumnsButton={
           <button
             ref={manageColumnsButtonRef}
             type="button"
@@ -738,9 +752,8 @@ const CustomTable = ({
             <i className="icon icon-three-cols text-gray-500 text-base" />{' '}
             Columns
           </button>
-          {tableHeaderRight}
-        </div>
-      </div>
+        }
+      />
       {/* Spacing Menu */}
 
       {/* Columns Drawer */}
@@ -898,14 +911,17 @@ const CustomTable = ({
                       key={col.key}
                       style={{
                         width: `${col.width}px`,
-                        left: col.locked ? `${stickyOffset}px` : undefined,
+                        left:
+                          pinColumns && col.locked
+                            ? `${stickyOffset}px`
+                            : undefined,
                         textAlign:
                           col.contentAlign && col.isSortable === false
                             ? col.contentAlign
                             : 'left',
                       }}
-                      className={`group ${col.locked ? `!sticky bg-gray-50 z-[2]` : ''
-                        } ${col.name === 'actions'
+                      className={`group ${pinColumns && col.locked ? `!sticky bg-gray-50 z-[2]` : ''
+                        } ${pinColumns && col.name === 'actions'
                           ? '!sticky bg-gray-50 z-[2] !left-auto right-0'
                           : ''
                         }`}
@@ -1026,7 +1042,7 @@ const CustomTable = ({
                                 key={col.key}
                                 style={{
                                   paddingBlock: `${spacing}px`,
-                                  left: col.locked
+                                  left: pinColumns && col.locked
                                     ? `${stickyOffset}px`
                                     : undefined,
                                   textAlign: col.contentAlign
@@ -1036,11 +1052,11 @@ const CustomTable = ({
                                     ? { backgroundColor: rowBackgroundColor }
                                     : {}),
                                 }}
-                                className={`group ${col.locked
+                                className={`group ${pinColumns && col.locked
                                   ? `!sticky bg-white ${onRowClick ? 'group-hover:bg-gray-50' : ''
                                   } z-[2]`
                                   : ''
-                                  }  ${col.name === 'actions'
+                                  }  ${pinColumns && col.name === 'actions'
                                     ? '!sticky !bg-transparent z-[2] !left-auto right-0'
                                     : ''
                                   }`}

@@ -87,12 +87,16 @@ export const Tabs: FC<TabsProps> = ({
 
   return (
     <div className={`tabs-container ${className}`}>
-      <div className={`tab-list flex border-b gap-x-10 ${containerClassName}`}>
+      {/* Horizontal scroll (hidden scrollbar) instead of wrapping: a wrapped tab
+          strip reads as two rows of unrelated links on a phone. */}
+      <div
+        className={`tab-list flex border-b gap-x-10 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${containerClassName}`}
+      >
         {tabs.map((tab) => (
           <button
             type="button"
             key={tab.id}
-            className={`tab-item pb-3 border-b-2 ${
+            className={`tab-item pb-3 border-b-2 whitespace-nowrap shrink-0 ${
               tab.id === activeTabId
                 ? `border-primarycolor ${tabButtonActiveClassName}`
                 : `text-gray-500 border-transparent ${tabButtonInactiveClassName}`

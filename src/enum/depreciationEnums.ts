@@ -49,8 +49,8 @@ export const BOOK_STATUS_LABELS: Record<number, string> = {
 };
 
 export const BOOK_STATUS_BADGE_CLASSES: Record<number, string> = {
-  [AssetBookStatusEnum.Active]: 'bg-green-100 text-green-700',
-  [AssetBookStatusEnum.Closed]: 'bg-gray-100 text-gray-600',
+  [AssetBookStatusEnum.Active]: 'bg-green-100 text-green-800',
+  [AssetBookStatusEnum.Closed]: 'bg-gray-100 text-gray-800',
 };
 
 export const RUN_STATUS_LABELS: Record<number, string> = {
@@ -63,11 +63,11 @@ export const RUN_STATUS_LABELS: Record<number, string> = {
 };
 
 export const RUN_STATUS_BADGE_CLASSES: Record<number, string> = {
-  [DepreciationRunStatusEnum.Draft]: 'bg-gray-100 text-gray-700',
-  [DepreciationRunStatusEnum.Calculated]: 'bg-blue-100 text-blue-700',
-  [DepreciationRunStatusEnum.Approved]: 'bg-amber-100 text-amber-700',
-  [DepreciationRunStatusEnum.Posted]: 'bg-green-100 text-green-700',
-  [DepreciationRunStatusEnum.Reversed]: 'bg-red-100 text-red-700',
+  [DepreciationRunStatusEnum.Draft]: 'bg-gray-100 text-gray-800',
+  [DepreciationRunStatusEnum.Calculated]: 'bg-blue-100 text-blue-800',
+  [DepreciationRunStatusEnum.Approved]: 'bg-amber-100 text-amber-800',
+  [DepreciationRunStatusEnum.Posted]: 'bg-green-100 text-green-800',
+  [DepreciationRunStatusEnum.Reversed]: 'bg-red-100 text-red-800',
   [DepreciationRunStatusEnum.Discarded]: 'bg-gray-100 text-gray-500',
 };
 
@@ -84,10 +84,10 @@ export const PROPOSAL_STATUS_LABELS: Record<number, string> = {
 };
 
 export const PROPOSAL_STATUS_BADGE_CLASSES: Record<number, string> = {
-  [JournalProposalStatusEnum.Pending]: 'bg-amber-100 text-amber-700',
-  [JournalProposalStatusEnum.Sent]: 'bg-blue-100 text-blue-700',
-  [JournalProposalStatusEnum.Posted]: 'bg-green-100 text-green-700',
-  [JournalProposalStatusEnum.Rejected]: 'bg-red-100 text-red-700',
+  [JournalProposalStatusEnum.Pending]: 'bg-amber-100 text-amber-800',
+  [JournalProposalStatusEnum.Sent]: 'bg-blue-100 text-blue-800',
+  [JournalProposalStatusEnum.Posted]: 'bg-green-100 text-green-800',
+  [JournalProposalStatusEnum.Rejected]: 'bg-red-100 text-red-800',
 };
 
 export const PROPOSAL_SOURCE_LABELS: Record<number, string> = {
@@ -120,10 +120,10 @@ export const CONVENTION_LABELS: Record<number, string> = {
 };
 
 export const CONVENTION_BADGE_CLASSES: Record<number, string> = {
-  [DepreciationConventionEnum.FullMonth]: 'bg-gray-100 text-gray-700',
-  [DepreciationConventionEnum.StartExcludedEndIncluded]: 'bg-blue-100 text-blue-700',
-  [DepreciationConventionEnum.StartIncludedEndIncluded]: 'bg-blue-100 text-blue-700',
-  [DepreciationConventionEnum.NextMonth]: 'bg-gray-100 text-gray-700',
+  [DepreciationConventionEnum.FullMonth]: 'bg-gray-100 text-gray-800',
+  [DepreciationConventionEnum.StartExcludedEndIncluded]: 'bg-blue-100 text-blue-800',
+  [DepreciationConventionEnum.StartIncludedEndIncluded]: 'bg-blue-100 text-blue-800',
+  [DepreciationConventionEnum.NextMonth]: 'bg-gray-100 text-gray-800',
 };
 
 /** The two the capitalize form offers. The other two exist but are not chooseable here. */

@@ -353,7 +353,7 @@ const AssetDetailPage = () => {
         }
       />
 
-      <div className="flex gap-1 border-b border-gray-200 mb-5 overflow-x-auto">
+      <div className="flex gap-1 border-b border-gray-200 mb-5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {(
           [
             { key: 'overview', label: 'Overview' },
@@ -365,7 +365,7 @@ const AssetDetailPage = () => {
             key={tab.key}
             type="button"
             onClick={() => setActiveTab(tab.key)}
-            className={`px-4 py-2.5 text-sm whitespace-nowrap border-b-2 -mb-px transition-colors ${
+            className={`px-4 py-2.5 text-sm whitespace-nowrap shrink-0 border-b-2 -mb-px transition-colors ${
               activeTab === tab.key
                 ? 'border-primarycolor text-primarycolor font-medium'
                 : 'border-transparent text-gray-500 hover:text-secondaryColor'

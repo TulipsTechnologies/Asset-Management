@@ -992,7 +992,7 @@ const MaintenancePage = () => {
       </div>
 
       {/* Tab switcher: triage queue vs the work itself */}
-      <div className="flex border-b gap-x-10 mb-4">
+      <div className="flex border-b gap-x-10 mb-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {(
           [
             { id: 'requests', label: 'Requests' },
@@ -1004,7 +1004,7 @@ const MaintenancePage = () => {
             type="button"
             role="tab"
             aria-selected={activeTab === tab.id}
-            className={`pb-3 border-b-2 text-sm font-medium ${
+            className={`pb-3 border-b-2 text-sm font-medium whitespace-nowrap shrink-0 ${
               activeTab === tab.id
                 ? 'border-primarycolor text-secondaryColor'
                 : 'border-transparent text-gray-500'

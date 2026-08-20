@@ -67,11 +67,11 @@ export const AUDIT_CAMPAIGN_STATUS_LABELS: Record<number, string> = {
 };
 
 export const AUDIT_CAMPAIGN_STATUS_BADGE_CLASSES: Record<number, string> = {
-  [AuditCampaignStatusEnum.Draft]: 'bg-gray-100 text-gray-700',
-  [AuditCampaignStatusEnum.InProgress]: 'bg-blue-50 text-blue-700',
+  [AuditCampaignStatusEnum.Draft]: 'bg-gray-100 text-gray-800',
+  [AuditCampaignStatusEnum.InProgress]: 'bg-blue-50 text-blue-800',
   [AuditCampaignStatusEnum.UnderReview]: 'bg-amber-100 text-amber-800',
   [AuditCampaignStatusEnum.Approved]: 'bg-green-100 text-green-800',
-  [AuditCampaignStatusEnum.Cancelled]: 'bg-gray-100 text-gray-600',
+  [AuditCampaignStatusEnum.Cancelled]: 'bg-gray-100 text-gray-800',
 };
 
 export const AUDIT_SCOPE_TYPE_LABELS: Record<number, string> = {
@@ -110,16 +110,16 @@ export const AUDIT_RESULT_TYPE_LABELS: Record<number, string> = {
 
 /** Verified green, Not Found red, mismatches amber, unknown-item types purple. */
 export const AUDIT_RESULT_TYPE_BADGE_CLASSES: Record<number, string> = {
-  [AuditResultTypeEnum.Pending]: 'bg-gray-100 text-gray-600',
+  [AuditResultTypeEnum.Pending]: 'bg-gray-100 text-gray-800',
   [AuditResultTypeEnum.Verified]: 'bg-green-100 text-green-800',
   [AuditResultTypeEnum.WrongLocation]: 'bg-amber-100 text-amber-800',
   [AuditResultTypeEnum.WrongCustodian]: 'bg-amber-100 text-amber-800',
   [AuditResultTypeEnum.ConditionMismatch]: 'bg-amber-100 text-amber-800',
-  [AuditResultTypeEnum.NotFound]: 'bg-red-100 text-red-700',
+  [AuditResultTypeEnum.NotFound]: 'bg-red-100 text-red-800',
   [AuditResultTypeEnum.UnregisteredFound]: 'bg-purple-100 text-purple-800',
   [AuditResultTypeEnum.TagDamaged]: 'bg-amber-100 text-amber-800',
   [AuditResultTypeEnum.SerialMismatch]: 'bg-amber-100 text-amber-800',
-  [AuditResultTypeEnum.DisposedButActive]: 'bg-rose-100 text-rose-700',
+  [AuditResultTypeEnum.DisposedButActive]: 'bg-pink-100 text-pink-800',
   [AuditResultTypeEnum.NotInRegister]: 'bg-purple-100 text-purple-800',
 };
 
@@ -129,7 +129,7 @@ export const AUDIT_DISCREPANCY_STATUS_LABELS: Record<number, string> = {
 };
 
 export const AUDIT_DISCREPANCY_STATUS_BADGE_CLASSES: Record<number, string> = {
-  [AuditDiscrepancyStatusEnum.Open]: 'bg-red-50 text-red-700',
+  [AuditDiscrepancyStatusEnum.Open]: 'bg-red-50 text-red-800',
   [AuditDiscrepancyStatusEnum.Reconciled]: 'bg-green-100 text-green-800',
 };
 

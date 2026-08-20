@@ -1495,7 +1495,7 @@ const DisposalPage = () => {
             {/* The execution record */}
             {viewing.transaction && (
               <div className="mt-6 border-t pt-4">
-                <div className="flex items-center justify-between mb-3">
+                <div className="flex flex-wrap items-center justify-between gap-y-2 mb-3">
                   <span className="text-sm font-medium text-gray-500">
                     Execution
                   </span>

@@ -46,12 +46,18 @@ const FilterPanel = ({
         className="flex items-center gap-x-2 text-sm font-medium whitespace-nowrap"
       >
         <i className="icon icon-filter text-gray-500 text-base"></i>
-        <span>Filters</span>
-        {activeCount > 0 && (
-          <span className="ml-1 min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full bg-primarycolor text-white text-[11px] leading-none">
-            {activeCount}
-          </span>
-        )}
+        {/* Badge nested INSIDE the label span: the table toolbar's mobile icon
+            row hides `button > span` labels and corner-pins `span span` badges,
+            so the count survives the collapse. The label span reproduces the
+            button's old gap-x-2 so desktop spacing is unchanged. */}
+        <span className="inline-flex items-center gap-x-2">
+          Filters
+          {activeCount > 0 && (
+            <span className="ml-1 min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full bg-primarycolor text-white text-[11px] leading-none">
+              {activeCount}
+            </span>
+          )}
+        </span>
       </button>
 
       <FilterPanelDropdown

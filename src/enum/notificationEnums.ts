@@ -41,9 +41,9 @@ export const NOTIFICATION_PRIORITY_BADGE_CLASSES: Record<
   NotificationPriorityEnum,
   string
 > = {
-  [NotificationPriorityEnum.Low]: 'bg-gray-100 text-gray-700',
+  [NotificationPriorityEnum.Low]: 'bg-gray-100 text-gray-800',
   [NotificationPriorityEnum.Normal]: 'bg-blue-100 text-blue-800',
-  [NotificationPriorityEnum.High]: 'bg-yellow-100 text-yellow-800',
+  [NotificationPriorityEnum.High]: 'bg-amber-100 text-yellow-800',
   [NotificationPriorityEnum.Critical]: 'bg-red-100 text-red-800',
 };
 
@@ -75,7 +75,7 @@ export const DELIVERY_STATUS_LABELS: Record<DeliveryStatusEnum, string> = {
 
 export const DELIVERY_STATUS_BADGE_CLASSES: Record<DeliveryStatusEnum, string> =
   {
-    [DeliveryStatusEnum.Pending]: 'bg-yellow-100 text-yellow-800',
+    [DeliveryStatusEnum.Pending]: 'bg-amber-100 text-yellow-800',
     [DeliveryStatusEnum.Sent]: 'bg-green-100 text-green-800',
     [DeliveryStatusEnum.Failed]: 'bg-red-100 text-red-800',
     [DeliveryStatusEnum.Bounced]: 'bg-red-100 text-red-800',

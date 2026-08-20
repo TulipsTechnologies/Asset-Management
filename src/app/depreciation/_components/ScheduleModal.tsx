@@ -466,7 +466,7 @@ export default function ScheduleModal({
           )}
 
           {/* Table */}
-          <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-5">
+          <div className="min-h-0 flex-1 overflow-auto px-6 pb-5">
             <table className="w-full border-separate border-spacing-0 text-sm">
               <thead className="sticky top-0 z-10">
                 {view === 'yearly' ? (

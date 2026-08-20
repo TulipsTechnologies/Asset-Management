@@ -894,7 +894,7 @@ export default function CapitalizeForm() {
 
   return (
     <div className="mt-2 max-w-[1400px] px-4">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-y-2">
         <div>
           <h1 className="text-lg font-semibold text-secondaryColor">
             {isEdit ? `Edit Depreciation — ${book?.assetCode}` : 'Add Depreciation'}
@@ -975,7 +975,7 @@ export default function CapitalizeForm() {
                   : 'border-gray-200 bg-gray-50/50'
               }`}
             >
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-y-2">
                 <div>
                   <h2 className="text-xs font-semibold uppercase tracking-wide text-primarycolor">
                     Nepal IRD Tax Details
@@ -1785,7 +1785,7 @@ export default function CapitalizeForm() {
                 </div>
               )}
 
-              <div className="max-h-96 overflow-y-auto">
+              <div className="max-h-96 overflow-auto">
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 bg-gray-100 text-left text-xs text-gray-600">
                     <tr>

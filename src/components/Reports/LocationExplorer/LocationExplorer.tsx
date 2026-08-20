@@ -892,7 +892,7 @@ const LocationExplorer = ({
       </div>
 
       <Drawer isOpen={treeDrawerOpen} onClose={() => setTreeDrawerOpen(false)}>
-        <div className="h-full w-[300px] bg-white">{treePane}</div>
+        <div className="h-full w-[300px] max-w-[85vw] bg-white">{treePane}</div>
       </Drawer>
     </div>
   );

@@ -72,7 +72,7 @@ const DashboardContents = ({ children }: { children: ReactNode }) => {
   const menus = dynamicMenus?.length ? dynamicMenus : ASSET_FALLBACK_MENUS;
 
   return (
-    <div className="flex justify-between items-start md:p-3 bg-[#F7FCDC] h-screen">
+    <div className="flex justify-between items-start md:p-3 bg-[#F7FCDC] h-dvh">
       <DashboardSidebar
         logo={Logo}
         companyLogo={companyLogo}
@@ -93,7 +93,7 @@ const DashboardContents = ({ children }: { children: ReactNode }) => {
           isMenuExtended
             ? 'md:w-[calc(100vw-322px)]'
             : 'md:w-[calc(100vw-86px)]'
-        } rounded-none md:rounded-xl overflow-hidden h-screen md:h-[calc(100vh-24px)] bg-white transition-all duration-300 ease-in-out`}
+        } rounded-none md:rounded-xl overflow-hidden h-dvh md:h-[calc(100dvh-24px)] bg-white transition-all duration-300 ease-in-out`}
       >
         {/* Anchor for the tenant badge, which portals into the shared Header's own row: that row
             is this element's next sibling. Holding a handle this way rather than matching the
@@ -128,7 +128,7 @@ const DashboardContents = ({ children }: { children: ReactNode }) => {
         )}
         {token && <ActiveCompanyBadge headerHost={headerHostRef} />}
         <div
-          className={`h-[calc(100vh-60px)] md:h-[calc(100vh-83px)] ${
+          className={`h-[calc(100dvh-60px)] md:h-[calc(100dvh-83px)] ${
             pathname === '/404' ? '' : 'overflow-y-auto overflow-x-hidden'
           }`}
         >

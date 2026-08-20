@@ -59,12 +59,12 @@ export const RUN_STATUS_LABELS: Record<SystemTestRunStatusEnum, string> = {
 
 /** Badge classes for a run status — green/amber/red family used across the module. */
 export const RUN_STATUS_BADGE: Record<SystemTestRunStatusEnum, string> = {
-  [SystemTestRunStatusEnum.Running]: 'bg-blue-50 text-blue-700',
+  [SystemTestRunStatusEnum.Running]: 'bg-blue-50 text-blue-800',
   [SystemTestRunStatusEnum.Passed]: 'bg-green-100 text-green-800',
   [SystemTestRunStatusEnum.PassedWithWarnings]: 'bg-amber-100 text-amber-800',
-  [SystemTestRunStatusEnum.Failed]: 'bg-red-100 text-red-700',
-  [SystemTestRunStatusEnum.Cancelled]: 'bg-gray-100 text-gray-600',
-  [SystemTestRunStatusEnum.Abandoned]: 'bg-gray-100 text-gray-600',
+  [SystemTestRunStatusEnum.Failed]: 'bg-red-100 text-red-800',
+  [SystemTestRunStatusEnum.Cancelled]: 'bg-gray-100 text-gray-800',
+  [SystemTestRunStatusEnum.Abandoned]: 'bg-gray-100 text-gray-800',
 };
 
 export const RUN_ITEM_STATUS_LABELS: Record<SystemTestRunItemStatusEnum, string> = {
@@ -77,8 +77,8 @@ export const RUN_ITEM_STATUS_LABELS: Record<SystemTestRunItemStatusEnum, string>
 export const RUN_ITEM_STATUS_BADGE: Record<SystemTestRunItemStatusEnum, string> = {
   [SystemTestRunItemStatusEnum.Pass]: 'bg-green-100 text-green-800',
   [SystemTestRunItemStatusEnum.Warning]: 'bg-amber-100 text-amber-800',
-  [SystemTestRunItemStatusEnum.Failed]: 'bg-red-100 text-red-700',
-  [SystemTestRunItemStatusEnum.Info]: 'bg-blue-50 text-blue-700',
+  [SystemTestRunItemStatusEnum.Failed]: 'bg-red-100 text-red-800',
+  [SystemTestRunItemStatusEnum.Info]: 'bg-blue-50 text-blue-800',
 };
 
 /** True once a run can no longer change — polling stops on this. */
@@ -132,8 +132,8 @@ export const VISUAL_STATUS_BADGE: Record<VisualStatusEnum, string> = {
   [VisualStatusEnum.Pass]: 'bg-green-100 text-green-800',
   [VisualStatusEnum.MinorDifference]: 'bg-amber-100 text-amber-800',
   [VisualStatusEnum.ReviewRequired]: 'bg-orange-100 text-orange-800',
-  [VisualStatusEnum.Broken]: 'bg-red-100 text-red-700',
-  [VisualStatusEnum.NewScenario]: 'bg-blue-50 text-blue-700',
+  [VisualStatusEnum.Broken]: 'bg-red-100 text-red-800',
+  [VisualStatusEnum.NewScenario]: 'bg-blue-50 text-blue-800',
 };
 
 export const VISUAL_FUNCTIONAL_LABELS: Record<VisualFunctionalStatusEnum, string> = {
@@ -143,7 +143,7 @@ export const VISUAL_FUNCTIONAL_LABELS: Record<VisualFunctionalStatusEnum, string
 
 export const VISUAL_FUNCTIONAL_BADGE: Record<VisualFunctionalStatusEnum, string> = {
   [VisualFunctionalStatusEnum.Pass]: 'bg-green-100 text-green-800',
-  [VisualFunctionalStatusEnum.Failed]: 'bg-red-100 text-red-700',
+  [VisualFunctionalStatusEnum.Failed]: 'bg-red-100 text-red-800',
 };
 
 export const VISUAL_DECISION_LABELS: Record<VisualReviewDecisionEnum, string> = {

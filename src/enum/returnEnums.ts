@@ -32,7 +32,7 @@ export const RETURN_STATUS_LABELS: Record<number, string> = {
 export const RETURN_STATUS_BADGE_CLASSES: Record<number, string> = {
   [ReturnStatusEnum.Initiated]: 'bg-amber-100 text-amber-800',
   [ReturnStatusEnum.Completed]: 'bg-green-100 text-green-800',
-  [ReturnStatusEnum.Cancelled]: 'bg-gray-100 text-gray-600',
+  [ReturnStatusEnum.Cancelled]: 'bg-gray-100 text-gray-800',
 };
 
 export const RETURN_OUTCOME_LABELS: Record<number, string> = {
@@ -48,8 +48,8 @@ export const RETURN_OUTCOME_BADGE_CLASSES: Record<number, string> = {
   [ReturnOutcomeEnum.Available]: 'bg-green-100 text-green-800',
   [ReturnOutcomeEnum.Repair]: 'bg-amber-100 text-amber-800',
   [ReturnOutcomeEnum.Quarantine]: 'bg-purple-100 text-purple-800',
-  [ReturnOutcomeEnum.Missing]: 'bg-red-100 text-red-700',
-  [ReturnOutcomeEnum.DisposalRecommended]: 'bg-gray-200 text-gray-700',
+  [ReturnOutcomeEnum.Missing]: 'bg-red-100 text-red-800',
+  [ReturnOutcomeEnum.DisposalRecommended]: 'bg-gray-100 text-gray-800',
 };
 
 /** What completing a return with each outcome does to the asset. */
@@ -71,7 +71,7 @@ export const RECOVERY_CASE_STATUS_LABELS: Record<number, string> = {
 };
 
 export const RECOVERY_CASE_STATUS_BADGE_CLASSES: Record<number, string> = {
-  [RecoveryCaseStatusEnum.Open]: 'bg-red-50 text-red-700',
+  [RecoveryCaseStatusEnum.Open]: 'bg-red-50 text-red-800',
   [RecoveryCaseStatusEnum.Settled]: 'bg-green-100 text-green-800',
-  [RecoveryCaseStatusEnum.Waived]: 'bg-gray-100 text-gray-600',
+  [RecoveryCaseStatusEnum.Waived]: 'bg-gray-100 text-gray-800',
 };

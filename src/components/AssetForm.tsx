@@ -394,7 +394,7 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
 
   return (
     <div className="mt-2 max-w-[1400px] px-4">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-y-2">
         <div>
           <h1 className="text-lg font-semibold text-secondaryColor">
             {isEdit ? `Edit Asset — ${asset.assetCode}` : 'Add Asset'}

@@ -208,7 +208,7 @@ export default function ConventionSwitchModal({
             )}
 
             {preview.periods?.length > 0 && (
-              <div className="max-h-64 overflow-y-auto">
+              <div className="max-h-64 overflow-auto">
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 bg-gray-100 text-left text-xs text-gray-600">
                     <tr>

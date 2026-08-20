@@ -261,7 +261,7 @@ export default function OpeningBalanceImportModal({
               </span>
             </div>
 
-            <div className="max-h-72 overflow-y-auto">
+            <div className="max-h-72 overflow-auto">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-gray-100 text-left text-xs text-gray-600">
                   <tr>
