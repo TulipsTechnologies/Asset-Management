@@ -18,16 +18,20 @@ const nextConfig = {
     NEXT_PUBLIC_MAX_FILE_SIZE: "10",
   },
   images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "**",
-      },
-      {
-        protocol: "http",
-        hostname: "**",
-      },
-    ],
+    // EMPTY ON PURPOSE — this is a security control, not leftover config.
+    //
+    // Next serves the /_next/image optimizer endpoint whether or not the app imports
+    // next/image, and it will fetch any origin allowed here on the SERVER's behalf. A
+    // wildcard hostname therefore turns the app into an SSRF proxy: a request for
+    // /asset-management/_next/image?url=http://169.254.169.254/... or any host on the
+    // server's private network is made BY the server, from inside the perimeter, and
+    // the response is handed back to the caller.
+    //
+    // Nothing in this app imports next/image (the one <img> in VisualImage.tsx renders an
+    // object URL, which cannot go through the optimizer), so an empty list costs nothing
+    // and closes the hole. Add a SPECIFIC host here if remote images are ever needed —
+    // never a "**" wildcard.
+    remotePatterns: [],
   },
   async headers() {
     // Immutable caching is only safe for production builds, where chunk file

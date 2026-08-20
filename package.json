@@ -22,10 +22,10 @@
     "date-fns": "^4.1.0",
     "js-cookie": "^3.0.5",
     "jsonwebtoken": "^9.0.2",
-    "jspdf": "^2.5.2",
-    "jspdf-autotable": "^3.8.4",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "leaflet": "^1.9.4",
-    "next": "15.1.7",
+    "next": "^15.5.23",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-icons": "^5.5.0",
@@ -40,11 +40,19 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "pixelmatch": "5.3.0",
-    "playwright": "1.50.1",
+    "playwright": "^1.62.1",
     "pngjs": "7.0.0",
-    "postcss": "^8",
+    "postcss": "^8.5.26",
     "tailwindcss": "^3.4.1",
     "typescript": "^5",
-    "vitest": "^2.1.9"
+    "vitest": "^3.2.7"
+  },
+  "overrides": {
+    "postcss": "^8.5.26",
+    "sharp": "^0.35.0",
+    "nanoid": "^3.3.18",
+    "swiper": "^12.1.2",
+    "vite": "^6.4.3",
+    "esbuild": "^0.25.0"
   }
 }
