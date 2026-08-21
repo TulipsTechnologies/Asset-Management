@@ -7,6 +7,7 @@ import {
   ICompleteWorkOrder,
   IConvertMaintenanceRequest,
   ICreateMaintenanceRequest,
+  IUpdateMaintenanceRequest,
   ICreateWorkOrder,
   IMaintenanceRequest,
   IMaintenanceRequestFilter,
@@ -64,6 +65,39 @@ export const createMaintenanceRequest = (
     method: 'POST',
     body: JSON.stringify(data),
     contentType: 'application/json',
+    completeData: true,
+  });
+};
+
+/**
+ * Correct an Open request. Only the creator may edit their own; anyone else needs a manage
+ * permission, which the API re-checks. 409 when someone else changed it first — show the
+ * message verbatim and reload.
+ */
+export const updateMaintenanceRequest = (
+  id: string,
+  data: IUpdateMaintenanceRequest
+): Promise<IResponse<string>> => {
+  return requestApi({
+    apiEndpoint: `/MaintenanceRequests/${id}`,
+    method: 'PUT',
+    body: JSON.stringify(data),
+    contentType: 'application/json',
+    completeData: true,
+  });
+};
+
+/**
+ * Delete a request no work order refers to. A converted request 409s with the count of work
+ * orders that would be left unexplained — Withdraw is the remedy there, and the message says
+ * so. Soft delete on the server.
+ */
+export const deleteMaintenanceRequest = (
+  id: string
+): Promise<IResponse<string>> => {
+  return requestApi({
+    apiEndpoint: `/MaintenanceRequests/${id}`,
+    method: 'DELETE',
     completeData: true,
   });
 };

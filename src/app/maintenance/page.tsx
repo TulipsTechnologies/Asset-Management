@@ -32,6 +32,8 @@ import { IEmployee } from '@/interface/IEmployee';
 import { IVendor } from '@/interface/IVendor';
 import {
   cancelMaintenanceRequest,
+  updateMaintenanceRequest,
+  deleteMaintenanceRequest,
   cancelWorkOrder,
   completeWorkOrder,
   convertMaintenanceRequest,
@@ -309,6 +311,16 @@ const MaintenancePage = () => {
   const [requestForm, setRequestForm] = useState<TRequestForm>(emptyRequestForm);
   const [requestError, setRequestError] = useState('');
   const [requestSaving, setRequestSaving] = useState(false);
+
+  // Edit modal. Holds the request being corrected — its rowVersion is the concurrency token.
+  const [editing, setEditing] = useState<IMaintenanceRequest | null>(null);
+  const [editForm, setEditForm] = useState<TRequestForm>(emptyRequestForm);
+  const [editError, setEditError] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+
+  // Delete confirmation
+  const [deleting, setDeleting] = useState<IMaintenanceRequest | null>(null);
+  const [deleteSaving, setDeleteSaving] = useState(false);
 
   // Convert modal
   const [converting, setConverting] = useState<IMaintenanceRequest | null>(null);
@@ -601,6 +613,64 @@ const MaintenancePage = () => {
     }
   };
 
+  const openEdit = (request: IMaintenanceRequest) => {
+    setEditing(request);
+    setEditForm({
+      ...emptyRequestForm,
+      assetId: request.assetId,
+      requestType: String(request.requestType),
+      priority: String(request.priority),
+      description: request.description,
+    });
+    setEditError('');
+  };
+
+  const handleEdit = async () => {
+    if (!editing || editSaving) return;
+    if (!editForm.description.trim()) {
+      setEditError('Describe the problem');
+      return;
+    }
+    if (editForm.description.trim().length > 2000) {
+      setEditError('Description must be 2000 characters or fewer');
+      return;
+    }
+    setEditSaving(true);
+    try {
+      const res = await updateMaintenanceRequest(editing.id, {
+        requestType: Number(editForm.requestType) as MaintenanceRequestTypeEnum,
+        priority: Number(editForm.priority) as MaintenancePriorityEnum,
+        description: editForm.description.trim(),
+        rowVersion: editing.rowVersion ?? '',
+      });
+      if (res?.success) {
+        addToast.success(res.message || 'Maintenance request updated');
+        setEditing(null);
+        loadRequests();
+      } else {
+        // A 409 here means someone else moved it on — the row in hand is stale, so closing
+        // and reloading is the only honest next step; keeping the modal open would let them
+        // save the same stale rowVersion again.
+        addToast.error(res?.message || 'Failed to update the request');
+        setEditing(null);
+        loadRequests();
+      }
+    } catch (error) {
+      console.error('Error updating maintenance request:', error);
+      addToast.error('An error occurred while updating the request');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleting || deleteSaving) return;
+    setDeleteSaving(true);
+    await runRequestTransition(() => deleteMaintenanceRequest(deleting.id));
+    setDeleteSaving(false);
+    setDeleting(null);
+  };
+
   const openConvert = (request: IMaintenanceRequest) => {
     setConverting(request);
     // Seeded from the request; every field is overridable server-side too.
@@ -858,6 +928,11 @@ const MaintenancePage = () => {
             ...(request.status === MaintenanceRequestStatusEnum.Open
               ? [
                   {
+                    label: 'Edit',
+                    icon: <i className="icon icon-edit text-sm" />,
+                    action: () => openEdit(request),
+                  },
+                  {
                     label: 'Convert',
                     icon: <i className="icon icon-setting text-sm" />,
                     action: () => openConvert(request),
@@ -877,6 +952,18 @@ const MaintenancePage = () => {
                       setWithdrawing(request);
                       setWithdrawReason('');
                     },
+                  },
+                ]
+              : []),
+            /* Offered for everything except a Converted request, because that is exactly the
+               case the API refuses: a work order points back at it. Rejected and Withdrawn
+               requests carry no such reference and are the ones most often worth clearing. */
+            ...(request.status !== MaintenanceRequestStatusEnum.Converted
+              ? [
+                  {
+                    label: 'Delete',
+                    icon: <i className="icon icon-trash text-sm" />,
+                    action: () => setDeleting(request),
                   },
                 ]
               : []),
@@ -1281,6 +1368,106 @@ const MaintenancePage = () => {
           </div>
         </>
       )}
+
+      {/* Edit request modal. Deliberately narrower than New Request: the ASSET is fixed. A
+          request names what was reported against a particular asset, and re-pointing it
+          would rewrite that rather than correct it — so a wrong asset means withdraw and
+          raise again, which is what the API enforces too. */}
+      <Modal isOpen={!!editing} onClose={() => setEditing(null)} size="lg">
+        <div className="p-6">
+          <h2 className="text-lg font-semibold text-secondaryColor mb-1">
+            Edit Maintenance Request
+          </h2>
+          <p className="text-xs text-gray-400 mb-4">
+            {editing?.assetCode ? `${editing.assetCode} — ` : ''}
+            correct the type, priority or description. Only Open requests can be
+            edited.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+            <Select
+              label="Request Type"
+              required
+              options={Object.entries(MAINTENANCE_REQUEST_TYPE_LABELS).map(
+                ([v, l]) => ({ value: v, label: l })
+              )}
+              value={editForm.requestType}
+              onChange={(e) =>
+                setEditForm((prev) => ({ ...prev, requestType: e.target.value }))
+              }
+            />
+            <Select
+              label="Priority"
+              required
+              options={Object.entries(MAINTENANCE_PRIORITY_LABELS).map(
+                ([v, l]) => ({ value: v, label: l })
+              )}
+              value={editForm.priority}
+              onChange={(e) =>
+                setEditForm((prev) => ({ ...prev, priority: e.target.value }))
+              }
+            />
+            <div className="md:col-span-2">
+              <TextArea
+                label="Description"
+                required
+                value={editForm.description}
+                onChange={(e) => {
+                  setEditForm((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }));
+                  setEditError('');
+                }}
+                rows={3}
+                maxLength={2000}
+                placeholder="What is wrong, what was observed, when it started…"
+              />
+            </div>
+          </div>
+          {editError && (
+            <p className="text-sm text-red-600 mt-3">{editError}</p>
+          )}
+          <div className="flex justify-end gap-3 mt-6">
+            <Button variant="secondary" onClick={() => setEditing(null)}>
+              Cancel
+            </Button>
+            <Button onClick={handleEdit} disabled={editSaving}>
+              <i aria-hidden="true" className="icon icon-save text-xs" />
+              {editSaving ? 'Saving…' : 'Save Changes'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete confirmation. Names the asset, because the row menu is the only thing that
+          told the operator which request they were on. */}
+      <Modal isOpen={!!deleting} onClose={() => setDeleting(null)} size="md">
+        <div className="p-6">
+          <h2 className="text-lg font-semibold text-secondaryColor mb-1">
+            Delete this request?
+          </h2>
+          <p className="text-sm text-gray-500 mt-2">
+            {deleting?.assetCode ? `${deleting.assetCode} — ` : ''}
+            {truncate(deleting?.description ?? '')}
+          </p>
+          <p className="text-xs text-gray-400 mt-3">
+            A request already converted into a work order cannot be deleted —
+            withdraw it instead.
+          </p>
+          <div className="flex justify-end gap-3 mt-6">
+            <Button variant="secondary" onClick={() => setDeleting(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleDelete}
+              disabled={deleteSaving}
+            >
+              {deleteSaving ? 'Deleting…' : 'Delete'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* New Request modal */}
       <Modal isOpen={requestOpen} onClose={() => setRequestOpen(false)} size="lg">

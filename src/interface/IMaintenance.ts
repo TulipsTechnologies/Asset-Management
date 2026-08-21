@@ -48,6 +48,20 @@ export interface ICreateMaintenanceRequest {
   reportedByEmployeeId?: string;
 }
 
+/**
+ * Correcting a request already raised. The ASSET is deliberately absent: pointing a request
+ * at a different asset would rewrite what was reported, not correct how it was worded, and
+ * the backend refuses it. Wrong asset means withdraw and raise again.
+ */
+export interface IUpdateMaintenanceRequest {
+  requestType: MaintenanceRequestTypeEnum;
+  priority: MaintenancePriorityEnum;
+  description: string;
+  reportedByEmployeeId?: string;
+  /** Round-tripped for the concurrency check — 400 when missing, 409 when stale. */
+  rowVersion: string;
+}
+
 /** Convert seeds the work order from the request; every field is overridable. */
 export interface IConvertMaintenanceRequest {
   title?: string;
