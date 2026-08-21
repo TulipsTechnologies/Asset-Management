@@ -180,7 +180,7 @@ const AssetDocumentsSection = ({
         {!readOnly && (
           <Button variant="ghost" onClick={openUpload}>
             <i className="icon icon-plus text-xs" />
-            <span>Upload</span>
+            <span>Upload image</span>
           </Button>
         )}
       </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/Providers/ToastProvider';
 import Button from '@/components/UI/Button';
@@ -24,6 +24,9 @@ import {
   OwnershipTypeEnum,
 } from '@/enum/assetEnums';
 import useAssetConditions from '@/hooks/useAssetConditions';
+import { useAssetPhoto } from '@/components/Assets/assetPhoto';
+import { uploadAssetDocument } from '@/services/assetDocument.service';
+import { AssetDocumentTypeEnum } from '@/enum/assetDocumentEnums';
 
 type TFormErrors = Partial<
   Record<
@@ -86,6 +89,24 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
   const [locations, setLocations] = useState<IAssetLocation[]>([]);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<TFormErrors>({});
+
+  /**
+   * The asset's picture, chosen right here in Asset Identity.
+   *
+   * On EDIT it uploads as soon as it is chosen — the asset exists, so there is nothing to wait
+   * for. On CREATE it cannot: a document attaches to an asset id, and there is no id until the
+   * asset is registered. So the file is HELD and uploaded immediately after the create returns,
+   * which is why `photoFile` is state rather than a fire-and-forget call.
+   *
+   * A failed photo upload never fails the registration. The asset is saved either way and the
+   * operator is told the picture did not attach, because losing a filled-in form over a photo
+   * would be a far worse outcome than an asset with no photo yet.
+   */
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const existingPhoto = useAssetPhoto(asset?.id, isEdit);
   // Server-side refusal shown persistently above the footer — a toast alone is
   // too transient for a 409 whose message the operator must read and act on.
   const [failure, setFailure] = useState<{
@@ -123,32 +144,68 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
     notes: asset?.notes ?? '',
   });
 
-  // Which panels start open.
+  // Which panels start open — the SAME on create and edit.
   //
-  // Only Asset Identity — the three fields registration actually requires (name, category,
-  // condition) — is open to begin with. Every other cluster is optional and starts CLOSED, so
-  // the page opens as one short form instead of a wall of ~25 mostly-empty inputs. Each closed
-  // panel still shows its filled-count badge, so nothing is hidden, only folded.
+  // Only Asset Identity is open. Every other cluster is optional and starts CLOSED, so the
+  // page opens as one short form rather than a wall of ~25 mostly-empty inputs. Each closed
+  // panel keeps its filled-count badge (0/6, 1/7 …), so what a section holds is visible
+  // without opening it — nothing is hidden, only folded.
   //
-  // On EDIT a cluster opens when it already holds data: there the panels are a record of what
-  // was entered, not a form to work down. Computed once — typing must not snap sections open or
-  // shut under the user's cursor.
-  const [sections, setSections] = useState(() => {
-    const hasAny = (keys: readonly (keyof typeof form)[]) =>
-      keys.some((key) => String(form[key]).trim() !== '');
-    return {
-      identity: true,
-      tracking: isEdit ? hasAny(SECTION_FIELDS.tracking) : false,
-      purchase: isEdit ? hasAny(SECTION_FIELDS.purchase) : false,
-      service: hasAny(SECTION_FIELDS.service),
-      notes: hasAny(SECTION_FIELDS.notes),
-      readiness: true,
-      // Reference material, not something to read while typing — one click away.
-      guidance: false,
-    };
+  // Edit used to auto-open whichever clusters already held data, which meant the page you got
+  // depended on the record: two assets opened to different layouts, and a well-filled one
+  // opened to everything at once — the exact wall this is meant to avoid.
+  const [sections, setSections] = useState({
+    identity: true,
+    tracking: false,
+    purchase: false,
+    service: false,
+    notes: false,
+    readiness: true,
+    // Reference material, not something to read while typing — one click away.
+    guidance: false,
   });
   const toggle = (key: keyof typeof sections) =>
     setSections((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  /** Attaches the chosen file to an existing asset as its primary photo. */
+  const uploadPhotoFor = async (assetId: string, file: File) =>
+    uploadAssetDocument(assetId, {
+      documentType: AssetDocumentTypeEnum.Photo,
+      isPrimaryPhoto: true,
+      file,
+    });
+
+  const pickPhoto = async (file: File | null) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      addToast.error('Choose an image file.');
+      return;
+    }
+
+    // Shown immediately either way, so the operator sees what they picked before any
+    // round-trip. Revoked when replaced so a long editing session does not leak blobs.
+    setPhotoPreview((previous) => {
+      if (previous) URL.revokeObjectURL(previous);
+      return URL.createObjectURL(file);
+    });
+
+    if (!isEdit) {
+      // No asset id yet — hold it and let handleCreate attach it once there is one.
+      setPhotoFile(file);
+      return;
+    }
+
+    setPhotoUploading(true);
+    try {
+      const res = await uploadPhotoFor(asset.id, file);
+      if (res?.success) addToast.success('Image uploaded');
+      else addToast.error(res?.message || 'Could not upload the image');
+    } catch {
+      addToast.error('Could not upload the image');
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
 
   useEffect(() => {
     fetchAssetCategories({ pageNumber: 1, pageSize: 500, isActive: true })
@@ -284,6 +341,25 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
     const res = await createAsset(payload);
     if (res?.success) {
       addToast.success(res.message || 'Asset registered successfully');
+
+      // The picture chosen in Asset Identity, attached now that the asset has an id.
+      // Deliberately NOT allowed to fail the registration: the asset is already saved, so a
+      // photo problem is reported and the operator moves on rather than losing the form.
+      if (photoFile && res.data) {
+        try {
+          const photoRes = await uploadPhotoFor(res.data, photoFile);
+          if (!photoRes?.success) {
+            addToast.error(
+              'The asset was registered, but its image did not upload — add it from Edit.'
+            );
+          }
+        } catch {
+          addToast.error(
+            'The asset was registered, but its image did not upload — add it from Edit.'
+          );
+        }
+      }
+
       router.push(res.data ? `/assets/${res.data}` : '/assets');
     } else {
       addToast.error(res?.message || 'Failed to register the asset');
@@ -413,6 +489,59 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
             open={sections.identity}
             onToggle={() => toggle('identity')}
           >
+            {/* The picture sits with identity, because that is what it is: the quickest way
+                to tell one chair from another. Full width above the fields so it reads as
+                the record's face rather than as one more input. */}
+            <div className="mb-5 flex items-center gap-4">
+              <span className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gray-200 bg-blue-50">
+                {photoPreview || existingPhoto ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={photoPreview ?? existingPhoto ?? ''}
+                    alt={form.assetName.trim() || 'Asset image'}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <i className="icon icon-briefcase text-2xl text-blue-600" />
+                )}
+              </span>
+
+              <div className="min-w-0">
+                <Button
+                  variant="secondary"
+                  onClick={() => photoInputRef.current?.click()}
+                  disabled={photoUploading}
+                >
+                  <i className="icon icon-plus text-xs" />
+                  <span>
+                    {photoUploading
+                      ? 'Uploading…'
+                      : photoPreview || existingPhoto
+                        ? 'Replace image'
+                        : 'Upload image'}
+                  </span>
+                </Button>
+                <p className="mt-1.5 text-xs text-gray-500">
+                  {isEdit
+                    ? 'Uploaded straight away and set as the primary photo.'
+                    : 'Attached automatically once the asset is registered.'}
+                </p>
+              </div>
+
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                aria-label="Upload image"
+                onChange={(e) => {
+                  pickPhoto(e.target.files?.[0] ?? null);
+                  // Cleared so choosing the SAME file again still fires onChange.
+                  e.target.value = '';
+                }}
+              />
+            </div>
+
             <div className={grid}>
               {isEdit && (
                 <Input
