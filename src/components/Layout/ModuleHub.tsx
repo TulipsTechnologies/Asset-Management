@@ -12,6 +12,12 @@ export interface IHubCard {
   url: string;
   /** Planned for a later phase — shows a badge and links to /coming-soon. */
   phase2?: boolean;
+  /**
+   * Kept out of the grid without being deleted. A card announcing a feature nobody can use
+   * yet is a promise the hub cannot keep, so it waits here rather than in a commented-out
+   * block — flip this to false when the feature ships and the entry is already correct.
+   */
+  hidden?: boolean;
 }
 
 export interface IHubSection {
@@ -59,7 +65,9 @@ const ModuleHub = ({
             section.heading ? 'mt-3' : ''
           }`}
         >
-          {section.cards.map((card) => (
+          {section.cards
+            .filter((card) => !card.hidden)
+            .map((card) => (
             <Link
               key={card.label}
               href={card.url}

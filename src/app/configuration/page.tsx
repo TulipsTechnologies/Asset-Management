@@ -30,6 +30,7 @@ const SECTIONS: IHubSection[] = [
         iconName: 'clipboard',
         url: '/coming-soon',
         phase2: true,
+        hidden: true,
       },
     ],
   },
