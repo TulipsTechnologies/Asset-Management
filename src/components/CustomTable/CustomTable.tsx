@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   deleteTablePreference,
   fetchTablePreferences,
@@ -9,7 +9,15 @@ import {
 import dynamic from 'next/dynamic';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { CustomTableProps, ICacheData, RowWithFieldProps, TTableColumn } from './CustomTableInterface';
-import { clampColumnWidth, getColumnMinWidth } from './columnResizeUtils';
+import {
+  applyHeaderMinWidths,
+  clampColumnWidth,
+  clampStoredColumnWidth,
+  DEFAULT_MIN_COLUMN_WIDTH,
+  getColumnMinWidth,
+  HEADER_CONTENT_ATTRIBUTE,
+  measureHeaderMinWidth,
+} from './columnResizeUtils';
 import { sortDate, sortNumber, sortString } from './utils';
 import { useIsCompactViewport } from '@/hooks/useIsMobile';
 import SelectionBar from './SelectionBar';
@@ -93,9 +101,9 @@ const CustomTable = ({
   );
 
   // Below `md` every *horizontal* pin is dropped — locked columns and the
-  // right-pinned actions column alike. A pinned column is 200px at minimum
-  // (columnResizeUtils.DEFAULT_MIN_COLUMN_WIDTH), so on a phone or small tablet
-  // it covers most of the width and hides the row content scrolling under it.
+  // right-pinned actions column alike. A pinned data column is at least as wide
+  // as its own header (see columnResizeUtils), so on a phone or small tablet it
+  // covers most of the width and hides the row content scrolling under it.
   // The `md:hidden` card list already takes over below this width; keeping the
   // two in step means the desktop grid is never rendered with pinned columns
   // on a viewport too narrow for them.
@@ -163,6 +171,19 @@ const CustomTable = ({
     }
   }, [columns]);
 
+  // Widths restored from the saved preference predate the header-content floor,
+  // and a header long enough to break at its saved width has to be rescued.
+  // Only ever widens, and returns null once everything fits, so the pass this
+  // schedules settles immediately.
+  useLayoutEffect(() => {
+    const next = applyHeaderMinWidths(
+      tableRef.current,
+      columns,
+      (col) => col.key,
+    );
+    if (next) setColumns(next);
+  }, [columns]);
+
   useEffect(() => {
     // A client-sorted table re-applies its order to the rows that just arrived. Without
     // this a filter change hands back default-ordered rows while the header still shows
@@ -215,9 +236,10 @@ const CustomTable = ({
           return saved
             ? {
                 ...col,
-                // Clamp saved widths too, so a column stored below the floor by
-                // an older build recovers on load rather than needing a migration.
-                width: clampColumnWidth(saved.width, col.width, undefined, col.key),
+                // Saved widths are read before the header row exists, so only
+                // the absolute floor applies here; applyHeaderMinWidths rescues
+                // anything narrower than its header once it has rendered.
+                width: clampStoredColumnWidth(saved.width, col.width, col.key),
                 locked: saved.locked,
                 visible: saved.visible,
               }
@@ -231,9 +253,10 @@ const CustomTable = ({
           const prevCol = prevColumns.find((col) => col.key === item.key)!;
           return {
             ...prevCol,
-            // Clamp saved widths too, so a column stored below the floor by an
-            // older build recovers on load rather than needing a migration.
-            width: clampColumnWidth(item.width, prevCol.width, undefined, item.key),
+            // Saved widths are read before the header row exists, so only the
+            // absolute floor applies here; applyHeaderMinWidths rescues
+            // anything narrower than its header once it has rendered.
+            width: clampStoredColumnWidth(item.width, prevCol.width, item.key),
             locked: item.locked,
             visible: item.visible,
           };
@@ -481,7 +504,11 @@ const CustomTable = ({
     );
   };
 
-  const handleResize = (columnKey: string, newWidth: number) => {
+  const handleResize = (
+    columnKey: string,
+    newWidth: number,
+    measuredHeaderWidth?: number | null,
+  ) => {
     setColumns((prevColumns) =>
       prevColumns.map((col) => {
         if (col.key !== columnKey) return col;
@@ -489,7 +516,7 @@ const CustomTable = ({
           (init) => init.key === columnKey,
         )?.width;
         const width = Math.max(
-          getColumnMinWidth(design, undefined, col.key),
+          getColumnMinWidth(design, undefined, col.key, measuredHeaderWidth),
           Math.round(newWidth),
         );
         return width === col.width ? col : { ...col, width };
@@ -511,10 +538,20 @@ const CustomTable = ({
     // swallowed and the handle drifts away from the cursor.
     const initialX = e.clientX;
     const startWidth =
-      columns.find((col) => col.key === columnKey)?.width ?? 200;
+      columns.find((col) => col.key === columnKey)?.width ??
+      DEFAULT_MIN_COLUMN_WIDTH;
+    // Measure the header once, here — handleResize runs on every mousemove,
+    // and measuring inside it would force a layout per pixel dragged.
+    const measuredHeaderWidth = measureHeaderMinWidth(
+      e.currentTarget.closest('th'),
+    );
 
     const onMouseMove = (moveEvent: MouseEvent) => {
-      handleResize(columnKey, startWidth + (moveEvent.clientX - initialX));
+      handleResize(
+        columnKey,
+        startWidth + (moveEvent.clientX - initialX),
+        measuredHeaderWidth,
+      );
     };
 
     const onMouseUp = () => {
@@ -525,13 +562,30 @@ const CustomTable = ({
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
   };
-  const setColDefault = (columnKey: string) => {
+  const setColDefault = (
+    columnKey: string,
+    e?: React.MouseEvent<HTMLDivElement, MouseEvent>,
+  ) => {
     const initialCol = initialColumns.find((col) => col.key === columnKey);
+    // The code-defined width can sit below the header floor, so clamp it here
+    // too — a double-click must not land somewhere a drag cannot reach.
+    const measuredHeaderWidth = measureHeaderMinWidth(
+      e?.currentTarget.closest('th'),
+    );
 
     setColumns((prevColumns) =>
       prevColumns.map((col) =>
         col.key === columnKey
-          ? { ...col, width: initialCol?.width ?? 200 }
+          ? {
+              ...col,
+              width: clampColumnWidth(
+                initialCol?.width ?? DEFAULT_MIN_COLUMN_WIDTH,
+                initialCol?.width,
+                undefined,
+                col.key,
+                measuredHeaderWidth,
+              ),
+            }
           : col,
       ),
     );
@@ -929,6 +983,7 @@ const CustomTable = ({
                   col.visible && (
                     <th
                       key={col.key}
+                      data-col-key={col.key}
                       style={{
                         width: `${col.width}px`,
                         left:
@@ -947,6 +1002,7 @@ const CustomTable = ({
                         }`}
                     >
                       <div
+                        {...{ [HEADER_CONTENT_ATTRIBUTE]: '' }}
                         className={`flex items-center ${col.contentAlign === 'center' &&
                           col.isSortable === false
                           ? 'justify-center'
@@ -971,7 +1027,7 @@ const CustomTable = ({
                       <div
                         className="resize-handle opacity-0 group-hover:opacity-100"
                         onMouseDown={(e) => startResizing(e, col.key)}
-                        onDoubleClick={(e) => setColDefault(col.key)}
+                        onDoubleClick={(e) => setColDefault(col.key, e)}
                       />
                     </th>
                   )
