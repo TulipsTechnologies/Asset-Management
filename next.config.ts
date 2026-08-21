@@ -101,6 +101,12 @@ const nextConfig = {
           "font-src 'self' data:",
           // Same-origin API only — the browser never talks to the API's real host directly.
           "connect-src 'self'",
+          // Stripe: the shared HRM package loads and FRAMES js.stripe.com. Without an explicit
+          // frame-src the policy falls back to default-src 'self' and reports a violation on
+          // every page — and would block the payment iframe outright the day this is promoted
+          // from report-only to enforcing. Named here so that promotion is safe.
+          "script-src-elem 'self' 'unsafe-inline' https://js.stripe.com",
+          "frame-src 'self' https://js.stripe.com https://hooks.stripe.com",
           "frame-ancestors 'self'",
           "object-src 'none'",
           "base-uri 'self'",
