@@ -52,6 +52,24 @@ const emptyForm: TFormState = {
   designation: '',
 };
 
+/**
+ * The due-back cell, shared by the table and the stacked layout so the two can never drift.
+ *
+ * Overdue is derived exactly as the assignments board derives it: open, and past a date that
+ * was actually promised. An open-ended issue has no such date and can never be late — and an
+ * absence of a promise is not a value, so it is not given the weight of a real date.
+ */
+const DueBack = ({ value }: { value?: string | null }) => {
+  if (!value) return <span className="text-gray-400">Open-ended</span>;
+  const overdue = new Date(value) < new Date();
+  return (
+    <span className={overdue ? 'font-medium text-red-600' : 'text-gray-600'}>
+      {shortDate(value)}
+      {overdue && <span className="ml-1.5 text-[11px] font-normal">overdue</span>}
+    </span>
+  );
+};
+
 const EmployeesPage = () => {
   const { addToast } = useToast();
 
@@ -378,61 +396,105 @@ const EmployeesPage = () => {
       {/* What this custodian is actually holding. */}
       <Modal isOpen={!!holdingsFor} onClose={() => setHoldingsFor(null)} size="lg">
         <div className="p-6">
-          <h2 className="text-lg font-semibold text-secondaryColor mb-1">
+          <h2 className="text-lg font-semibold text-secondaryColor">
             Assets held by {holdingsFor?.fullName}
           </h2>
-          <p className="text-xs text-gray-400 mb-4">
+          <p className="mt-1 text-xs text-gray-400">
             {holdingsFor?.employeeCode ? `${holdingsFor.employeeCode} · ` : ''}
-            currently issued and not yet returned.
+            {holdings.length > 0
+              ? `${holdings.length} item${holdings.length === 1 ? '' : 's'} currently issued`
+              : 'currently issued and not yet returned'}
           </p>
 
           {holdingsLoading ? (
-            <p className="py-8 text-center text-sm text-gray-400">Loading…</p>
+            <p className="py-10 text-center text-sm text-gray-400">Loading…</p>
           ) : holdings.length === 0 ? (
-            <p className="py-8 text-center text-sm text-gray-400">
+            <p className="py-10 text-center text-sm text-gray-400">
               Nothing currently issued.
             </p>
           ) : (
-            <div className="max-h-[60vh] overflow-y-auto">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-white">
-                  <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-wide text-gray-500">
-                    <th className="py-2 pr-3 font-medium">Asset</th>
-                    <th className="py-2 pr-3 font-medium">Issued</th>
-                    <th className="py-2 pr-3 font-medium">Due back</th>
-                    <th className="py-2 font-medium">Condition at issue</th>
+            <div className="-mx-1 mt-5 max-h-[58vh] overflow-y-auto px-1">
+              {/*
+                Two layouts, because four columns do not fit a phone: at 375px the table
+                broke "PREMIER-00041" across two lines, stacked the asset name four deep and
+                pushed Condition off the edge behind a horizontal scrollbar.
+
+                The border resets on the table are load-bearing. The vendored
+                _app-shared.scss carries a bare `td, th { @apply border-r border-b }`, which
+                ruled every cell in the app into a boxed grid — the reason this read as a
+                spreadsheet rather than a statement of what someone holds. An
+                arbitrary-variant selector is (0,1,1) and beats that bare (0,0,1) element
+                rule wherever the vendored import lands.
+              */}
+              <table className="hidden w-full border-collapse text-sm sm:table [&_td]:border-0 [&_th]:border-0">
+                <thead>
+                  <tr className="text-left text-[11px] uppercase tracking-wider text-gray-400">
+                    <th className="sticky top-0 bg-white pb-2 pr-4 font-medium">Asset</th>
+                    <th className="sticky top-0 whitespace-nowrap bg-white pb-2 pr-4 font-medium">Issued</th>
+                    <th className="sticky top-0 whitespace-nowrap bg-white pb-2 pr-4 font-medium">Due back</th>
+                    <th className="sticky top-0 whitespace-nowrap bg-white pb-2 font-medium">Condition</th>
                   </tr>
                 </thead>
                 <tbody>
                   {holdings.map((held) => (
-                    <tr key={held.id} className="border-b border-gray-100 last:border-0">
-                      <td className="py-2.5 pr-3">
-                        <span className="block font-medium text-primarycolor">
+                    <tr key={held.id} className="border-t border-gray-100 align-middle">
+                      <td className="py-3 pr-4">
+                        <span className="block whitespace-nowrap font-medium leading-tight text-primarycolor">
                           {held.assetCode}
                         </span>
-                        <span className="block text-xs text-gray-500">
+                        <span className="mt-0.5 block text-xs leading-tight text-gray-500">
                           {held.assetName}
                         </span>
                       </td>
-                      <td className="py-2.5 pr-3 text-gray-600">
-                        {shortDate(held.assignmentDate) || '—'}
+                      <td className="whitespace-nowrap py-3 pr-4 text-gray-600">
+                        {shortDate(held.assignmentDate)}
                       </td>
-                      <td className="py-2.5 pr-3 text-gray-600">
-                        {/* An open-ended issue is not overdue and must not read as a missed
-                            date — nothing was ever promised back by one. Tested on the value,
-                            not on shortDate's output: it answers null with '—', so the
-                            fallback could never have fired. */}
-                        {held.expectedReturnDate
-                          ? shortDate(held.expectedReturnDate)
-                          : 'Open-ended'}
+                      <td className="whitespace-nowrap py-3 pr-4">
+                        <DueBack value={held.expectedReturnDate} />
                       </td>
-                      <td className="py-2.5 text-gray-600">
+                      <td className="whitespace-nowrap py-3 text-gray-600">
                         {held.conditionAtIssueName || '—'}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+
+              <ul className="sm:hidden">
+                {holdings.map((held) => (
+                  <li
+                    key={held.id}
+                    className="border-t border-gray-100 py-3 first:border-t-0"
+                  >
+                    <span className="block font-medium leading-tight text-primarycolor">
+                      {held.assetCode}
+                    </span>
+                    <span className="mt-0.5 block text-xs leading-snug text-gray-500">
+                      {held.assetName}
+                    </span>
+                    <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs">
+                      <div className="flex gap-x-1.5">
+                        <dt className="text-gray-400">Issued</dt>
+                        <dd className="text-gray-600">
+                          {shortDate(held.assignmentDate)}
+                        </dd>
+                      </div>
+                      <div className="flex gap-x-1.5">
+                        <dt className="text-gray-400">Due back</dt>
+                        <dd>
+                          <DueBack value={held.expectedReturnDate} />
+                        </dd>
+                      </div>
+                      <div className="flex gap-x-1.5">
+                        <dt className="text-gray-400">Condition</dt>
+                        <dd className="text-gray-600">
+                          {held.conditionAtIssueName || '—'}
+                        </dd>
+                      </div>
+                    </dl>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 
