@@ -70,11 +70,18 @@ const AssetCardView = ({ assets, loading, actions, onOpen }: IProps) => {
               onClick={() => onOpen(asset)}
               className="min-w-0 flex-1 text-left"
             >
-              <p className="text-sm font-bold text-primarycolor truncate">
-                {asset.assetCode}
-              </p>
-              <p className="text-sm font-semibold text-secondaryColor truncate mt-0.5">
+              {/* Name first, code beneath it. The name is what identifies the thing to a
+                  person — the code is the reference you quote once you have found it — so
+                  the name takes the larger type and is allowed two lines rather than being
+                  cut to "Cafeteria Plastic Chai…" by the thumbnail beside it. */}
+              <p
+                className="line-clamp-2 break-words text-sm font-semibold text-secondaryColor"
+                title={asset.assetName}
+              >
                 {asset.assetName}
+              </p>
+              <p className="mt-0.5 truncate text-xs font-bold text-primarycolor">
+                {asset.assetCode}
               </p>
             </button>
             {/* Sits above the card's own click target so opening the menu never navigates. */}

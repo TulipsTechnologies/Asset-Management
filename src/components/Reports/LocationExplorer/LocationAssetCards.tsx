@@ -83,14 +83,16 @@ const LocationAssetCards = ({
               size="md"
             />
             <div className="min-w-0 flex-1">
-              <p className="truncate font-mono text-[11px] text-gray-400">
-                {asset.assetCode}
-              </p>
+              {/* Name first, code beneath — same order as the register's card view, so an
+                  asset reads the same way wherever it is shown. */}
               <p
                 className="line-clamp-2 break-words text-sm font-medium text-secondaryColor"
                 title={asset.assetName}
               >
                 {asset.assetName}
+              </p>
+              <p className="mt-0.5 truncate font-mono text-xs text-gray-400">
+                {asset.assetCode}
               </p>
             </div>
             <span
