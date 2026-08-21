@@ -1,7 +1,7 @@
 import Cookies from 'js-cookie';
 import { IValidUser } from '@/interface/IAuth';
 import { IResponse } from '@/interface/IGeneric';
-import { buildApiUrl } from '@/utils/constants';
+import { buildApiUrl, DEV_AUTH_PLACEHOLDER_TOKEN } from '@/utils/constants';
 
 const ASSET_AUTH_TOKEN_COOKIE = 'AssetAuthToken';
 const ACTIVE_COMPANY_ID_COOKIE = 'ActiveCompanyId';
@@ -112,6 +112,27 @@ export async function ensureAssetToken(
         error: 'No AuthToken cookie found. Sign in again.',
         companyId: null,
       };
+    }
+
+    // A dev-auth session cannot be re-exchanged, and must not be thrown away trying.
+    //
+    // dev-auth writes the sentinel DEV_AUTH_PLACEHOLDER_TOKEN into AuthToken — it is not a hub
+    // credential and the hub always rejects it. Without this guard a single 401 anywhere in the
+    // app started a chain that logged the developer out completely: httpService force-refreshes
+    // on 401, `force` CLEARS the perfectly good AssetAuthToken, the exchange then posts the
+    // placeholder to the hub and gets a 400, and every request afterwards was 403 with no token
+    // at all. The pasted module token is the only credential a dev-auth session has, so the
+    // right answer is to keep it and say the exchange is not available.
+    if (authToken === DEV_AUTH_PLACEHOLDER_TOKEN) {
+      const existing = getAssetToken();
+      return existing
+        ? { token: existing, error: null, companyId: null }
+        : {
+            token: null,
+            error:
+              'This is a dev-auth session, which cannot refresh itself. Paste a fresh AssetAuthToken at /dev-auth.',
+            companyId: null,
+          };
     }
 
     if (force) {
