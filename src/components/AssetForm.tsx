@@ -8,7 +8,7 @@ import Input from '@/components/UI/Input';
 import Select from '@/components/UI/Select';
 import TextArea from '@/components/UI/TextArea';
 import ReasonBanner from '@/components/UI/ReasonBanner';
-import { Panel, PanelBox, Row } from '@/components/UI/FormLayout';
+import { Panel, PanelBox } from '@/components/UI/FormLayout';
 import { IAsset, ICreateAsset, IUpdateAsset } from '@/interface/IAsset';
 import { IAssetCategory } from '@/interface/IAssetCategory';
 import { IAssetLocation } from '@/interface/IAssetLocation';
@@ -78,11 +78,8 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
 
   // The asset's OWN condition rides along via includeId, so an asset graded at a condition
   // the company has since deactivated still shows its real grade rather than a blank.
-  const {
-    options: conditionOptions,
-    emptyText: conditionEmptyText,
-    nameById: conditionNameById,
-  } = useAssetConditions(asset?.assetConditionTypeId);
+  const { options: conditionOptions, emptyText: conditionEmptyText } =
+    useAssetConditions(asset?.assetConditionTypeId);
 
   const [categories, setCategories] = useState<IAssetCategory[]>([]);
   const [vendors, setVendors] = useState<IVendor[]>([]);
@@ -126,21 +123,28 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
     notes: asset?.notes ?? '',
   });
 
-  // Which panels start open: identity always; on create the common registration
-  // clusters; on edit whichever clusters already hold data (computed once —
-  // typing must not snap sections open or shut under the user's cursor).
+  // Which panels start open.
+  //
+  // Only Asset Identity — the three fields registration actually requires (name, category,
+  // condition) — is open to begin with. Every other cluster is optional and starts CLOSED, so
+  // the page opens as one short form instead of a wall of ~25 mostly-empty inputs. Each closed
+  // panel still shows its filled-count badge, so nothing is hidden, only folded.
+  //
+  // On EDIT a cluster opens when it already holds data: there the panels are a record of what
+  // was entered, not a form to work down. Computed once — typing must not snap sections open or
+  // shut under the user's cursor.
   const [sections, setSections] = useState(() => {
     const hasAny = (keys: readonly (keyof typeof form)[]) =>
       keys.some((key) => String(form[key]).trim() !== '');
     return {
       identity: true,
-      tracking: isEdit ? hasAny(SECTION_FIELDS.tracking) : true,
-      purchase: isEdit ? hasAny(SECTION_FIELDS.purchase) : true,
+      tracking: isEdit ? hasAny(SECTION_FIELDS.tracking) : false,
+      purchase: isEdit ? hasAny(SECTION_FIELDS.purchase) : false,
       service: hasAny(SECTION_FIELDS.service),
       notes: hasAny(SECTION_FIELDS.notes),
-      summary: true,
       readiness: true,
-      guidance: true,
+      // Reference material, not something to read while typing — one click away.
+      guidance: false,
     };
   });
   const toggle = (key: keyof typeof sections) =>
@@ -210,25 +214,9 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
   const filledCount = (keys: readonly (keyof typeof form)[]) =>
     keys.filter((key) => String(form[key]).trim() !== '').length;
 
-  const selectedCategory = categories.find(
-    (c) => c.id === form.assetCategoryId
-  );
-  const conditionName = conditionNameById(form.assetConditionTypeId);
-  const ownershipLabel = enumOptions(OWNERSHIP_LABELS).find(
-    (o) => String(o.value) === form.ownershipType
-  )?.label;
-  const locationName = locationOptions.find(
-    (o) => o.value === form.assetLocationId
-  )?.label;
-  const supplierName = vendorOptions.find(
-    (o) => o.value === form.supplierId
-  )?.label;
-  const costDisplay = form.purchaseCost
-    ? `${Number(form.purchaseCost).toLocaleString(undefined, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })}${form.currencyId.trim() ? ` ${form.currencyId.trim().toUpperCase()}` : ''}`
-    : null;
+  // (The Summary panel that read back Category / Ownership / Location / Supplier / cost was
+  // removed: it restated, in a second column, values the operator had just typed and could
+  // still see. Its derived lookups went with it.)
 
   const multiUnitTagClash =
     !isEdit &&
@@ -392,8 +380,11 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
   // page was opened from a deep link. Same targets a successful save uses.
   const backUrl = isEdit ? `/assets/${asset.id}` : '/assets';
 
+  // 1200 rather than 1400: this is a FORM, and a field stretched across a 1400px column is
+  // harder to scan, not more generous. The narrower measure also keeps the two-field rows a
+  // comfortable width on a large monitor.
   return (
-    <div className="mt-2 max-w-[1400px] px-4">
+    <div className="mt-2 max-w-[1200px] px-4">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold text-secondaryColor">
@@ -413,7 +404,7 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
         {/* ------------------------------------------------------------ form */}
         <div className="space-y-4">
           <Panel
@@ -676,33 +667,6 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
 
         {/* --------------------------------------------------- side panels */}
         <aside className="space-y-4 xl:sticky xl:top-4">
-          <Panel
-            title="Summary"
-            icon="info"
-            open={sections.summary}
-            onToggle={() => toggle('summary')}
-          >
-            <PanelBox>
-              {isEdit && <Row label="Asset code" value={asset.assetCode} />}
-              <Row label="Name" value={form.assetName.trim() || null} />
-              <Row
-                label="Category"
-                value={
-                  selectedCategory
-                    ? `${selectedCategory.categoryCode} — ${selectedCategory.name}`
-                    : null
-                }
-              />
-              {!isEdit && <Row label="Condition" value={conditionName ?? null} />}
-              <Row label="Ownership" value={ownershipLabel ?? null} />
-              <Row label="Location" value={locationName ?? null} />
-              {!isEdit && <Row label="Units" value={form.quantity || null} />}
-              <Row label="Supplier" value={supplierName ?? null} />
-              <Row label="Purchase cost" value={costDisplay} />
-              <Row label="Purchase date" value={form.purchaseDate || null} />
-            </PanelBox>
-          </Panel>
-
           <Panel
             title="Readiness"
             icon={ready ? 'check-circle' : 'alert'}
