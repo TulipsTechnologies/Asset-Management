@@ -42,7 +42,19 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 
     const variantStyles = {
       primary: 'rounded-full bg-primarycolor/90 text-white hover:bg-primarycolor/100',
-      secondary: 'rounded-full bg-gray-600 text-white hover:bg-gray-700',
+      /*
+       * The QUIET half of a decision pair — Cancel, Close, Back.
+       *
+       * This was a solid dark-grey pill, which gave a dismiss the same visual weight as the
+       * action beside it: two filled buttons competing, and the one that throws work away
+       * shouting as loudly as the one that commits it. An outline recedes and lets the
+       * primary carry the emphasis.
+       *
+       * Changed at the variant, not per call site, because that is what the variant already
+       * meant: of its ~78 uses, Cancel, Close and Back are ~58.
+       */
+      secondary:
+        'rounded-full border border-gray-300 bg-white text-secondaryColor hover:border-gray-400 hover:bg-gray-50',
       danger: 'rounded-full bg-red-600 text-white hover:bg-red-700',
       outline: 'rounded-full border border-gray-300 text-gray-600 hover:border-gray-400',
       ghost: 'rounded-full text-gray-600 bg-gray-100 hover:bg-gray-200',

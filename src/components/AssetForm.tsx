@@ -782,6 +782,7 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
               Cancel
             </Button>
             <Button onClick={handleSave} disabled={saving}>
+              <i aria-hidden="true" className="icon icon-save text-xs" />
               {saving
                 ? isEdit
                   ? 'Saving…'

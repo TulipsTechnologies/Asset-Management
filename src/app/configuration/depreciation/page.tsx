@@ -644,7 +644,7 @@ export default function DepreciationConfigurationPage() {
           />
           <div className="mt-5 flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setPolicyOpen(false)}>Cancel</Button>
-            <Button onClick={submitPolicy} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
+            <Button onClick={submitPolicy} disabled={saving}><i aria-hidden="true" className="icon icon-save text-xs" />{saving ? 'Saving…' : 'Save'}</Button>
           </div>
         </div>
       </Modal>
@@ -806,7 +806,7 @@ export default function DepreciationConfigurationPage() {
           />
           <div className="mt-5 flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setMappingOpen(false)}>Cancel</Button>
-            <Button onClick={submitMapping} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
+            <Button onClick={submitMapping} disabled={saving}><i aria-hidden="true" className="icon icon-save text-xs" />{saving ? 'Saving…' : 'Save'}</Button>
           </div>
         </div>
       </Modal>

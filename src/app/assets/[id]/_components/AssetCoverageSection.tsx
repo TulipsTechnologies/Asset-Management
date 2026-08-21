@@ -667,6 +667,7 @@ export default function AssetCoverageSection({
               Cancel
             </Button>
             <Button type="submit" disabled={saving}>
+              <i aria-hidden="true" className="icon icon-save text-xs" />
               {saving ? 'Saving…' : 'Save'}
             </Button>
           </div>

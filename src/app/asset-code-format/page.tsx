@@ -319,6 +319,7 @@ const AssetCodeFormatPage = () => {
               Reset
             </Button>
             <Button onClick={handleSave} disabled={saving}>
+              <i aria-hidden="true" className="icon icon-save text-xs" />
               {saving ? 'Saving…' : 'Save Format'}
             </Button>
           </div>

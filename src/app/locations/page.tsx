@@ -427,6 +427,7 @@ const LocationsPage = () => {
               Cancel
             </Button>
             <Button onClick={handleSave} disabled={saving}>
+              <i aria-hidden="true" className="icon icon-save text-xs" />
               {saving ? 'Saving…' : 'Save'}
             </Button>
           </div>

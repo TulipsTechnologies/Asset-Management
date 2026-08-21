@@ -686,6 +686,7 @@ const AssetCategoriesPage = () => {
               Cancel
             </Button>
             <Button onClick={handleSave} disabled={saving}>
+              <i aria-hidden="true" className="icon icon-save text-xs" />
               {saving ? 'Saving…' : editing ? 'Save Changes' : 'Save'}
             </Button>
           </div>
