@@ -56,6 +56,7 @@ import {
   LifecycleStatusEnum,
   OPERATIONAL_LABELS,
   OperationalStatusEnum,
+  VerificationStatusEnum,
 } from '@/enum/assetEnums';
 import useDebounce from '@/hooks/useDebounce';
 
@@ -85,6 +86,19 @@ const AssetsPage = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  /*
+   * Status filters accepted from the URL, so the dashboard tiles can deep-link the register
+   * to exactly the rows they counted. Only lifecycleStatus was read before, which is why
+   * "Active" and "Missing Assets" landed on an unfiltered list of every asset.
+   *
+   * Read once into the initial state — re-reading on every render would fight the user the
+   * moment they changed a filter, because the URL does not change when they do.
+   */
+  const asStatus = <T,>(value: string | null) =>
+    value !== null && value.trim() !== '' && !Number.isNaN(Number(value))
+      ? (Number(value) as T)
+      : undefined;
+
   const initialLifecycle = searchParams.get('lifecycleStatus');
 
   const [view, setView] = useState<TAssetView>('table');
@@ -102,9 +116,14 @@ const AssetsPage = () => {
   const [filters, setFilters] = useState<IAssetFilter>({
     pageNumber: 1,
     pageSize: DEFAULT_PAGE_SIZE,
-    lifecycleStatus: initialLifecycle
-      ? (Number(initialLifecycle) as LifecycleStatusEnum)
-      : undefined,
+    lifecycleStatus: asStatus<LifecycleStatusEnum>(initialLifecycle),
+    custodyStatus: asStatus<CustodyStatusEnum>(searchParams.get('custodyStatus')),
+    operationalStatus: asStatus<OperationalStatusEnum>(
+      searchParams.get('operationalStatus')
+    ),
+    verificationStatus: asStatus<VerificationStatusEnum>(
+      searchParams.get('verificationStatus')
+    ),
   });
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 400);
