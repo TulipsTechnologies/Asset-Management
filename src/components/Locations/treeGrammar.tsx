@@ -92,38 +92,66 @@ export const LeafDot = () => (
   </span>
 );
 
-/** Depth speaks through the icon: buildings anchor, floors carry, rooms point.
- *  `pseudo` forces the room marker — "(No location)" is a bucket, not a building. */
+/**
+ * A small, deterministic accent palette so the building icons are not all one colour.
+ * Each location maps to a stable tone by its id, giving the tree visual variety at a
+ * glance with no per-record configuration. Floors and rooms stay neutral so depth reads.
+ */
+export const LOCATION_TONES = [
+  { soft: 'bg-blue-50', icon: 'text-blue-600' },
+  { soft: 'bg-indigo-50', icon: 'text-indigo-600' },
+  { soft: 'bg-teal-50', icon: 'text-teal-600' },
+  { soft: 'bg-amber-50', icon: 'text-amber-600' },
+  { soft: 'bg-rose-50', icon: 'text-rose-600' },
+  { soft: 'bg-violet-50', icon: 'text-violet-600' },
+  { soft: 'bg-cyan-50', icon: 'text-cyan-600' },
+] as const;
+
+export const locationTone = (key?: string) => {
+  if (!key) return LOCATION_TONES[0];
+  let h = 0;
+  for (let i = 0; i < key.length; i += 1) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return LOCATION_TONES[h % LOCATION_TONES.length];
+};
+
+/** Depth speaks through the icon: buildings anchor (each in its own tone), floors carry,
+ *  rooms point. `pseudo` forces the room marker — "(No location)" is a bucket, not a building. */
 export const LocationTypeIcon = ({
   tier,
   compact,
   pseudo,
+  hueKey,
 }: {
   tier: 1 | 2 | 3;
   compact?: boolean;
   pseudo?: boolean;
+  /** Stable key (usually the location id) that picks this building's accent tone. */
+  hueKey?: string;
 }) => {
   if (pseudo || tier === 3)
     return <i className="icon icon-marker shrink-0 text-[12px] text-gray-400" />;
-  if (tier === 1)
+  if (tier === 1) {
+    const tone = locationTone(hueKey);
     return (
       <span
-        className={`flex shrink-0 items-center justify-center rounded-lg bg-primarycolor/10 ${
+        className={`flex shrink-0 items-center justify-center rounded-lg ${tone.soft} ${
           compact ? 'h-6 w-6' : 'h-7 w-7'
         }`}
       >
         <i
-          className={`icon icon-company text-primarycolor ${
+          className={`icon icon-company ${tone.icon} ${
             compact ? 'text-[12px]' : 'text-[14px]'
           }`}
         />
       </span>
     );
+  }
   return <i className="icon icon-home shrink-0 text-[13px] text-gray-500" />;
 };
 
-/** The count, one palette everywhere: neutral by default, brand-tinted for
- *  building anchors, near-white on a selected row. Never blue. */
+/** The count, a neutral slate hierarchy so it stays readable data beside the coloured
+ *  icons and blue meters rather than competing with them: a touch stronger for building
+ *  anchors, a crisp chip on a selected row, quiet grey for the rest. */
 export const CountBadge = ({
   total,
   anchor,
@@ -138,10 +166,10 @@ export const CountBadge = ({
   <span
     className={`rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums transition-colors ${
       selected
-        ? 'bg-white/80 text-primarycolor'
+        ? 'bg-white/90 text-secondaryColor ring-1 ring-gray-200'
         : anchor
-          ? 'bg-primarycolor/10 text-primarycolor'
-          : 'bg-gray-100 text-secondaryColor'
+          ? 'bg-gray-100 text-secondaryColor'
+          : 'bg-gray-50 text-gray-500'
     }`}
     title={title}
   >
@@ -173,13 +201,15 @@ export const MeterBar = ({
   title?: string;
   children?: ReactNode;
 }) => {
+  // Fill meters read as capacity/occupancy — a cool blue is the modern, informational
+  // choice and keeps the brand green for actions and positive states, not every bar.
   const fill = selected
-    ? 'bg-primarycolor'
+    ? 'bg-blue-500'
     : tier === 1
-      ? 'bg-primarycolor/90'
+      ? 'bg-blue-500/90'
       : tier === 2
-        ? 'bg-primarycolor/60'
-        : 'bg-primarycolor/40';
+        ? 'bg-blue-500/60'
+        : 'bg-blue-500/40';
   const width = Math.min(Math.max(share, 0), 1) * 100;
   return (
     <span

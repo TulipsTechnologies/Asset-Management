@@ -58,7 +58,7 @@ const REPORT_ICONS: Record<string, string> = {
 const AVAILABILITY_STYLES: Record<string, string> = {
   Available: 'bg-green-50 text-green-700 ring-green-200',
   'In Use': 'bg-blue-50 text-blue-700 ring-blue-200',
-  'In Transfer': 'bg-sky-50 text-sky-700 ring-sky-200',
+  'In Transfer': 'bg-indigo-50 text-indigo-700 ring-indigo-200',
   Missing: 'bg-red-50 text-red-700 ring-red-200',
   'Under Maintenance': 'bg-amber-50 text-amber-700 ring-amber-200',
   Quarantined: 'bg-amber-50 text-amber-700 ring-amber-200',

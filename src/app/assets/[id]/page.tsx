@@ -8,7 +8,9 @@ import Modal from '@/components/UI/Modal';
 import TextArea from '@/components/UI/TextArea';
 import AssetDocumentsSection from './_components/AssetDocumentsSection';
 import ProfileHeader from '@/components/UI/ProfileHeader';
-import { useAssetPrimaryPhoto } from '@/hooks/useAssetPrimaryPhoto';
+import { money, shortDate } from '@/components/Assets/AssetViewShared';
+import ImageLightbox from '@/components/UI/ImageLightbox';
+import { useAssetPhoto } from '@/components/Assets/assetPhoto';
 import PageToolbar from '@/components/UI/PageToolbar';
 import InfoCard, { InfoCardGrid, InfoField } from '@/components/UI/InfoCard';
 import AssetDepreciationSection from './_components/AssetDepreciationSection';
@@ -47,19 +49,27 @@ import {
   ASSIGNMENT_STATUS_LABELS,
 } from '@/enum/assignmentEnums';
 
-const formatDate = (value?: string | null) =>
-  value ? new Date(value).toLocaleDateString() : '—';
+// Delegates to the module's one date formatter. This was one of 18 identical local copies
+// rendering the locale default ("8/20/2026"), which reads as a different day outside the US
+// and disagreed with the dashboard and the printed sheets.
+const formatDate = (value?: string | null) => shortDate(value);
 
 /** Nepal standard VAT. Display-only — the register stores net prices. */
 const VAT_RATE = 0.13;
 
+/**
+ * Money on this page, in the module's one format.
+ *
+ * This used to PREFIX the currency ("NPR 1,200.00") while AssetCoverageSection — rendered
+ * further down this very page — suffixed it ("1,200.00 NPR"), so a single viewport showed the
+ * same kind of figure two ways. The shared `money` helper suffixes, and every other screen
+ * follows it, so the prefix was the outlier.
+ *
+ * Returns null rather than an em dash when there is no value: the callers here distinguish
+ * "not recorded" from "zero" and render their own placeholder.
+ */
 const fmtMoney = (value?: number | null, currency?: string | null) =>
-  value != null
-    ? `${currency ? `${currency} ` : ''}${value.toLocaleString(undefined, {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })}`
-    : null;
+  value != null ? money(value, currency) : null;
 
 /** Release lifts a Quarantined hold; recommission brings back an OutOfService asset. */
 type THoldAction = 'release' | 'recommission';
@@ -104,8 +114,9 @@ const AssetDetailPage = () => {
   const { addToast } = useToast();
   const { can } = useUserPermissions();
 
-  // Fetched through the authenticated document endpoint — asset photos are not reachable by URL.
-  const primaryPhotoUrl = useAssetPrimaryPhoto(id);
+  // Fetched through the authenticated document endpoint. Shares the module-level cache with
+  // the card grids, so arriving from a card that already showed the photo paints instantly.
+  const primaryPhotoUrl = useAssetPhoto(id);
 
   const [asset, setAsset] = useState<IAsset | null>(null);
   const [loading, setLoading] = useState(true);
@@ -116,6 +127,8 @@ const AssetDetailPage = () => {
   const [retiring, setRetiring] = useState(false);
   // Release / recommission modal (the only audited exits from a hold)
   const [activeTab, setActiveTab] = useState<'overview' | 'assignments' | 'documents'>('overview');
+  /** The header photo, opened full size. */
+  const [photoZoomed, setPhotoZoomed] = useState(false);
   const [holdAction, setHoldAction] = useState<THoldAction | null>(null);
   const [holdReason, setHoldReason] = useState('');
   const [holdSaving, setHoldSaving] = useState(false);
@@ -309,6 +322,7 @@ const AssetDetailPage = () => {
       />
       <ProfileHeader
         photoUrl={primaryPhotoUrl}
+        onPhotoClick={primaryPhotoUrl ? () => setPhotoZoomed(true) : undefined}
         fallback={<i className="icon icon-briefcase text-2xl"></i>}
         title={asset.assetCode}
         titleBadges={
@@ -609,11 +623,19 @@ const AssetDetailPage = () => {
 
       {activeTab === 'documents' && (
         <div className="max-w-5xl">
-          <AssetDocumentsSection
-            assetId={asset.id}
-            readOnly={asset.lifecycleStatus === LifecycleStatusEnum.Disposed}
-          />
+          {/* Read-only on the view page: photos & documents are listed and downloadable,
+              but adding/removing them is done from the Edit page. */}
+          <AssetDocumentsSection assetId={asset.id} readOnly />
         </div>
+      )}
+
+      {photoZoomed && (
+        <ImageLightbox
+          src={primaryPhotoUrl}
+          alt={`${asset.assetCode} — ${asset.assetName}`}
+          caption={`${asset.assetCode} · ${asset.assetName}`}
+          onClose={() => setPhotoZoomed(false)}
+        />
       )}
 
       {/* Retire confirmation modal */}

@@ -16,6 +16,12 @@ import {
   IMonthlyAmount,
 } from '@/interface/IDashboard';
 import { fetchDashboard } from '@/services/dashboard.service';
+import {
+  CustodyStatusEnum,
+  LifecycleStatusEnum,
+  OperationalStatusEnum,
+  VerificationStatusEnum,
+} from '@/enum/assetEnums';
 
 /* --------------------------------------------------------------------- */
 /* Top pastel KPI cards — same grid, tints and card style as the Vehicle  */
@@ -42,11 +48,47 @@ interface IKpiCard {
  * them held it.
  */
 const KPI_CARDS: IKpiCard[] = [
+  /*
+   * Each tile links to the register FILTERED to exactly the rows it counted.
+   *
+   * They used to link to a bare page: Active, Missing and Total all landed on an unfiltered
+   * /assets showing all 5,486, and Never Verified went to /physical-verification — the audit
+   * CAMPAIGNS list, which is why it so often came back empty. It never showed the assets.
+   *
+   * The query strings below mirror AssetDashboardService's count predicates one-for-one, so
+   * the number on the tile is the number of rows that come back. Note Never Verified carries
+   * BOTH filters: the count is Active AND NotVerified deliberately, because Draft, Retired and
+   * Disposed assets would only pad it with things nobody is expected to scan.
+   */
   { key: 'assetsTotal', label: 'Total Assets', iconName: 'briefcase', tint: 'sky', href: '/assets' },
-  { key: 'assetsActive', label: 'Active', iconName: 'checked', tint: 'mint', href: '/assets' },
-  { key: 'assetsUnderMaintenance', label: 'Under Maintenance', iconName: 'setting', tint: 'amber', href: '/maintenance' },
-  { key: 'assetsMissing', label: 'Missing Assets', iconName: 'alert', tint: 'pink', href: '/assets' },
-  { key: 'assetsNotVerified', label: 'Never Verified', iconName: 'documents', tint: 'peach', href: '/physical-verification' },
+  {
+    key: 'assetsActive',
+    label: 'Active',
+    iconName: 'checked',
+    tint: 'mint',
+    href: `/assets?lifecycleStatus=${LifecycleStatusEnum.Active}`,
+  },
+  {
+    key: 'assetsUnderMaintenance',
+    label: 'Under Maintenance',
+    iconName: 'setting',
+    tint: 'amber',
+    href: `/assets?operationalStatus=${OperationalStatusEnum.UnderMaintenance}`,
+  },
+  {
+    key: 'assetsMissing',
+    label: 'Missing Assets',
+    iconName: 'alert',
+    tint: 'pink',
+    href: `/assets?custodyStatus=${CustodyStatusEnum.Missing}`,
+  },
+  {
+    key: 'assetsNotVerified',
+    label: 'Never Verified',
+    iconName: 'documents',
+    tint: 'peach',
+    href: `/assets?lifecycleStatus=${LifecycleStatusEnum.Active}&verificationStatus=${VerificationStatusEnum.NotVerified}`,
+  },
 ];
 
 /* --------------------------------------------------------------------- */
@@ -262,7 +304,7 @@ const AttentionQueue = ({
               <i className={`icon icon-${kind.iconName} text-base ${kind.iconColor}`}></i>
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-secondaryColor truncate">{item.name}</p>
+              <p className="text-sm font-semibold text-secondaryColor line-clamp-2 lg:line-clamp-1">{item.name}</p>
               <p className="flex items-center gap-1.5 mt-0.5 min-w-0">
                 {/* The kind label is metadata, not signal — the tinted icon circle and
                     the age badge carry the color; five chip palettes per row was a
@@ -350,7 +392,7 @@ const InFlightStrip = ({
    * DOM order, not grid rows, so on the two-column layout it drew a rule above the second
    * cell of the first row — a stray line between two side-by-side tiles.
    */
-  <div className="grid grid-cols-2 gap-1 lg:grid-cols-4 lg:gap-0 lg:divide-x lg:divide-gray-100">
+  <div className="grid grid-cols-1 gap-1 sm:grid-cols-2 lg:grid-cols-4 lg:gap-0 lg:divide-x lg:divide-gray-100">
     {items.map((item) => (
       <button
         key={item.label}

@@ -74,7 +74,7 @@ export const CUSTODY_BADGE_CLASSES: Record<number, string> = {
   [CustodyStatusEnum.Unassigned]: 'bg-gray-100 text-gray-800',
   [CustodyStatusEnum.Reserved]: 'bg-blue-100 text-blue-800',
   [CustodyStatusEnum.Assigned]: 'bg-green-100 text-green-800',
-  [CustodyStatusEnum.InTransfer]: 'bg-amber-100 text-amber-800',
+  [CustodyStatusEnum.InTransfer]: 'bg-indigo-100 text-indigo-800',
   [CustodyStatusEnum.Missing]: 'bg-red-100 text-red-800',
 };
 
@@ -83,7 +83,24 @@ export const OPERATIONAL_LABELS: Record<number, string> = {
   [OperationalStatusEnum.UnderMaintenance]: 'Under Maintenance',
   [OperationalStatusEnum.Breakdown]: 'Breakdown',
   [OperationalStatusEnum.Quarantined]: 'Quarantined',
-  [OperationalStatusEnum.OutOfService]: 'Out of Service',
+  [OperationalStatusEnum.OutOfService]: 'Out Of Service',
+};
+
+/**
+ * Operational status colours.
+ *
+ * Every other status family has a *_BADGE_CLASSES map beside its labels; this one did not, so
+ * each screen that needed an operational colour invented its own — which is how "In Transfer"
+ * ended up sky on one page, indigo on another and amber in the enum map. The amber cluster is
+ * reserved for "something is wrong with the thing itself" (maintenance, breakdown, quarantine),
+ * which is why movement states are not amber.
+ */
+export const OPERATIONAL_BADGE_CLASSES: Record<number, string> = {
+  [OperationalStatusEnum.Operational]: 'bg-green-100 text-green-800',
+  [OperationalStatusEnum.UnderMaintenance]: 'bg-amber-100 text-amber-800',
+  [OperationalStatusEnum.Breakdown]: 'bg-red-100 text-red-800',
+  [OperationalStatusEnum.Quarantined]: 'bg-amber-100 text-amber-800',
+  [OperationalStatusEnum.OutOfService]: 'bg-gray-100 text-gray-800',
 };
 
 export const FINANCIAL_LABELS: Record<number, string> = {

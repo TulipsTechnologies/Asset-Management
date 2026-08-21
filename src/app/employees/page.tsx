@@ -5,7 +5,6 @@ import { useToast } from '@/components/Providers/ToastProvider';
 import Button from '@/components/UI/Button';
 import CustomTable from '@/components/CustomTable/CustomTable';
 import ImportExportOptions from '@/components/ImportExport/ImportExportOptions';
-import { syncEmployeesFromHrm } from '@/services/employeeSync.service';
 import {
   ITableFilters,
   TTableColumn,
@@ -21,6 +20,9 @@ import {
   fetchEmployees,
   updateEmployee,
 } from '@/services/employee.service';
+import { fetchAssetAssignments } from '@/services/assetAssignment.service';
+import { IAssetAssignment } from '@/interface/IAssetAssignment';
+import { AssignmentStatusEnum } from '@/enum/assignmentEnums';
 import CustomMenuItem from '@/components/UI/CustomMenuItem';
 import Dropdown from '@/components/UI/Dropdown';
 import RowKebab from '@/components/UI/RowKebab';
@@ -30,6 +32,7 @@ import { IBulkResult, runBulkAction, summariseBulk } from '@/utils/bulkActions';
 import { mergeTableFilters, unwrapPaged } from '@/utils/serviceUtils';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import useDebounce from '@/hooks/useDebounce';
+import { shortDate } from '@/components/Assets/AssetViewShared';
 
 type TFormState = {
   employeeCode: string;
@@ -49,6 +52,24 @@ const emptyForm: TFormState = {
   designation: '',
 };
 
+/**
+ * The due-back cell, shared by the table and the stacked layout so the two can never drift.
+ *
+ * Overdue is derived exactly as the assignments board derives it: open, and past a date that
+ * was actually promised. An open-ended issue has no such date and can never be late — and an
+ * absence of a promise is not a value, so it is not given the weight of a real date.
+ */
+const DueBack = ({ value }: { value?: string | null }) => {
+  if (!value) return <span className="text-gray-400">Open-ended</span>;
+  const overdue = new Date(value) < new Date();
+  return (
+    <span className={overdue ? 'font-medium text-red-600' : 'text-gray-600'}>
+      {shortDate(value)}
+      {overdue && <span className="ml-1.5 text-[11px] font-normal">overdue</span>}
+    </span>
+  );
+};
+
 const EmployeesPage = () => {
   const { addToast } = useToast();
 
@@ -63,9 +84,16 @@ const EmployeesPage = () => {
   const [rowCount, setRowCount] = useState(0);
   const [pageCount, setPageCount] = useState(0);
 
+  /*
+   * hasOpenAssignments is pinned on for THIS page only. The register answers "who is
+   * responsible for what we own", and against that question an employee holding nothing is
+   * noise. Every other consumer of the employee list — the assignment custodian picker above
+   * all — must keep seeing everyone, or you could never hand someone their first asset.
+   */
   const [filters, setFilters] = useState<IEmployeeFilter>({
     pageNumber: 1,
     pageSize: DEFAULT_PAGE_SIZE,
+    hasOpenAssignments: true,
   });
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 400);
@@ -76,7 +104,11 @@ const EmployeesPage = () => {
   const [editing, setEditing] = useState<IEmployee | null>(null);
   const [deleting, setDeleting] = useState<IEmployee | null>(null);
   const [saving, setSaving] = useState(false);
-  const [syncing, setSyncing] = useState(false);
+
+  // Assets-held drill-down: which custodian's holdings are on screen, and what they are.
+  const [holdingsFor, setHoldingsFor] = useState<IEmployee | null>(null);
+  const [holdings, setHoldings] = useState<IAssetAssignment[]>([]);
+  const [holdingsLoading, setHoldingsLoading] = useState(false);
 
   // sortField names an Employee ENTITY property, so the server orders the whole register
   // and hands back page 1. Assets Held has none: it counts open assignments in the
@@ -97,6 +129,36 @@ const EmployeesPage = () => {
       name: 'actions',
     },
   ];
+
+  /**
+   * The count in the row was a dead end: it told an operator that someone holds four things
+   * and gave them no way to find out WHICH four without leaving for the assignments page and
+   * filtering it by hand. Open assignments only — the number they clicked counts exactly
+   * those, and a list that quietly included returned items would not add up.
+   */
+  const openHoldings = async (employee: IEmployee) => {
+    setHoldingsFor(employee);
+    setHoldings([]);
+    setHoldingsLoading(true);
+    try {
+      const res = await fetchAssetAssignments({
+        employeeId: employee.id,
+        status: AssignmentStatusEnum.Open,
+        pageNumber: 1,
+        pageSize: 100,
+      });
+      if (res?.success) {
+        setHoldings(unwrapPaged(res).items);
+      } else {
+        addToast.error(res?.message || 'Failed to load the assets held');
+      }
+    } catch (error) {
+      console.error('Error loading assets held:', error);
+      addToast.error('An error occurred while loading the assets held');
+    } finally {
+      setHoldingsLoading(false);
+    }
+  };
 
   const loadEmployees = useCallback(async () => {
     setLoading(true);
@@ -187,33 +249,6 @@ const EmployeesPage = () => {
     }
   };
 
-  /**
-   * TulipsHRM owns the register for linked companies; this pulls it. Nobody is
-   * deleted — people who left HRM come back deactivated — so the outcome is
-   * reported as counts rather than a bare success.
-   */
-  const handleSyncFromHrm = async () => {
-    setSyncing(true);
-    try {
-      const res = await syncEmployeesFromHrm();
-      if (res?.success) {
-        addToast.success(res.message || 'Employees synced from TulipsHRM');
-        // Data problems in HRM the sync worked around (duplicate codes, …).
-        (res.data?.warnings ?? []).forEach((warning) =>
-          addToast.info(warning, 12000)
-        );
-        loadEmployees();
-      } else {
-        addToast.error(res?.message || 'Could not sync employees from TulipsHRM');
-      }
-    } catch (error) {
-      console.error('Error syncing employees:', error);
-      addToast.error('An error occurred while syncing employees');
-    } finally {
-      setSyncing(false);
-    }
-  };
-
   const handleDelete = async () => {
     if (!deleting) return;
     setSaving(true);
@@ -243,9 +278,14 @@ const EmployeesPage = () => {
     email: employee.email || '—',
     openAssignmentCount:
       employee.openAssignmentCount > 0 ? (
-        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700">
+        <button
+          type="button"
+          onClick={() => openHoldings(employee)}
+          title={`Show the ${employee.openAssignmentCount} asset${employee.openAssignmentCount === 1 ? '' : 's'} ${employee.fullName} holds`}
+          className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100 hover:text-blue-800"
+        >
           {employee.openAssignmentCount}
-        </span>
+        </button>
       ) : (
         '—'
       ),
@@ -330,32 +370,8 @@ const EmployeesPage = () => {
             },
           },
         ]}
-        tableHeaderLeft={
-          <Button
-            onClick={() => {
-              setForm(emptyForm);
-              setFormError('');
-              setFormOpen(true);
-            }}
-          >
-            <i className="icon icon-plus text-xs"></i>
-            <span>Add Employee</span>
-          </Button>
-        }
         tableHeaderRight={
           <>
-            <button
-              type="button"
-              onClick={handleSyncFromHrm}
-              disabled={syncing}
-              className="text-sm flex items-center gap-x-2 font-medium whitespace-nowrap disabled:opacity-50"
-              title="Pull the employee register from TulipsHRM"
-            >
-              <i
-                className={`icon icon-redo text-base ${syncing ? 'animate-spin text-gray-400' : 'text-gray-500'}`}
-              />
-              <span>{syncing ? 'Syncing…' : 'Sync from HRM'}</span>
-            </button>
             <ImportExportOptions
               entity="employees"
               entityLabel="Employees"
@@ -377,14 +393,130 @@ const EmployeesPage = () => {
         />
       </div>
 
+      {/* What this custodian is actually holding. */}
+      <Modal isOpen={!!holdingsFor} onClose={() => setHoldingsFor(null)} size="lg">
+        <div className="p-6">
+          <h2 className="text-lg font-semibold text-secondaryColor">
+            Assets held by {holdingsFor?.fullName}
+          </h2>
+          <p className="mt-1 text-xs text-gray-400">
+            {holdingsFor?.employeeCode ? `${holdingsFor.employeeCode} · ` : ''}
+            {holdings.length > 0
+              ? `${holdings.length} item${holdings.length === 1 ? '' : 's'} currently issued`
+              : 'currently issued and not yet returned'}
+          </p>
+
+          {holdingsLoading ? (
+            <p className="py-10 text-center text-sm text-gray-400">Loading…</p>
+          ) : holdings.length === 0 ? (
+            <p className="py-10 text-center text-sm text-gray-400">
+              Nothing currently issued.
+            </p>
+          ) : (
+            <div className="-mx-1 mt-5 max-h-[58vh] overflow-y-auto px-1">
+              {/*
+                Two layouts, because four columns do not fit a phone: at 375px the table
+                broke "PREMIER-00041" across two lines, stacked the asset name four deep and
+                pushed Condition off the edge behind a horizontal scrollbar.
+
+                The border resets on the table are load-bearing. The vendored
+                _app-shared.scss carries a bare `td, th { @apply border-r border-b }`, which
+                ruled every cell in the app into a boxed grid — the reason this read as a
+                spreadsheet rather than a statement of what someone holds. An
+                arbitrary-variant selector is (0,1,1) and beats that bare (0,0,1) element
+                rule wherever the vendored import lands.
+              */}
+              <table className="hidden w-full border-collapse text-sm sm:table [&_td]:border-0 [&_th]:border-0">
+                <thead>
+                  <tr className="text-left text-[11px] uppercase tracking-wider text-gray-400">
+                    <th className="sticky top-0 bg-white pb-2 pr-4 font-medium">Asset</th>
+                    <th className="sticky top-0 whitespace-nowrap bg-white pb-2 pr-4 font-medium">Issued</th>
+                    <th className="sticky top-0 whitespace-nowrap bg-white pb-2 pr-4 font-medium">Due back</th>
+                    <th className="sticky top-0 whitespace-nowrap bg-white pb-2 font-medium">Condition</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {holdings.map((held) => (
+                    <tr key={held.id} className="border-t border-gray-100 align-middle">
+                      <td className="py-3 pr-4">
+                        <span className="block whitespace-nowrap font-medium leading-tight text-primarycolor">
+                          {held.assetCode}
+                        </span>
+                        <span className="mt-0.5 block text-xs leading-tight text-gray-500">
+                          {held.assetName}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap py-3 pr-4 text-gray-600">
+                        {shortDate(held.assignmentDate)}
+                      </td>
+                      <td className="whitespace-nowrap py-3 pr-4">
+                        <DueBack value={held.expectedReturnDate} />
+                      </td>
+                      <td className="whitespace-nowrap py-3 text-gray-600">
+                        {held.conditionAtIssueName || '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <ul className="sm:hidden">
+                {holdings.map((held) => (
+                  <li
+                    key={held.id}
+                    className="border-t border-gray-100 py-3 first:border-t-0"
+                  >
+                    <span className="block font-medium leading-tight text-primarycolor">
+                      {held.assetCode}
+                    </span>
+                    <span className="mt-0.5 block text-xs leading-snug text-gray-500">
+                      {held.assetName}
+                    </span>
+                    <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs">
+                      <div className="flex gap-x-1.5">
+                        <dt className="text-gray-400">Issued</dt>
+                        <dd className="text-gray-600">
+                          {shortDate(held.assignmentDate)}
+                        </dd>
+                      </div>
+                      <div className="flex gap-x-1.5">
+                        <dt className="text-gray-400">Due back</dt>
+                        <dd>
+                          <DueBack value={held.expectedReturnDate} />
+                        </dd>
+                      </div>
+                      <div className="flex gap-x-1.5">
+                        <dt className="text-gray-400">Condition</dt>
+                        <dd className="text-gray-600">
+                          {held.conditionAtIssueName || '—'}
+                        </dd>
+                      </div>
+                    </dl>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="mt-6 flex justify-end">
+            <Button variant="secondary" onClick={() => setHoldingsFor(null)}>
+              Close
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
       <Modal isOpen={formOpen} onClose={() => setFormOpen(false)} size="lg">
         <div className="p-6">
           <h2 className="text-lg font-semibold text-secondaryColor mb-1">
-            Add Employee
+            {editing ? 'Edit Custodian' : 'Add Custodian'}
           </h2>
           <p className="text-xs text-gray-400 mb-4">
-            Custodian registry for asset assignments. Once HRM integration is
-            wired, this list is populated automatically from TulipsHRM.
+            {/* The old copy promised HRM integration in the future tense. It has been wired
+                for a while — the sync runs nightly — and the heading said "Add" even when
+                the row menu had opened this to EDIT someone. */}
+            Synced nightly from TulipsHRM for linked companies; standalone
+            companies keep their own list.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
             <Input
@@ -443,6 +575,7 @@ const EmployeesPage = () => {
               Cancel
             </Button>
             <Button onClick={handleSave} disabled={saving}>
+              <i aria-hidden="true" className="icon icon-save text-xs" />
               {saving ? 'Saving…' : 'Save'}
             </Button>
           </div>

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useToast } from '@/components/Providers/ToastProvider';
 import AssetForm from '@/components/AssetForm';
+import AssetDocumentsSection from '../_components/AssetDocumentsSection';
 import Button from '@/components/UI/Button';
 import { LifecycleStatusEnum } from '@/enum/assetEnums';
 import { IAsset } from '@/interface/IAsset';
@@ -160,6 +161,15 @@ const EditAssetPage = () => {
         </div>
       )}
       <AssetForm asset={asset} />
+
+      {/* Photos & documents are managed here in EDIT mode (the view page is read-only).
+          They attach to an existing asset and upload immediately, independent of the form. */}
+      <div className="mx-4 mb-10 mt-2 max-w-5xl">
+        <AssetDocumentsSection
+          assetId={asset.id}
+          readOnly={asset.lifecycleStatus === LifecycleStatusEnum.Disposed}
+        />
+      </div>
     </>
   );
 };

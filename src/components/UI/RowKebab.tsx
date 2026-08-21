@@ -4,7 +4,7 @@
  * is how the design drifted apart in the first place.
  */
 const RowKebab = () => (
-  <div className="bg-white/80 px-1.5 py-2 rounded-sm hover:bg-primarycolor hover:text-white">
+  <div className="inline-flex size-8 items-center justify-center rounded-lg bg-white/80 transition-colors hover:bg-hoverColor hover:text-primarycolor">
     <i className="icon icon-elipsis-v text-sm"></i>
   </div>
 );

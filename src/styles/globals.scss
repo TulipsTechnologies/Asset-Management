@@ -382,8 +382,12 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   html,
   body,
   main,
-  header,
-  footer,
+  /* Scoped to the APP's own chrome. Bare `header`/`footer` also matched the <header> and
+     <footer> of every printed document, stomping the letterhead rule and the footer rule
+     with `border: none !important` — so the preview drew lines the printer never would,
+     which is precisely the mismatch the preview exists to eliminate. */
+  body > header,
+  body > footer,
   .container {
     background: transparent !important;
     color: #000 !important;
@@ -424,7 +428,11 @@ input[type="time"]::-webkit-calendar-picker-indicator {
     height: auto !important;
     border: none !important;
     overflow: visible;
-    margin: 0 auto 0.5% auto !important;
+    /* NOT !important. The named pages below (@page schedule / sheet-landscape) exist to give
+       printed documents a real 14mm/12mm margin, and !important here beat them — every sheet
+       printed full-bleed at x=0, inside the unprintable area most printers clip. Unnamed
+       pages still resolve to this same value; it is simply overridable now. */
+    margin: 0 auto 0.5% auto;
     top: auto !important;
     left: auto !important;
     right: auto !important;
@@ -566,55 +574,21 @@ input[type="number"]::-webkit-outer-spin-button {
   display: none;
 }
 
-@media print {
-  /* SCOPED to the class the schedule dialog puts on <body> while it is open. Unscoped,
-     this hid every body child on every route and printed the rest of the app blank. */
-  body.schedule-print-active > *:not(#schedule-print-root) {
-    display: none !important;
-  }
+/* ------------------------------------------------------- the document's own typography
+   ONE definition, serving both the on-screen preview and the paper.
 
-  /* The GENERAL form of the rule above, for every sheet built on usePrintSheet(): the hook
-     adds `printing` to <body> and portals the sheet into #print-root. Same scoping discipline
-     — the class is only present while a print is in flight, so no other route can be blanked. */
-  body.printing > *:not(#print-root) {
-    display: none !important;
-  }
+   All of this used to live inside @media print, so the preview rendered the document's raw
+   markup with none of its styling: field labels welded to their values ("Employee
+   codeDEMO-002"), section headings falling back to the app's link colour, tables with no
+   rules. The operator was checking something that looked nothing like what the printer
+   would produce — which defeats the point of having a preview at all.
 
-  /* A NAMED page, claimed only by the schedule sheet. The app-wide print block above
-     already declares `@page { margin: … !important }`; overriding the anonymous page here
-     would have re-margined every other printable view, and a plain (non-important) rule
-     would simply have lost to it. */
-  @page schedule {
-    size: A4 portrait;
-    margin: 14mm 12mm;
-  }
-
-  .print-sheet {
-    page: schedule;
-  }
-
-  /* Landscape variant for wide tables. A separate NAMED page for the same reason as above;
-     a sheet opts in by adding .print-sheet--landscape alongside .print-sheet. */
-  @page sheet-landscape {
-    size: A4 landscape;
-    margin: 12mm 10mm;
-  }
-
-  .print-sheet--landscape {
-    page: sheet-landscape;
-  }
-
-  html,
-  body {
-    background: #fff;
-  }
-
-  .print-sheet {
-    display: block;
-    color: #111;
-    font-size: 10pt;
-    line-height: 1.35;
-  }
+   Sizes stay in pt. The preview sheet is 210mm wide, so a pt here is the same fraction of
+   the page on screen as it is on paper, and the two renderings agree. */
+.print-sheet {
+  color: #111;
+  font-size: 10pt;
+  line-height: 1.35;
 
   .print-header {
     display: flex;
@@ -857,5 +831,192 @@ input[type="number"]::-webkit-outer-spin-button {
   /* Forces a page break before an element — one receipt per page when several are printed. */
   .print-break-before {
     break-before: page;
+  }
+}
+
+/* ---------------------------------------------------------------- print preview
+   The sheet used to be display:none at every size except @media print, so nobody could
+   see a document before committing it to paper — and a blank result looked identical to a
+   printer fault. The preview shows the same markup on screen at paper proportions, and the
+   operator prints from there. */
+.print-preview {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  overflow: auto;
+  padding: 4.5rem 1rem 2rem;
+  background: rgb(15 23 42 / 55%);
+}
+
+/* Beats the display:none above only inside the preview. */
+.print-preview .print-sheet {
+  display: block;
+  max-width: 210mm; /* A4 portrait */
+  margin: 0 auto;
+  padding: 14mm 12mm;
+  background: #fff;
+  color: #111;
+  border-radius: 4px;
+  box-shadow: 0 12px 40px rgb(0 0 0 / 25%);
+}
+
+.print-preview .print-sheet--landscape {
+  max-width: 297mm; /* A4 landscape */
+}
+
+/* A document that prints as several copies — a receipt is issued in two, one for each party —
+   showed on screen as ONE unbroken white column: the custodian copy's footer butted straight
+   into the office copy's letterhead, and the preview read as a wall of text. `break-before:
+   page` says nothing to a screen.
+
+   So when a sheet actually contains a page break, the sheet stops being the page and becomes
+   a STACK of them: it goes transparent, and each direct child takes the paper treatment. The
+   gap between them is the backdrop showing through, which is what a page boundary looks like
+   in any PDF viewer. Sheets without a break are untouched and stay a single page. */
+.print-preview .print-sheet:has(> .print-break-before) {
+  display: flex;
+  flex-direction: column;
+  gap: 9mm;
+  padding: 0;
+  background: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.print-preview .print-sheet:has(> .print-break-before) > * {
+  padding: 14mm 12mm;
+  background: #fff;
+  border-radius: 4px;
+  box-shadow: 0 12px 40px rgb(0 0 0 / 25%);
+}
+
+.print-preview__chrome {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1.25rem;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.print-preview__title {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.print-preview__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+@media print {
+  /* SCOPED to the class the schedule dialog puts on <body> while it is open. Unscoped,
+     this hid every body child on every route and printed the rest of the app blank. */
+  body.schedule-print-active > *:not(#schedule-print-root) {
+    display: none !important;
+  }
+
+  /* The GENERAL form of the rule above, for every sheet built on usePrintSheet(): the hook
+     adds `printing` to <body> and portals the sheet into #print-root. Same scoping discipline
+     — the class is only present while a print is in flight, so no other route can be blanked. */
+  body.printing > *:not(#print-root) {
+    display: none !important;
+  }
+
+  /* Re-assert visibility for our own print roots.
+     @tulipstechnologies/common's _app-shared.scss — imported AFTER this file in layout.tsx —
+     ends with `body * { visibility: hidden }` and re-shows only `#training-content`. That is a
+     "print just this panel" rule belonging to a different app in the suite, and it silently
+     blanked EVERY document this app prints: the sheet was in the DOM, correctly laid out and
+     visible on screen, and came out of the printer as one empty page.
+     `#print-root *` outranks `body *` on specificity, so this wins wherever the vendored
+     import happens to land in the cascade. */
+  #print-root,
+  #print-root *,
+  #schedule-print-root,
+  #schedule-print-root * {
+    visibility: visible;
+  }
+
+  /* The preview is a SCREEN affordance. On paper the wrapper must stop being a fixed,
+     scrolling, tinted overlay and become an ordinary block, or the document is clipped to
+     one viewport-sized page with a grey background painted behind it. */
+  .print-preview {
+    position: static !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    background: none !important;
+  }
+
+  .print-preview .print-sheet {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  /* The preview's page stack is a SCREEN device. On paper `break-before: page` already does
+     the work, so the children must go back to being plain blocks — otherwise every copy
+     carries a shadow, a radius and a second set of margins onto the sheet. */
+  .print-preview .print-sheet:has(> .print-break-before) {
+    display: block;
+    gap: 0;
+  }
+
+  .print-preview .print-sheet:has(> .print-break-before) > * {
+    padding: 0;
+    background: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  /* The toolbar is never part of the document. */
+  .print-preview__chrome {
+    display: none !important;
+  }
+
+  /* A NAMED page, claimed only by the schedule sheet. The app-wide print block above
+     already declares `@page { margin: … !important }`; overriding the anonymous page here
+     would have re-margined every other printable view, and a plain (non-important) rule
+     would simply have lost to it. */
+  @page schedule {
+    size: A4 portrait;
+    margin: 14mm 12mm;
+  }
+
+  .print-sheet {
+    page: schedule;
+  }
+
+  /* Landscape variant for wide tables. A separate NAMED page for the same reason as above;
+     a sheet opts in by adding .print-sheet--landscape alongside .print-sheet. */
+  @page sheet-landscape {
+    size: A4 landscape;
+    margin: 12mm 10mm;
+  }
+
+  .print-sheet--landscape {
+    page: sheet-landscape;
+  }
+
+  html,
+  body {
+    /* The reset makes <body> an atomic inline box (src/styles/common/_reset.scss, twinned in
+       the vendored copy). An atomic inline CANNOT be fragmented, so `break-before: page` on
+       the office copy was silently discarded and only the first copy ever reached paper —
+       and <body> sized itself shrink-to-fit at 654px instead of the 794px page width.
+       Measured: this one declaration takes the receipt from 1 printed page to 2. */
+    display: block !important;
+    background: #fff;
+  }
+
+  .print-sheet {
+    display: block;
   }
 }

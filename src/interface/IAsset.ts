@@ -151,6 +151,8 @@ export interface IAssetFilter extends ISortFilter {
   pageNumber?: number;
   pageSize?: number;
   search?: string;
+  assetName?: string;
+  custodianId?: string;
   assetCategoryId?: string;
   lifecycleStatus?: LifecycleStatusEnum;
   custodyStatus?: CustodyStatusEnum;

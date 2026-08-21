@@ -194,7 +194,7 @@ const AssetCodeFormatPage = () => {
               Example
             </p>
             <p
-              className={`mt-1 font-mono text-2xl ${
+              className={`mt-1 font-mono text-xl sm:text-2xl break-all ${
                 previewTooLong ? 'text-red-600' : 'text-secondaryColor'
               }`}
             >
@@ -319,6 +319,7 @@ const AssetCodeFormatPage = () => {
               Reset
             </Button>
             <Button onClick={handleSave} disabled={saving}>
+              <i aria-hidden="true" className="icon icon-save text-xs" />
               {saving ? 'Saving…' : 'Save Format'}
             </Button>
           </div>

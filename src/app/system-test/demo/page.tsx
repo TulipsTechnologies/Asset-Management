@@ -32,6 +32,7 @@ import {
   fetchSystemTestEnvironment,
   fetchSystemTestModules,
   provisionSystemTestCompanies,
+  resetCompanyData,
   runSystemTestDemoData,
 } from '@/services/systemTest.service';
 import { appUrl } from '@/utils/constants';
@@ -55,6 +56,11 @@ const DemoContent = () => {
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [result, setResult] = useState<ISystemTestRun | null>(null);
   const [provisionNotes, setProvisionNotes] = useState<string[]>([]);
+  // The company whose data a reset is being confirmed for (null ⇒ modal closed).
+  const [resetTarget, setResetTarget] = useState<{
+    companyId: string;
+    companyName: string;
+  } | null>(null);
 
   const load = () => {
     fetchSystemTestEnvironment()
@@ -169,6 +175,37 @@ const DemoContent = () => {
     }
   };
 
+  /**
+   * Environment reset — wipes ONE company's asset data (any company on this page, not only
+   * a registered test/demo one). PIN + typed name are both verified server-side; a refusal
+   * (wrong PIN, wrong name, not a member) comes back as a message, never a silent no-op.
+   */
+  const resetCompany = async ({
+    confirmationPhrase,
+    pin,
+  }: {
+    confirmationPhrase: string;
+    pin: string;
+  }) => {
+    if (!resetTarget) return;
+    const name = resetTarget.companyName;
+    setBusy(true);
+    try {
+      const res = await resetCompanyData(resetTarget.companyId, confirmationPhrase, pin);
+      if (res?.success) {
+        setResetTarget(null);
+        addToast.success(res.message || `${name} now starts from an empty register`);
+        load();
+      } else {
+        addToast.error(res?.message || 'Reset was refused');
+      }
+    } catch {
+      addToast.error('An error occurred while resetting');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const provisioned = environment?.provisionedCompanies ?? [];
   const callerCompanies = environment?.callerCompanies ?? [];
 
@@ -246,23 +283,39 @@ const DemoContent = () => {
                         </span>
                       </td>
                       <td className="px-3 py-2 text-gray-500">{company.subdomain}</td>
-                      <td className="px-3 py-2 text-right">
-                        {!isCurrent && (
-                          <Button
-                            variant="toolbar"
-                            onClick={() => openCompany(company)}
-                          >
-                            <i className="icon icon-right text-[10px]" />
-                            <span>
-                              Open{' '}
-                              {company.purpose ===
-                              SystemTestCompanyPurposeEnum.DemoCompany
-                                ? 'Demo'
-                                : 'Test'}{' '}
-                              Company
-                            </span>
-                          </Button>
-                        )}
+                      <td className="px-3 py-2">
+                        <div className="flex items-center justify-end gap-2">
+                          {!isCurrent && (
+                            <Button
+                              variant="toolbar"
+                              onClick={() => openCompany(company)}
+                            >
+                              <i className="icon icon-right text-[10px]" />
+                              <span>
+                                Open{' '}
+                                {company.purpose ===
+                                SystemTestCompanyPurposeEnum.DemoCompany
+                                  ? 'Demo'
+                                  : 'Test'}{' '}
+                                Company
+                              </span>
+                            </Button>
+                          )}
+                          {canDestruct && (
+                            <Button
+                              variant="danger"
+                              onClick={() =>
+                                setResetTarget({
+                                  companyId: company.companyId,
+                                  companyName: company.companyName,
+                                })
+                              }
+                            >
+                              <i className="icon icon-delete text-[10px]" />
+                              <span>Reset data</span>
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -312,14 +365,30 @@ const DemoContent = () => {
                         </span>
                       )}
                     </div>
-                    <Button
-                      variant="toolbar"
-                      onClick={() => openCompany(company)}
-                      disabled={isCurrent}
-                    >
-                      <i className="icon icon-right text-[10px]" />
-                      <span>Open</span>
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="toolbar"
+                        onClick={() => openCompany(company)}
+                        disabled={isCurrent}
+                      >
+                        <i className="icon icon-right text-[10px]" />
+                        <span>Open</span>
+                      </Button>
+                      {canDestruct && (
+                        <Button
+                          variant="danger"
+                          onClick={() =>
+                            setResetTarget({
+                              companyId: company.companyId,
+                              companyName: company.companyName,
+                            })
+                          }
+                        >
+                          <i className="icon icon-delete text-[10px]" />
+                          <span>Reset data</span>
+                        </Button>
+                      )}
+                    </div>
                   </li>
                 );
               })}
@@ -459,6 +528,25 @@ const DemoContent = () => {
         confirmLabel={busy ? 'Working…' : refresh ? 'Reset and reload' : 'Load demo data'}
         busy={busy}
         onConfirm={runDemo}
+      />
+
+      <DestructiveConfirmModal
+        isOpen={resetTarget != null}
+        onClose={() => setResetTarget(null)}
+        title="Reset this company's data?"
+        consequence={
+          <p>
+            Every asset record in{' '}
+            <span className="font-medium">{resetTarget?.companyName}</span> — assets,
+            custody, depreciation, audits, transfers and disposals — will be{' '}
+            <span className="font-medium">permanently deleted</span>. Employees, users, the
+            fiscal calendar and configuration are kept. This cannot be undone.
+          </p>
+        }
+        confirmationPhrase={resetTarget?.companyName ?? null}
+        confirmLabel={busy ? 'Resetting…' : 'Reset data'}
+        busy={busy}
+        onConfirm={resetCompany}
       />
     </div>
   );

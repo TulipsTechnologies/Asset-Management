@@ -58,6 +58,7 @@ import {
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import { CustodyStatusEnum } from '@/enum/assetEnums';
 import useAssetConditions from '@/hooks/useAssetConditions';
+import { shortDate } from '@/components/Assets/AssetViewShared';
 import usePrintSheet, { usePrintIdentity } from '@/hooks/usePrintSheet';
 import CountSheet from '@/components/Print/CountSheet';
 import { groupForCountSheet, ICountSheetGroup } from '@/utils/printDocuments';
@@ -79,8 +80,10 @@ import {
 } from '@/enum/auditEnums';
 import useDebounce from '@/hooks/useDebounce';
 
-const formatDate = (value?: string | null) =>
-  value ? new Date(value).toLocaleDateString() : '—';
+// Delegates to the module's one date formatter. This was one of 18 identical local copies
+// rendering the locale default ("8/20/2026"), which reads as a different day outside the US
+// and disagreed with the dashboard and the printed sheets.
+const formatDate = (value?: string | null) => shortDate(value);
 
 const resultTypeBadge = (type: AuditResultTypeEnum) => (
   <span
@@ -394,15 +397,8 @@ const CampaignDetailPage = () => {
 
   // Print on the render AFTER the sheet mounts — calling it inline races the browser's
   // document snapshot and prints a blank page.
-  useEffect(() => {
-    if (!countSheetGroups) return;
-    // setTimeout, NOT requestAnimationFrame: rAF never fires while the document is
-    // hidden, so a user who switches tab straight after clicking would get no print
-    // at all and no error either. A timer fires regardless of visibility.
-    const timer = setTimeout(() => printSheet(), 0);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [countSheetGroups]);
+  // No auto-print: the sheet opens as a PREVIEW and the operator presses Print once they can
+  // see the document. Printing on the same tick the portal mounted is what produced blanks.
 
   const loadDiscrepancies = useCallback(async () => {
     if (!id) return;
@@ -1177,7 +1173,7 @@ const CampaignDetailPage = () => {
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-y-2">
         <div>
-          <h1 className="text-lg font-semibold text-secondaryColor flex items-center gap-3">
+          <h1 className="text-lg font-semibold text-secondaryColor flex flex-wrap items-center gap-x-3 gap-y-1">
             {campaign.name}
             <span
               className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
@@ -2154,7 +2150,11 @@ const CampaignDetailPage = () => {
 
       {/* Landscape: ten columns, four of them left blank for a pen. */}
       {countSheetGroups && (
-        <PrintSheet landscape>
+        <PrintSheet
+          landscape
+          title={`Count sheet — ${campaign.name}`}
+          onClose={() => setCountSheetGroups(null)}
+        >
           <CountSheet
             companyName={printIdentity.companyName}
             generatedBy={printIdentity.userName}

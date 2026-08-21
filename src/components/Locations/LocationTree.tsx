@@ -257,14 +257,15 @@ const TreeNode = memo(function TreeNode({
           <LeafDot />
         )}
 
-        <LocationTypeIcon tier={tier} compact={compact || dense} />
+        <LocationTypeIcon tier={tier} compact={compact || dense} hueKey={node.id ?? node.name} />
 
         {selectable ? (
           <button
             type="button"
             onClick={() => onSelect!(node)}
             className={`min-w-0 shrink truncate text-left ${nameClass(tier, compact || dense)}`}
-            style={{ flexBasis: nameBasis, flexGrow: 0 }}
+            style={{ flexBasis: nameBasis, flexGrow: 1 }}
+            title={node.name}
             aria-current={isSelected ? 'true' : undefined}
           >
             {node.name}
@@ -272,7 +273,8 @@ const TreeNode = memo(function TreeNode({
         ) : (
           <span
             className={`min-w-0 shrink truncate ${nameClass(tier, compact || dense)}`}
-            style={{ flexBasis: nameBasis, flexGrow: 0 }}
+            style={{ flexBasis: nameBasis, flexGrow: 1 }}
+            title={node.name}
           >
             {node.name}
           </span>

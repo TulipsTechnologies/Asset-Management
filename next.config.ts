@@ -1,8 +1,32 @@
 const nextConfig = {
   basePath: "/asset-management",
   reactStrictMode: false,
+
+  // Turbopack (Next 15.5) cannot parse a UTF-8 BOM and dies at 1:1 on the vendor stylesheet.
+  //
+  // dart-sass prepends a BOM to COMPRESSED output whenever the CSS contains a non-ASCII
+  // character, and the vendor icon sheet's `content: "\e97f"` escapes compile to literal
+  // private-use glyphs. Turbopack's CSS parser does not skip the BOM, so the very first
+  // token fails and the error points at `globals.scss.css:1:1` — which is the sass
+  // transform's OUTPUT name, i.e. evidence that sass RAN, not that it was skipped.
+  //
+  // The variable is the file's CONTENT, not its location: a relative import, an app-owned
+  // wrapper and transpilePackages all fail identically. `charset: false` tells sass to emit
+  // no BOM; the glyphs themselves survive untouched.
+  //
+  // As of Next 16 Turbopack is the default bundler for `next build` too, so both paths now
+  // run the same CSS parser and this single line covers both. (Under Next 15 only `next dev`
+  // broke, because `next build` still ran webpack — that asymmetry is gone.) If the BOM ever
+  // resurfaces, `next build --webpack` is the escape hatch.
+  sassOptions: { charset: false },
   cleanDistDir: true,
-  productionBrowserSourceMaps: true,
+  // Source maps ship the readable source of every screen — including the shape of the API,
+  // the permission names gating each control, and the comments explaining them — to anyone
+  // who opens devtools on the production site. Keep them off; a stack trace from minified
+  // output is still resolvable from the build artefacts kept on the server.
+  productionBrowserSourceMaps: false,
+  // Do not advertise the framework and version to a scanner.
+  poweredByHeader: false,
   experimental: {
     // `next dev` proxies rewrites with a hard-coded 30s ceiling
     // (`proxyTimeout || 30000` in next/dist/server/lib/router-utils/proxy-request).
@@ -36,14 +60,70 @@ const nextConfig = {
     ],
   },
   async headers() {
+    /*
+     * SECURITY HEADERS — applied in EVERY environment.
+     *
+     * This function used to return [] outside production, so dev had none at all and
+     * production had only the cache rule below: no framing protection on screens that
+     * permanently delete a register, no MIME-sniffing protection, no referrer policy, and
+     * no CSP backstop behind an auth cookie that is readable from JavaScript.
+     *
+     * SAMEORIGIN rather than DENY, and frame-ancestors 'self' rather than 'none': this
+     * module is served under the same origin as the HRM shell that links to it, so DENY
+     * would break a legitimate embed while doing nothing extra against the actual threat,
+     * which is framing by a DIFFERENT site.
+     *
+     * The CSP is REPORT-ONLY on purpose. Next injects inline bootstrap scripts and the app
+     * loads blob: images (asset photos arrive as object URLs), so an enforcing policy needs
+     * to be measured against real traffic first. Report-only ships the policy, surfaces
+     * violations, and cannot break a working page; promote it to Content-Security-Policy
+     * once the reports are clean.
+     */
+    const securityHeaders = [
+      { key: "X-Frame-Options", value: "SAMEORIGIN" },
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      {
+        key: "Permissions-Policy",
+        value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+      },
+      {
+        key: "Strict-Transport-Security",
+        value: "max-age=63072000; includeSubDomains",
+      },
+      {
+        key: "Content-Security-Policy-Report-Only",
+        value: [
+          "default-src 'self'",
+          // Next's runtime needs both for hydration and its dev overlay.
+          "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+          "style-src 'self' 'unsafe-inline'",
+          // blob: is how every asset photo is rendered; data: covers inlined icons.
+          "img-src 'self' data: blob:",
+          "font-src 'self' data:",
+          // Same-origin API only — the browser never talks to the API's real host directly.
+          "connect-src 'self'",
+          // Stripe: the shared HRM package loads and FRAMES js.stripe.com. Without an explicit
+          // frame-src the policy falls back to default-src 'self' and reports a violation on
+          // every page — and would block the payment iframe outright the day this is promoted
+          // from report-only to enforcing. Named here so that promotion is safe.
+          "script-src-elem 'self' 'unsafe-inline' https://js.stripe.com",
+          "frame-src 'self' https://js.stripe.com https://hooks.stripe.com",
+          "frame-ancestors 'self'",
+          "object-src 'none'",
+          "base-uri 'self'",
+          "form-action 'self'",
+        ].join("; "),
+      },
+    ];
+
+    const headers = [{ source: "/:path*", headers: securityHeaders }];
+
     // Immutable caching is only safe for production builds, where chunk file
     // names are content-hashed. Turbopack dev chunk names are stable across
     // rebuilds, so an immutable header makes browsers keep stale UI forever.
-    if (process.env.NODE_ENV !== "production") {
-      return [];
-    }
-    return [
-      {
+    if (process.env.NODE_ENV === "production") {
+      headers.push({
         source: "/_next/static/:path*",
         headers: [
           {
@@ -51,8 +131,10 @@ const nextConfig = {
             value: "public, max-age=31536000, immutable",
           },
         ],
-      },
-    ];
+      });
+    }
+
+    return headers;
   },
   // Mirror server.js's API proxy for `next dev` (server.js serves IIS).
   //

@@ -507,6 +507,7 @@ const AssetConditionsPage = () => {
               <span>Cancel</span>
             </Button>
             <Button onClick={handleSave} disabled={saving}>
+              <i aria-hidden="true" className="icon icon-save text-xs" />
               <span>{saving ? 'Saving…' : editing ? 'Save Changes' : 'Add Condition'}</span>
             </Button>
           </div>

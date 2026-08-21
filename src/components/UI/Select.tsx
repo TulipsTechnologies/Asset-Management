@@ -296,7 +296,7 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
                     onKeyDown={onSearchKeyDown}
                     placeholder="Search…"
                     aria-label={typeof label === 'string' && label ? `Search ${label}` : 'Search options'}
-                    className="w-full bg-transparent text-sm outline-none"
+                    className="w-full bg-transparent text-sm"
                   />
                   {query && (
                     <button

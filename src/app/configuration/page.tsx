@@ -30,6 +30,7 @@ const SECTIONS: IHubSection[] = [
         iconName: 'clipboard',
         url: '/coming-soon',
         phase2: true,
+        hidden: true,
       },
     ],
   },
@@ -65,17 +66,6 @@ const SECTIONS: IHubSection[] = [
         description: 'Fiscal calendar, capitalization policy and GL account mappings',
         iconName: 'calculator',
         url: '/configuration/depreciation',
-      },
-    ],
-  },
-  {
-    heading: 'Data',
-    cards: [
-      {
-        label: 'Master Data Reset',
-        description: 'Load a demo register, or permanently clear this company to start fresh',
-        iconName: 'redo',
-        url: '/master-data-reset',
       },
     ],
   },

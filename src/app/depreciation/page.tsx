@@ -58,6 +58,7 @@ import TaxRunModal from './_components/TaxRunModal';
 import OpeningBalanceImportModal from './_components/OpeningBalanceImportModal';
 import { NEPAL_TAX_CLASSES, TAX_ENTRY_PERIODS, TaxTreatmentEnum } from '@/interface/ITax';
 import { mergeTableFilters, unwrapPaged } from '@/utils/serviceUtils';
+import { shortDate } from '@/components/Assets/AssetViewShared';
 import { DEFAULT_PAGE_SIZE } from '@/utils/constants';
 import {
   AssetBookStatusEnum,
@@ -77,8 +78,10 @@ import {
 } from '@/enum/depreciationEnums';
 import useDebounce from '@/hooks/useDebounce';
 
-const formatDate = (value?: string | null) =>
-  value ? new Date(value).toLocaleDateString() : '—';
+// Delegates to the module's one date formatter. This was one of 18 identical local copies
+// rendering the locale default ("8/20/2026"), which reads as a different day outside the US
+// and disagreed with the dashboard and the printed sheets.
+const formatDate = (value?: string | null) => shortDate(value);
 
 const money = (amount?: number | null, currency?: string | null) =>
   amount == null
@@ -974,7 +977,7 @@ export default function DepreciationPage() {
             sortBy={bookFilters.sortBy}
             sortDesc={bookFilters.sortDesc}
             tableHeaderLeft={
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button onClick={openCapitalize}>
                   <i className="icon icon-plus text-xs"></i>
                   <span>Add Depreciation</span>
@@ -1025,7 +1028,7 @@ export default function DepreciationPage() {
             sortBy={runFilters.sortBy}
             sortDesc={runFilters.sortDesc}
             tableHeaderLeft={
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button onClick={openCalculate}>
                   <i className="icon icon-plus text-xs"></i>
                   <span>Calculate Run</span>
@@ -1096,7 +1099,7 @@ export default function DepreciationPage() {
             remaining life.
           </p>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Residual Value"
               type="number"
@@ -1187,7 +1190,7 @@ export default function DepreciationPage() {
               rule rather than claimed as a single value for the whole run. */}
           {selectedPeriod && !calculateResult && (
             <div className="mt-4 rounded bg-gray-50 p-3">
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <DetailField
                   label="Period"
                   value={`${selectedPeriod.fiscalYearCode} · ${selectedPeriod.monthName}`}
@@ -1219,7 +1222,7 @@ export default function DepreciationPage() {
           {/* What the run actually did. */}
           {calculateResult && (
             <div className="mt-4 space-y-3">
-              <div className="grid grid-cols-4 gap-4 rounded bg-gray-50 p-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 rounded bg-gray-50 p-3">
                 <DetailField label="Assets Calculated" value={calculateResult.assetCount} />
                 <DetailField label="Excluded" value={calculateResult.excludedAssetCount} />
                 <DetailField
@@ -1511,7 +1514,7 @@ export default function DepreciationPage() {
         <div className="p-5">
           <h2 className="mb-4 text-lg font-semibold text-secondaryColor">Journal Proposal</h2>
 
-          <div className="mb-4 grid grid-cols-4 gap-4 rounded bg-gray-50 p-3">
+          <div className="mb-4 grid grid-cols-2 sm:grid-cols-4 gap-4 rounded bg-gray-50 p-3">
             <DetailField
               label="Source"
               value={
@@ -1539,7 +1542,7 @@ export default function DepreciationPage() {
           </div>
 
           <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[560px] text-sm">
             <thead className="bg-gray-100 text-left text-xs text-gray-600">
               <tr>
                 <th className="px-3 py-2">#</th>

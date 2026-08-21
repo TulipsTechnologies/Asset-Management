@@ -804,16 +804,26 @@ const CustomTable = ({
                       const rowId = resolveRowId(row, rowIndex);
                       const isSelected = selectedIds.has(rowId);
                       return (
-                        <i
+                        // A real <button>: an <i> is not focusable, so the row checkbox — and
+                        // therefore every bulk action behind SelectionBar — could not be
+                        // reached by keyboard at all (WCAG 2.1.1). A button also fires on both
+                        // Enter and Space, so no key handler is needed.
+                        <button
+                          type="button"
                           role="checkbox"
                           aria-checked={isSelected}
-                          className={`icon ${isSelected ? 'icon-checked text-primarycolor' : 'icon-unchecked text-gray-300'} text-xl mt-1 shrink-0 cursor-pointer`}
+                          className="mt-1 shrink-0 cursor-pointer leading-none"
                           onClick={(e) => {
                             e.stopPropagation();
                             toggleSelectRow(rowId);
                           }}
                           aria-label="Select row"
-                        />
+                        >
+                          <i
+                            aria-hidden="true"
+                            className={`icon ${isSelected ? 'icon-checked text-primarycolor' : 'icon-unchecked text-gray-300'} text-xl`}
+                          />
+                        </button>
                       );
                     })()}
                   <div className="min-w-0 flex-1">
@@ -882,16 +892,26 @@ const CustomTable = ({
                   style={{ width: `${CHECKBOX_COL_WIDTH}px` }}
                   className="!text-center"
                 >
-                  <i
+                  {/* aria-checked follows what is DRAWN. It was bound to `allSelected` while the
+                      glyph switched on `allSelected || someSelected`, so a partial selection
+                      looked checked and announced "not checked"; "mixed" is the state that
+                      actually describes it. */}
+                  <button
+                    type="button"
                     role="checkbox"
-                    aria-checked={allSelected}
-                    className={`icon ${allSelected || someSelected ? 'icon-checked text-primarycolor' : 'icon-unchecked text-gray-300'} text-xl cursor-pointer align-middle`}
+                    aria-checked={allSelected ? true : someSelected ? 'mixed' : false}
+                    className="cursor-pointer align-middle leading-none"
                     onClick={(e) => {
                       e.stopPropagation();
                       toggleSelectAll();
                     }}
                     aria-label="Select all rows"
-                  />
+                  >
+                    <i
+                      aria-hidden="true"
+                      className={`icon ${allSelected || someSelected ? 'icon-checked text-primarycolor' : 'icon-unchecked text-gray-300'} text-xl`}
+                    />
+                  </button>
                 </th>
               )}
               {showSerial && (
@@ -1015,13 +1035,19 @@ const CustomTable = ({
                                 className="!text-center"
                                 onClick={(e) => e.stopPropagation()}
                               >
-                                <i
+                                <button
+                                  type="button"
                                   role="checkbox"
                                   aria-checked={isSelected}
-                                  className={`icon ${isSelected ? 'icon-checked text-primarycolor' : 'icon-unchecked text-gray-300'} text-xl cursor-pointer align-middle`}
+                                  className="cursor-pointer align-middle leading-none"
                                   onClick={() => toggleSelectRow(rowId)}
                                   aria-label="Select row"
-                                />
+                                >
+                                  <i
+                                    aria-hidden="true"
+                                    className={`icon ${isSelected ? 'icon-checked text-primarycolor' : 'icon-unchecked text-gray-300'} text-xl`}
+                                  />
+                                </button>
                               </td>
                             );
                           })()}

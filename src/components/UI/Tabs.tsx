@@ -90,7 +90,7 @@ export const Tabs: FC<TabsProps> = ({
       {/* Horizontal scroll (hidden scrollbar) instead of wrapping: a wrapped tab
           strip reads as two rows of unrelated links on a phone. */}
       <div
-        className={`tab-list flex border-b gap-x-10 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${containerClassName}`}
+        className={`tab-list flex border-b gap-x-6 sm:gap-x-10 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${containerClassName}`}
       >
         {tabs.map((tab) => (
           <button

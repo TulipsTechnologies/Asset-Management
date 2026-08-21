@@ -34,4 +34,9 @@ export interface IEmployeeFilter extends ISortFilter {
   pageSize?: number;
   search?: string;
   isActive?: boolean;
+  /**
+   * Narrow to people actually holding something. Set only by the custodian register; leave
+   * it off wherever the list is a picker, or you cannot assign someone their first asset.
+   */
+  hasOpenAssignments?: boolean;
 }

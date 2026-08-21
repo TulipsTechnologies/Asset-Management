@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useToast } from '@/components/Providers/ToastProvider';
 import Button from '@/components/UI/Button';
+import BackButton from '@/components/UI/BackButton';
 import CustomTable from '@/components/CustomTable/CustomTable';
 import ImportExportOptions from '@/components/ImportExport/ImportExportOptions';
 import {
@@ -427,6 +428,7 @@ const LocationsPage = () => {
               Cancel
             </Button>
             <Button onClick={handleSave} disabled={saving}>
+              <i aria-hidden="true" className="icon icon-save text-xs" />
               {saving ? 'Saving…' : 'Save'}
             </Button>
           </div>
@@ -479,12 +481,15 @@ const LocationsPage = () => {
   if (view === 'tree') {
     return (
       <div className="px-4 mt-2">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* Tree is the DEFAULT view and takes its own early return, so until now the most
+            common way to arrive at Locations was also the one with no way back. */}
+        <BackButton className="mb-2" />
+        <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between">
           <Button onClick={openCreate}>
             <i className="icon icon-plus text-xs"></i>
             <span>Add Location</span>
           </Button>
-          <div className="flex items-center gap-2">{headerRight}</div>
+          <div className="flex flex-wrap items-center gap-2">{headerRight}</div>
         </div>
 
         <div className="mt-3 rounded-xl border border-gray-200 bg-white p-4">

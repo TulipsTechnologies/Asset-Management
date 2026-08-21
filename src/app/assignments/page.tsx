@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/Providers/ToastProvider';
 import Button from '@/components/UI/Button';
+import BackButton from '@/components/UI/BackButton';
 import CustomTable from '@/components/CustomTable/CustomTable';
 import TableToolbar from '@/components/CustomTable/TableToolbar';
 import {
@@ -48,9 +49,12 @@ import BulkAssignModal from '@/components/Assignments/BulkAssignModal';
 import ViewSwitcher, { IViewOption, readStoredView } from '@/components/UI/ViewSwitcher';
 import AssignmentKanbanView from '@/components/Assignments/AssignmentKanbanView';
 import AssignmentAnalyticsView from '@/components/Assignments/AssignmentAnalyticsView';
+import { shortDate } from '@/components/Assets/AssetViewShared';
 
-const formatDate = (value?: string | null) =>
-  value ? new Date(value).toLocaleDateString() : '—';
+// Delegates to the module's one date formatter. This was one of 18 identical local copies
+// rendering the locale default ("8/20/2026"), which reads as a different day outside the US
+// and disagreed with the dashboard and the printed sheets.
+const formatDate = (value?: string | null) => shortDate(value);
 
 /* --------------------------------------------------------------------- */
 /* View modes                                                             */
@@ -227,17 +231,9 @@ const AssignmentsPage = () => {
     setReceiptFor(assignment);
   };
 
-  // The sheet mounts on the render after the state lands, so the print is queued behind it;
-  // calling window.print() in the click handler would race the document snapshot.
-  useEffect(() => {
-    if (!receiptFor || receiptLines.length === 0) return;
-    // setTimeout, NOT requestAnimationFrame: rAF never fires while the document is
-    // hidden, so a user who switches tab straight after clicking would get no print
-    // at all and no error either. A timer fires regardless of visibility.
-    const timer = setTimeout(() => print(), 0);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [receiptFor]);
+  // No auto-print: the sheet now opens as a PREVIEW and the operator presses Print when they
+  // can see the document. That removes the race this effect used to paper over — printing on
+  // the same tick the portal mounted is what produced blank pages.
 
   const openReturn = (assignment: IAssetAssignment) => {
     setReturning(assignment);
@@ -496,7 +492,15 @@ const AssignmentsPage = () => {
       ) : (
         <>
           <TableToolbar
-            tableHeaderLeft={toolbarLeft}
+            tableHeaderLeft={
+              <>
+                {/* Back is inherited from CustomTable, which only renders in the table view — so
+                    every other view had no way back, and an operator whose saved view is Card or
+                    Kanban never saw one at all. */}
+                <BackButton />
+                {toolbarLeft}
+              </>
+            }
             tableHeaderRight={filterControls}
           />
 
@@ -659,9 +663,15 @@ const AssignmentsPage = () => {
         </div>
       </Modal>
 
-      {/* Hidden on screen; the print stylesheet reveals it and hides everything else. */}
+      {/* Shown as an on-screen preview; Print in its toolbar sends it to paper. */}
       {receiptFor && receiptLines.length > 0 && (
-        <PrintSheet>
+        <PrintSheet
+          title={`Issue receipt — ${receiptFor.assetCode}`}
+          onClose={() => {
+            setReceiptFor(null);
+            setReceiptLines([]);
+          }}
+        >
           <IssueReceiptSheet
             companyName={printIdentity.companyName}
             generatedBy={printIdentity.userName}

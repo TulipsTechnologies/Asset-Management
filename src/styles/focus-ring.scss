@@ -1,0 +1,55 @@
+/*
+ * The application's focus indicator — WCAG 2.4.7 (Focus Visible) and 1.4.11 (Non-text Contrast).
+ *
+ * WHY THIS FILE EXISTS SEPARATELY, AND WHY IT IS IMPORTED LAST.
+ *
+ * The vendored shared stylesheet
+ * (@tulipstechnologies/common/dist/styles/common/_app-shared.scss) paints its own focus ring:
+ *
+ *     outline: 2px dotted rgba(156, 163, 175, 0.85) !important;
+ *     outline-offset: -1px !important;
+ *     border-radius: 2px;
+ *
+ * That grey measures about 2.16:1 against white and 2.09:1 against the gray-50 table headers —
+ * below the 3:1 that 1.4.11 requires for a focus indicator, so the ring is present but not
+ * reliably perceivable. Because it is `!important` and the vendored sheet is imported AFTER the
+ * local ones, a rule in _reset.scss cannot beat it however it is written: an earlier `!important`
+ * of equal specificity still loses on source order. Hence a dedicated file imported after it,
+ * matching the vendored selector list exactly so specificity ties and source order decides.
+ *
+ * The colour is green-700 (#15803d) rather than the brand --primarycolor (#3ac47d): the brand
+ * green is roughly 2.2:1 on white and would fail the same check it is meant to fix. green-700 is
+ * about 5:1 on white and 4.5:1 on gray-100, so it passes on every surface the app focuses on.
+ *
+ * The two border-radius rules undo a real side effect of the vendored `border-radius: 2px`: it is
+ * specificity (0,2,0) and beats Tailwind's `.rounded-full` (0,1,0), so every pill-shaped Button
+ * visibly squared off while focused.
+ */
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+button:focus-visible,
+a:focus-visible,
+[role='combobox']:focus-visible,
+[role='button']:focus-visible,
+[role='checkbox']:focus-visible,
+[role='option']:focus-visible,
+[tabindex]:focus-visible,
+:focus-visible {
+  outline: 2px solid #15803d !important;
+  outline-offset: 2px !important;
+}
+
+/* Keep the control's own shape while focused (see the note above). */
+.rounded-full:focus-visible {
+  border-radius: 9999px !important;
+}
+
+.rounded-xl:focus-visible {
+  border-radius: 0.75rem !important;
+}
+
+.rounded-lg:focus-visible {
+  border-radius: 0.5rem !important;
+}

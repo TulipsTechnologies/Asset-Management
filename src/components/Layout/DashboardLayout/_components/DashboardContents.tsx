@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useRef } from 'react';
+import { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import { useDashbordCtx } from '@tulipstechnologies/common/dist/contexts/DashboardContext';
 import {
@@ -24,7 +24,6 @@ import {
 } from '@/utils/assetFallbackMenus';
 import { staticMenus } from '@/utils/staticMenus';
 import { headerStaticMenus } from '@/utils/headerStaticMenus';
-import ActiveCompanyBadge from '../../ActiveCompanyBadge';
 import Logo from '../../../../../public/logo.svg';
 
 const DashboardContents = ({ children }: { children: ReactNode }) => {
@@ -37,7 +36,6 @@ const DashboardContents = ({ children }: { children: ReactNode }) => {
   const { addToast } = useToast();
   const pathname = usePathname();
   const dispatch = useAppDispatch();
-  const headerHostRef = useRef<HTMLDivElement>(null);
 
   const { currentUser, adminView, profileImage, companyLogo } = useAppSelector(
     (state) => state.auth
@@ -95,10 +93,6 @@ const DashboardContents = ({ children }: { children: ReactNode }) => {
             : 'md:w-[calc(100vw-86px)]'
         } rounded-none md:rounded-xl overflow-hidden h-dvh md:h-[calc(100dvh-24px)] bg-white transition-all duration-300 ease-in-out`}
       >
-        {/* Anchor for the tenant badge, which portals into the shared Header's own row: that row
-            is this element's next sibling. Holding a handle this way rather than matching the
-            shared component's class names keeps the badge working when its styling changes. */}
-        <div ref={headerHostRef} className="hidden" aria-hidden />
         {token && (
           <Header
             addToast={addToast}
@@ -126,8 +120,13 @@ const DashboardContents = ({ children }: { children: ReactNode }) => {
             activeMatchGroups={ASSET_ACTIVE_MATCH_GROUPS}
           />
         )}
-        {token && <ActiveCompanyBadge headerHost={headerHostRef} />}
-        <div
+        {/* The one <main> in the app. Without a main landmark (and with the sidebar unwrapped)
+            a screen-reader user had nothing to jump to and no way to skip the whole menu tree
+            on any of the 37 routes — WCAG 2.4.1. tabIndex={-1} makes it a valid target for the
+            skip link in layout.tsx. */}
+        <main
+          id="main-content"
+          tabIndex={-1}
           className={`h-[calc(100dvh-60px)] md:h-[calc(100dvh-83px)] ${
             pathname === '/404' ? '' : 'overflow-y-auto overflow-x-hidden'
           }`}
@@ -141,7 +140,7 @@ const DashboardContents = ({ children }: { children: ReactNode }) => {
           ) : (
             children
           )}
-        </div>
+        </main>
       </div>
     </div>
   );

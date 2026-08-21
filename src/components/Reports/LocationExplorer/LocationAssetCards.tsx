@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { money } from '@/components/Assets/AssetViewShared';
+import AssetPhotoThumb from '@/components/Assets/AssetPhotoThumb';
 
 /**
  * The walk-through view: one card per asset, sized to be recognised at arm's length
@@ -9,11 +10,14 @@ import { money } from '@/components/Assets/AssetViewShared';
  * matched), then the name, then the facts a physical check needs — kind, condition,
  * who holds it, and its state.
  *
- * No photograph yet, deliberately: uploads are stored at original camera size with no
- * thumbnail pipeline, so a page of 25 cards would pull tens of megabytes over the
- * venue's Wi-Fi — the one place this view has to work. The tinted glyph is the same
- * placeholder the asset detail page uses; photos arrive with a bounded, authenticated
- * thumbnail endpoint.
+ * The photo shows when the asset has one, falling back to the tinted glyph when it does
+ * not, and clicking it opens the full-size image.
+ *
+ * Uploads are still stored at original camera size with no thumbnail pipeline, so the cost
+ * is managed rather than removed: AssetPhotoThumb defers each fetch until the card scrolls
+ * into view and caches the result per asset, so a page of 25 pulls only what is actually
+ * looked at. A bounded, authenticated thumbnail endpoint remains the real fix — it would
+ * turn these into kilobytes.
  */
 
 export interface ILocationAssetCard {
@@ -72,18 +76,29 @@ const LocationAssetCards = ({
           className="flex flex-col rounded-xl border border-gray-200 bg-white p-4 transition-shadow hover:shadow-sm"
         >
           <div className="flex items-start gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primarycolor/10">
-              <i className="icon icon-briefcase text-[17px] text-primarycolor" />
-            </span>
+            <AssetPhotoThumb
+              assetId={asset.id}
+              assetCode={asset.assetCode}
+              assetName={asset.assetName}
+              size="md"
+            />
             <div className="min-w-0 flex-1">
-              <p className="truncate font-mono text-[11px] text-gray-400">
-                {asset.assetCode}
-              </p>
+              {/* Name first, code beneath — same order as the register's card view, so an
+                  asset reads the same way wherever it is shown. */}
               <p
-                className="truncate text-sm font-medium text-secondaryColor"
+                className="line-clamp-2 break-words text-sm font-medium text-secondaryColor"
                 title={asset.assetName}
               >
                 {asset.assetName}
+              </p>
+              {/* Green, like every other asset code in the app. This was the only surface
+                  rendering it grey — the explorer's own TABLE view already used
+                  font-mono text-primarycolor, so the two halves of the same report
+                  disagreed with each other as well as with the register. Mono is kept: that
+                  is the explorer's convention for a code, and it is what the table beside
+                  this uses. */}
+              <p className="mt-0.5 truncate font-mono text-xs text-primarycolor">
+                {asset.assetCode}
               </p>
             </div>
             <span

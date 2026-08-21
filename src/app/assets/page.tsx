@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/components/Providers/ToastProvider';
 import Button from '@/components/UI/Button';
+import BackButton from '@/components/UI/BackButton';
 import CustomTable from '@/components/CustomTable/CustomTable';
 import TableToolbar from '@/components/CustomTable/TableToolbar';
 import ImportExportOptions from '@/components/ImportExport/ImportExportOptions';
@@ -15,10 +16,12 @@ import ConfirmationModal from '@/components/UI/ConfirmationModel';
 import Modal from '@/components/UI/Modal';
 import Select from '@/components/UI/Select';
 import FilterPanel from '@/components/UI/FilterPanel';
+import Input from '@/components/UI/Input';
 import SearchBox from '@/components/SearchBox';
 import Pagination from '@/components/UI/Pagination';
 import ViewSwitcher, { IViewOption, readStoredView } from '@/components/UI/ViewSwitcher';
 import AssetCardView from '@/components/Assets/AssetCardView';
+import AssetPhotoThumb from '@/components/Assets/AssetPhotoThumb';
 import AssetCalendarView from '@/components/Assets/AssetCalendarView';
 import AssetAnalyticsView from '@/components/Assets/AssetAnalyticsView';
 import SingleAssignModal, { IAssignTarget } from '@/components/Assignments/SingleAssignModal';
@@ -55,6 +58,7 @@ import {
   LifecycleStatusEnum,
   OPERATIONAL_LABELS,
   OperationalStatusEnum,
+  VerificationStatusEnum,
 } from '@/enum/assetEnums';
 import useDebounce from '@/hooks/useDebounce';
 
@@ -84,6 +88,19 @@ const AssetsPage = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  /*
+   * Status filters accepted from the URL, so the dashboard tiles can deep-link the register
+   * to exactly the rows they counted. Only lifecycleStatus was read before, which is why
+   * "Active" and "Missing Assets" landed on an unfiltered list of every asset.
+   *
+   * Read once into the initial state — re-reading on every render would fight the user the
+   * moment they changed a filter, because the URL does not change when they do.
+   */
+  const asStatus = <T,>(value: string | null) =>
+    value !== null && value.trim() !== '' && !Number.isNaN(Number(value))
+      ? (Number(value) as T)
+      : undefined;
+
   const initialLifecycle = searchParams.get('lifecycleStatus');
 
   const [view, setView] = useState<TAssetView>('table');
@@ -101,12 +118,21 @@ const AssetsPage = () => {
   const [filters, setFilters] = useState<IAssetFilter>({
     pageNumber: 1,
     pageSize: DEFAULT_PAGE_SIZE,
-    lifecycleStatus: initialLifecycle
-      ? (Number(initialLifecycle) as LifecycleStatusEnum)
-      : undefined,
+    lifecycleStatus: asStatus<LifecycleStatusEnum>(initialLifecycle),
+    custodyStatus: asStatus<CustodyStatusEnum>(searchParams.get('custodyStatus')),
+    operationalStatus: asStatus<OperationalStatusEnum>(
+      searchParams.get('operationalStatus')
+    ),
+    verificationStatus: asStatus<VerificationStatusEnum>(
+      searchParams.get('verificationStatus')
+    ),
   });
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedSearch = useDebounce(searchQuery, 400);
+  // Asset Name is a dedicated filter field. Debounced like the search box so typing in it
+  // narrows the list without a request per keystroke.
+  const [assetNameInput, setAssetNameInput] = useState('');
+  const debouncedAssetName = useDebounce(assetNameInput, 400);
   const [showFilters, setShowFilters] = useState(false);
   const loadTokenRef = useRef(0);
   // Ids with an activation in flight — the row menu stays open after a click, so without
@@ -125,9 +151,13 @@ const AssetsPage = () => {
   // projection) cannot be ordered by the database and so offer no sort control.
   const columns: TTableColumn[] = [
     { key: 'purchaseDate', label: 'Purchase Date', width: 120, type: 'date', name: 'purchaseDate', sortField: 'PurchaseDate' },
-    { key: 'assetCode', label: 'Code', width: 140, type: 'string', name: 'assetCode', sortField: 'AssetCode' },
+    // Wider than a bare code: the cell also carries the asset's photo thumbnail.
+    { key: 'assetCode', label: 'Code', width: 195, type: 'string', name: 'assetCode', sortField: 'AssetCode' },
     { key: 'assetName', label: 'Asset Name', width: 190, type: 'string', name: 'assetName', sortField: 'AssetName' },
-    { key: 'currentCustodianEmployeeName', label: 'Custodian', width: 150, type: 'string', name: 'currentCustodianEmployeeName' },
+    // Custodian and Location are joined/subquery names, not Asset entity properties, so
+    // the server orders them through an explicit hand-written path (AssetService.ApplyAssetSort)
+    // rather than the generic entity sorter — hence they carry a sortField despite the rule above.
+    { key: 'currentCustodianEmployeeName', label: 'Custodian', width: 150, type: 'string', name: 'currentCustodianEmployeeName', sortField: 'CurrentCustodianEmployeeName' },
     { key: 'units', label: 'Units', width: 60, name: 'units' },
     // Both money columns print a formatted string but order by the stored decimal —
     // and the VAT-inclusive total is a fixed multiple of it, so it shares the field.
@@ -135,7 +165,7 @@ const AssetsPage = () => {
     { key: 'totalPrice', label: `Total (incl. ${VAT_RATE * 100}% VAT)`, width: 155, name: 'totalPrice', sortField: 'PurchaseCost' },
     { key: 'accumulatedDepreciation', label: 'Depreciation', width: 120, name: 'accumulatedDepreciation' },
     { key: 'netBookValue', label: 'Net Value', width: 120, name: 'netBookValue' },
-    { key: 'assetLocationName', label: 'Location', width: 150, type: 'string', name: 'assetLocationName' },
+    { key: 'assetLocationName', label: 'Location', width: 150, type: 'string', name: 'assetLocationName', sortField: 'AssetLocationName' },
     { key: 'lifecycleStatus', label: 'Lifecycle', width: 110, name: 'lifecycleStatus', sortField: 'LifecycleStatus' },
     // Off by default — the Columns control brings them back per user or company-wide.
     { key: 'assetCategoryName', label: 'Category', width: 150, type: 'string', name: 'assetCategoryName', visible: false },
@@ -208,6 +238,14 @@ const AssetsPage = () => {
     }));
   }, [debouncedSearch]);
 
+  useEffect(() => {
+    setFilters((prev) => ({
+      ...prev,
+      assetName: debouncedAssetName || undefined,
+      pageNumber: 1,
+    }));
+  }, [debouncedAssetName]);
+
   const updateFilters = (updates: Partial<ITableFilters>) => {
     setFilters((prev) => mergeTableFilters(prev, updates));
   };
@@ -221,6 +259,8 @@ const AssetsPage = () => {
   const viewFilters = useMemo<IAssetFilter>(
     () => ({
       search: filters.search,
+      assetName: filters.assetName,
+      custodianId: filters.custodianId,
       assetCategoryId: filters.assetCategoryId,
       lifecycleStatus: filters.lifecycleStatus,
       custodyStatus: filters.custodyStatus,
@@ -228,6 +268,8 @@ const AssetsPage = () => {
     }),
     [
       filters.search,
+      filters.assetName,
+      filters.custodianId,
       filters.assetCategoryId,
       filters.lifecycleStatus,
       filters.custodyStatus,
@@ -236,6 +278,8 @@ const AssetsPage = () => {
   );
 
   const activeFilterCount = [
+    filters.assetName,
+    filters.custodianId,
     filters.assetCategoryId,
     filters.lifecycleStatus,
     filters.custodyStatus,
@@ -245,6 +289,11 @@ const AssetsPage = () => {
   /** Plain-language echo of the active narrowing, so Analytics can say what it describes. */
   const filterSummary = useMemo(() => {
     const parts: string[] = [];
+    if (filters.assetName) parts.push(`name “${filters.assetName}”`);
+    if (filters.custodianId) {
+      const custodian = employees.find((e) => e.id === filters.custodianId);
+      if (custodian) parts.push(`held by ${custodian.fullName}`);
+    }
     if (filters.assetCategoryId) {
       const category = categories.find((c) => c.id === filters.assetCategoryId);
       if (category) parts.push(category.name);
@@ -254,7 +303,7 @@ const AssetsPage = () => {
     if (filters.operationalStatus != null) parts.push(OPERATIONAL_LABELS[filters.operationalStatus]);
     if (filters.search) parts.push(`matching “${filters.search}”`);
     return parts.length ? parts.join(' · ') : 'every asset in the register';
-  }, [filters, categories]);
+  }, [filters, categories, employees]);
 
   const handleActivate = useCallback(
     async (asset: IAssetListItem) => {
@@ -343,15 +392,24 @@ const AssetsPage = () => {
   const rowData = useMemo(() => assets.map((asset) => ({
     id: asset.id,
     purchaseDate: shortDate(asset.purchaseDate),
-    // The code reads as a link, so it is one — it opens the asset it names.
+    // The code reads as a link, so it is one — it opens the asset it names. The thumb beside
+    // it identifies the physical thing; clicking the thumb enlarges rather than navigating.
     assetCode: (
-      <button
-        type="button"
-        className="font-medium text-primarycolor hover:underline"
-        onClick={() => router.push(`/assets/${asset.id}`)}
-      >
-        {asset.assetCode}
-      </button>
+      <span className="flex items-center gap-2">
+        <AssetPhotoThumb
+          assetId={asset.id}
+          assetCode={asset.assetCode}
+          assetName={asset.assetName}
+          size="sm"
+        />
+        <button
+          type="button"
+          className="min-w-0 truncate font-medium text-primarycolor hover:underline"
+          onClick={() => router.push(`/assets/${asset.id}`)}
+        >
+          {asset.assetCode}
+        </button>
+      </span>
     ),
     assetName: asset.assetName,
     // Named only while someone actually holds it: an unassigned asset has no custodian,
@@ -444,17 +502,42 @@ const AssetsPage = () => {
         open={showFilters}
         onOpenChange={setShowFilters}
         activeCount={activeFilterCount}
-        onClearAll={() =>
+        onClearAll={() => {
+          setAssetNameInput('');
           setFilters((prev) => ({
             ...prev,
+            assetName: undefined,
+            custodianId: undefined,
             assetCategoryId: undefined,
             lifecycleStatus: undefined,
             custodyStatus: undefined,
             operationalStatus: undefined,
             pageNumber: 1,
-          }))
-        }
+          }));
+        }}
       >
+        <Input
+          label="Asset Name"
+          placeholder="Name contains…"
+          value={assetNameInput}
+          onChange={(e) => setAssetNameInput(e.target.value)}
+        />
+        <Select
+          label="Custodian"
+          placeholder="All custodians"
+          options={employees.map((employee) => ({
+            value: employee.id,
+            label: employee.fullName,
+          }))}
+          value={filters.custodianId ?? ''}
+          onChange={(e) =>
+            setFilters((prev) => ({
+              ...prev,
+              custodianId: e.target.value || undefined,
+              pageNumber: 1,
+            }))
+          }
+        />
         <Select
           label="Category"
           placeholder="All categories"
@@ -527,7 +610,11 @@ const AssetsPage = () => {
         />
       </FilterPanel>
       <ImportExportOptions entity="assets" entityLabel="Assets" onImported={loadAssets} />
-      <SearchBox onSearch={setSearchQuery} searchVal={searchQuery} />
+      <SearchBox
+        onSearch={setSearchQuery}
+        searchVal={searchQuery}
+        placeholder="Search name, code, custodian, location…"
+      />
     </>
   );
 
@@ -583,7 +670,15 @@ const AssetsPage = () => {
       ) : (
         <>
           <TableToolbar
-            tableHeaderLeft={toolbarLeft}
+            tableHeaderLeft={
+              <>
+                {/* Back is inherited from CustomTable, which only renders in the table view — so
+                    every other view had no way back, and an operator whose saved view is Card or
+                    Kanban never saw one at all. */}
+                <BackButton />
+                {toolbarLeft}
+              </>
+            }
             tableHeaderRight={filterControls}
           />
 

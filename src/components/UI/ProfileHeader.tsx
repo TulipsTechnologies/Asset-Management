@@ -43,6 +43,7 @@ const ProfileHeader = ({
   rightSlot,
   actions,
   onPhotoSelected,
+  onPhotoClick,
   photoUploading = false,
 }: {
   photoUrl?: string | null;
@@ -57,6 +58,8 @@ const ProfileHeader = ({
   actions?: ReactNode;
   /** When provided, a small camera overlay lets the user change the photo. */
   onPhotoSelected?: (file: File) => void;
+  /** When provided, clicking the photo calls this — used to open it full size. */
+  onPhotoClick?: () => void;
   photoUploading?: boolean;
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -66,12 +69,31 @@ const ProfileHeader = ({
       <div className="flex flex-wrap items-center gap-4">
         <div className="relative shrink-0">
           {photoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={photoUrl}
-              alt={title}
-              className="size-16 rounded-full object-cover object-center border border-gray-100"
-            />
+            onPhotoClick ? (
+              <button
+                type="button"
+                onClick={onPhotoClick}
+                title="View photo"
+                className="group relative block size-16 overflow-hidden rounded-full border border-gray-100"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={photoUrl}
+                  alt={title}
+                  className="size-16 rounded-full object-cover object-center transition-transform duration-200 group-hover:scale-105"
+                />
+                <span className="absolute inset-0 flex items-center justify-center bg-black/0 text-transparent transition-colors group-hover:bg-black/35 group-hover:text-white">
+                  <i className="icon icon-expand text-xs" />
+                </span>
+              </button>
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={photoUrl}
+                alt={title}
+                className="size-16 rounded-full object-cover object-center border border-gray-100"
+              />
+            )
           ) : (
             <div className="size-16 rounded-full bg-primarycolor text-white flex items-center justify-center text-xl font-bold">
               {fallback}

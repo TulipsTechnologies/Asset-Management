@@ -49,9 +49,12 @@ import {
   AuditScopeTypeEnum,
 } from '@/enum/auditEnums';
 import useDebounce from '@/hooks/useDebounce';
+import { shortDate } from '@/components/Assets/AssetViewShared';
 
-const formatDate = (value?: string | null) =>
-  value ? new Date(value).toLocaleDateString() : '—';
+// Delegates to the module's one date formatter. This was one of 18 identical local copies
+// rendering the locale default ("8/20/2026"), which reads as a different day outside the US
+// and disagreed with the dashboard and the printed sheets.
+const formatDate = (value?: string | null) => shortDate(value);
 
 type TScopeRow = { scopeType: string; scopeRefId: string };
 
@@ -569,7 +572,7 @@ const PhysicalVerificationPage = () => {
               maxLength={200}
               placeholder="Q3 head-office audit…"
             />
-            <div className="grid grid-cols-2 gap-x-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-5">
               <Input
                 label="Scheduled From"
                 type="date"
@@ -624,10 +627,10 @@ const PhysicalVerificationPage = () => {
             </div>
             <div className="space-y-4">
               {form.scopes.map((row, index) => (
-                <div key={index} className="flex items-end gap-x-4">
+                <div key={index} className="flex flex-col sm:flex-row sm:items-end gap-y-3 sm:gap-x-4">
                   <Select
                     label="Scope Type"
-                    className="w-44"
+                    className="w-full sm:w-44"
                     placeholder="Select type"
                     options={AUDIT_SCOPE_TYPE_OPTIONS.map((t) => ({
                       value: String(t),
@@ -687,6 +690,7 @@ const PhysicalVerificationPage = () => {
               Cancel
             </Button>
             <Button onClick={handleSave} disabled={saving}>
+              <i aria-hidden="true" className="icon icon-save text-xs" />
               {saving
                 ? 'Saving…'
                 : editing

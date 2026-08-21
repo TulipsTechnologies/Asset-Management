@@ -49,10 +49,10 @@ const SearchBox: React.FC<SearchBoxProps> = ({
         aria-label={ariaLabel ?? placeholder}
         onChange={handleChange}
         onKeyPress={handleKeyPress}
-        className="h-[40px] pr-10 focus:outline-none bg-transparent text-sm border-b"
+        className="w-full h-[40px] pr-10 bg-transparent text-sm border-b"
       />
       <button
-        className="absolute right-0 top-0 h-full py-2 pl-3 text-gray-500 flex items-center justify-center focus:outline-none  text-sm bg-transparent"
+        className="absolute right-0 top-0 h-full py-2 pl-3 text-gray-500 flex items-center justify-center  text-sm bg-transparent"
         disabled
       >
         <i className="icon icon-search text-sm" />

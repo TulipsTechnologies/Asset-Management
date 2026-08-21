@@ -39,9 +39,12 @@ import {
   FiscalPeriodStatusEnum,
   PERIOD_STATUS_LABELS,
 } from '@/enum/depreciationEnums';
+import { shortDate } from '@/components/Assets/AssetViewShared';
 
-const formatDate = (value?: string | null) =>
-  value ? new Date(value).toLocaleDateString() : '—';
+// Delegates to the module's one date formatter. This was one of 18 identical local copies
+// rendering the locale default ("8/20/2026"), which reads as a different day outside the US
+// and disagreed with the dashboard and the printed sheets.
+const formatDate = (value?: string | null) => shortDate(value);
 
 /** Bikram Sambat month names, Shrawan first — the fiscal year's fixed order. */
 type TMappingForm = {
@@ -475,7 +478,7 @@ export default function DepreciationConfigurationPage() {
 
         {selectedYearId && periods.length > 0 && (
           <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[620px] text-sm">
             <thead className="bg-gray-50 text-left text-xs text-gray-600">
               <tr>
                 <th className="px-3 py-2">#</th>
@@ -552,7 +555,7 @@ export default function DepreciationConfigurationPage() {
 
         {mappings.length > 0 && (
           <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[760px] text-sm">
             <thead className="bg-gray-50 text-left text-xs text-gray-600">
               <tr>
                 <th className="px-3 py-2">Scope</th>
@@ -609,7 +612,7 @@ export default function DepreciationConfigurationPage() {
             The previous policy is retired, not overwritten. The currency cannot change while
             capitalized assets are on the register.
           </p>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Threshold"
               type="number"
@@ -641,7 +644,7 @@ export default function DepreciationConfigurationPage() {
           />
           <div className="mt-5 flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setPolicyOpen(false)}>Cancel</Button>
-            <Button onClick={submitPolicy} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
+            <Button onClick={submitPolicy} disabled={saving}><i aria-hidden="true" className="icon icon-save text-xs" />{saving ? 'Saving…' : 'Save'}</Button>
           </div>
         </div>
       </Modal>
@@ -655,7 +658,7 @@ export default function DepreciationConfigurationPage() {
             month against the published patro before saving. Month lengths of 29–32 days are
             all legitimate.
           </p>
-          <div className="grid grid-cols-3 items-end gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 items-end gap-4">
             <Input
               label="Year Code"
               placeholder="2084/85"
@@ -675,7 +678,7 @@ export default function DepreciationConfigurationPage() {
 
           {periodDrafts.length > 0 && (
             <div className="mt-4 max-h-80 overflow-auto">
-              <table className="w-full text-sm">
+              <table className="w-full min-w-[520px] text-sm">
                 <thead className="sticky top-0 bg-gray-100 text-left text-xs text-gray-600">
                   <tr>
                     <th className="px-2 py-2">#</th>
@@ -734,7 +737,7 @@ export default function DepreciationConfigurationPage() {
             Proceeds must have their own account — debiting them against the cost account
             would leave part of a disposed asset&apos;s cost on the balance sheet.
           </p>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Select
               label="Scope"
               value={mappingForm.assetCategoryId}
@@ -803,7 +806,7 @@ export default function DepreciationConfigurationPage() {
           />
           <div className="mt-5 flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setMappingOpen(false)}>Cancel</Button>
-            <Button onClick={submitMapping} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
+            <Button onClick={submitMapping} disabled={saving}><i aria-hidden="true" className="icon icon-save text-xs" />{saving ? 'Saving…' : 'Save'}</Button>
           </div>
         </div>
       </Modal>

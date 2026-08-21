@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useToast } from '@/components/Providers/ToastProvider';
+import { money, shortDate } from '@/components/Assets/AssetViewShared';
 import Button from '@/components/UI/Button';
 import CustomTable from '@/components/CustomTable/CustomTable';
 import {
@@ -34,13 +35,17 @@ import {
 } from '@/enum/returnEnums';
 import useDebounce from '@/hooks/useDebounce';
 
-const formatDate = (value?: string | null) =>
-  value ? new Date(value).toLocaleDateString() : '—';
+// Delegates to the module's one date formatter. This was one of 18 identical local copies
+// rendering the locale default ("8/20/2026"), which reads as a different day outside the US
+// and disagreed with the dashboard and the printed sheets.
+const formatDate = (value?: string | null) => shortDate(value);
 
+/**
+ * Money, through the module's one formatter — see the note in disposal/page.tsx. The local copy
+ * used bare toLocaleString(), so a recovery amount of 1234.50 was shown as "1,234.5".
+ */
 const formatAmount = (amount?: number | null, currencyId?: string | null) =>
-  amount != null
-    ? `${amount.toLocaleString()}${currencyId ? ` ${currencyId}` : ''}`
-    : '—';
+  money(amount, currencyId);
 
 const RecoveryCasesTab = () => {
   const { addToast } = useToast();

@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import BackButton from '../UI/BackButton';
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { LAST_HUB_STORAGE_KEY } from '@/utils/navigation';
+import { HUB_URLS, LAST_HUB_STORAGE_KEY } from '@/utils/navigation';
 
 export interface IHubCard {
   label: string;
@@ -12,6 +13,12 @@ export interface IHubCard {
   url: string;
   /** Planned for a later phase — shows a badge and links to /coming-soon. */
   phase2?: boolean;
+  /**
+   * Kept out of the grid without being deleted. A card announcing a feature nobody can use
+   * yet is a promise the hub cannot keep, so it waits here rather than in a commented-out
+   * block — flip this to false when the feature ships and the entry is already correct.
+   */
+  hidden?: boolean;
 }
 
 export interface IHubSection {
@@ -39,11 +46,20 @@ const ModuleHub = ({
   // Categories, for one, is offered by two different hubs.
   const pathname = usePathname();
   useEffect(() => {
-    if (pathname) sessionStorage.setItem(LAST_HUB_STORAGE_KEY, pathname);
+    // Only an actual HUB may be remembered as one. This wrote whatever path it was on, and
+    // /system-test renders a ModuleHub while being a Settings CHILD — so visiting it recorded
+    // a leaf as the last hub and poisoned the tie-break for pages two hubs both offer, such
+    // as Categories.
+    if (pathname && HUB_URLS.includes(pathname))
+      sessionStorage.setItem(LAST_HUB_STORAGE_KEY, pathname);
   }, [pathname]);
 
   return (
   <div className="px-4 sm:px-6 py-6">
+    {/* Silent on the four hub pages — they are in ROOTS, where the resolver has no answer and
+        the sidebar already reaches. It renders on /system-test, which renders a hub but is a
+        Settings child, and which had no way back at all. */}
+    <BackButton className="mb-3" />
     <h1 className="text-lg font-semibold text-secondaryColor">{title}</h1>
     <p className="text-xs text-gray-500 mt-0.5">{description}</p>
 
@@ -59,7 +75,9 @@ const ModuleHub = ({
             section.heading ? 'mt-3' : ''
           }`}
         >
-          {section.cards.map((card) => (
+          {section.cards
+            .filter((card) => !card.hidden)
+            .map((card) => (
             <Link
               key={card.label}
               href={card.url}

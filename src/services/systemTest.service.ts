@@ -67,6 +67,24 @@ export const runSystemTestDemoData = (
     completeData: true,
   });
 
+/**
+ * Environment reset — permanently erases ONE company's asset data. Any company the caller
+ * is a member of (not only test/demo): the deliberate "client finished testing, start the
+ * real system fresh" wipe. PIN-gated and name-confirmed, both verified server-side.
+ */
+export const resetCompanyData = (
+  companyId: string,
+  confirmationPhrase: string,
+  pin: string
+): Promise<IResponse<{ totalRows: number; deleted: Record<string, number> }>> =>
+  requestApi({
+    apiEndpoint: '/SystemTest/reset',
+    method: 'POST',
+    body: JSON.stringify({ companyId, confirmationPhrase, pin }),
+    contentType: 'application/json',
+    completeData: true,
+  });
+
 /** Deterministic regression. Registered TEST company only — never the demo company. */
 export const runSystemTestRegression = (
   request: ISystemTestRegressionRequest
