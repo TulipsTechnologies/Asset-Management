@@ -382,8 +382,12 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   html,
   body,
   main,
-  header,
-  footer,
+  /* Scoped to the APP's own chrome. Bare `header`/`footer` also matched the <header> and
+     <footer> of every printed document, stomping the letterhead rule and the footer rule
+     with `border: none !important` — so the preview drew lines the printer never would,
+     which is precisely the mismatch the preview exists to eliminate. */
+  body > header,
+  body > footer,
   .container {
     background: transparent !important;
     color: #000 !important;
@@ -424,7 +428,11 @@ input[type="time"]::-webkit-calendar-picker-indicator {
     height: auto !important;
     border: none !important;
     overflow: visible;
-    margin: 0 auto 0.5% auto !important;
+    /* NOT !important. The named pages below (@page schedule / sheet-landscape) exist to give
+       printed documents a real 14mm/12mm margin, and !important here beat them — every sheet
+       printed full-bleed at x=0, inside the unprintable area most printers clip. Unnamed
+       pages still resolve to this same value; it is simply overridable now. */
+    margin: 0 auto 0.5% auto;
     top: auto !important;
     left: auto !important;
     right: auto !important;
@@ -999,6 +1007,12 @@ input[type="number"]::-webkit-outer-spin-button {
 
   html,
   body {
+    /* The reset makes <body> an atomic inline box (src/styles/common/_reset.scss, twinned in
+       the vendored copy). An atomic inline CANNOT be fragmented, so `break-before: page` on
+       the office copy was silently discarded and only the first copy ever reached paper —
+       and <body> sized itself shrink-to-fit at 654px instead of the 794px page width.
+       Measured: this one declaration takes the receipt from 1 printed page to 2. */
+    display: block !important;
     background: #fff;
   }
 
