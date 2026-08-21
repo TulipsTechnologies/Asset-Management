@@ -101,15 +101,8 @@ const TransfersPage = () => {
   };
 
   // Print on the render AFTER the sheet mounts; inline would race the document snapshot.
-  useEffect(() => {
-    if (!gatePassFor) return;
-    // setTimeout, NOT requestAnimationFrame: rAF never fires while the document is
-    // hidden, so a user who switches tab straight after clicking would get no print
-    // at all and no error either. A timer fires regardless of visibility.
-    const timer = setTimeout(() => printGatePass(), 0);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gatePassFor]);
+  // No auto-print: the sheet opens as a PREVIEW and the operator presses Print once they can
+  // see the document. Printing on the same tick the portal mounted is what produced blanks.
 
   const [transfers, setTransfers] = useState<IAssetTransfer[]>([]);
   const [loading, setLoading] = useState(false);
@@ -668,7 +661,10 @@ const TransfersPage = () => {
       </Modal>
 
       {gatePassFor && (
-        <PrintSheet>
+        <PrintSheet
+          title={`Gate pass — ${gatePassFor.assetCode}`}
+          onClose={() => setGatePassFor(null)}
+        >
           <GatePassSheet
             companyName={printIdentity.companyName}
             generatedBy={printIdentity.userName}

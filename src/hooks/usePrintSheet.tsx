@@ -93,42 +93,84 @@ export const usePrintSheet = (armed = true) => {
     return () => document.body.classList.remove('printing');
   }, [armed]);
 
-  // A document's data usually lands in two stages — the row first, then an enriching fetch —
-  // and the effect that triggers the print re-runs on each. Without this the print dialog
-  // opens twice for one click. Reset when the sheet disarms, so the next document prints.
-  const printed = useRef(false);
-  useEffect(() => {
-    if (!armed) printed.current = false;
-  }, [armed]);
-
   const print = useCallback(() => {
-    if (!armed || printed.current) return;
-    printed.current = true;
+    if (!armed) return;
     window.print();
   }, [armed]);
 
-  /** Wraps the document and portals it. Render it unconditionally; CSS decides visibility. */
+  /**
+   * The document, shown on screen as a PREVIEW with its own Print button.
+   *
+   * It used to print the instant it armed. That is what produced blank paper: the sheet was
+   * `display: none` at every size except `@media print`, so nothing was ever visible to check,
+   * and window.print() fired on the same tick the portal mounted — whichever won the race
+   * decided whether the page had content. Worse, a blank result was indistinguishable from a
+   * printer problem, because there was nothing on screen to compare against.
+   *
+   * Now the sheet is rendered visibly, at paper proportions, and the operator presses Print
+   * when they can see what they are about to sign. That removes the race completely (the
+   * document has been on screen for however long they looked at it) and makes a genuinely
+   * empty document obvious instead of mysterious.
+   */
   const PrintSheet = useCallback(
     ({
       children,
       landscape,
+      title = 'Print preview',
+      onClose,
     }: {
       children: ReactNode;
       /** Wide tables (a count sheet, a register listing) that do not fit portrait. */
       landscape?: boolean;
+      /** Shown in the preview toolbar — names the document being previewed. */
+      title?: string;
+      /** Disarms the sheet. Wired to Close, the backdrop and Escape. */
+      onClose?: () => void;
     }) => {
       if (!armed || typeof document === 'undefined') return null;
       return createPortal(
         <div
           id="print-root"
-          className={`print-sheet${landscape ? ' print-sheet--landscape' : ''}`}
+          className="print-preview"
+          role="dialog"
+          aria-modal="true"
+          aria-label={title}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) onClose?.();
+          }}
         >
-          {children}
+          {/* Screen-only chrome — hidden by @media print so it never reaches paper. */}
+          <div className="print-preview__chrome">
+            <span className="print-preview__title">{title}</span>
+            <span className="print-preview__actions">
+              <button
+                type="button"
+                onClick={print}
+                className="rounded-full bg-primarycolor px-4 py-1.5 text-sm font-medium text-white hover:brightness-95"
+              >
+                <i className="icon icon-print mr-1.5 text-xs" />
+                Print
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-full border border-gray-300 bg-white px-4 py-1.5 text-sm font-medium text-secondaryColor hover:bg-gray-50"
+              >
+                Close
+              </button>
+            </span>
+          </div>
+
+          <div
+            className={`print-sheet${landscape ? ' print-sheet--landscape' : ''}`}
+          >
+            {children}
+          </div>
         </div>,
         document.body
       );
     },
-    [armed]
+    [armed, print]
   );
 
   return { print, PrintSheet };

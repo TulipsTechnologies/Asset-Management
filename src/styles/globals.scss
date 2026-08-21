@@ -566,6 +566,60 @@ input[type="number"]::-webkit-outer-spin-button {
   display: none;
 }
 
+/* ---------------------------------------------------------------- print preview
+   The sheet used to be display:none at every size except @media print, so nobody could
+   see a document before committing it to paper — and a blank result looked identical to a
+   printer fault. The preview shows the same markup on screen at paper proportions, and the
+   operator prints from there. */
+.print-preview {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  overflow: auto;
+  padding: 4.5rem 1rem 2rem;
+  background: rgb(15 23 42 / 55%);
+}
+
+/* Beats the display:none above only inside the preview. */
+.print-preview .print-sheet {
+  display: block;
+  max-width: 210mm; /* A4 portrait */
+  margin: 0 auto;
+  padding: 14mm 12mm;
+  background: #fff;
+  color: #111;
+  border-radius: 4px;
+  box-shadow: 0 12px 40px rgb(0 0 0 / 25%);
+}
+
+.print-preview .print-sheet--landscape {
+  max-width: 297mm; /* A4 landscape */
+}
+
+.print-preview__chrome {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1.25rem;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.print-preview__title {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.print-preview__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
 @media print {
   /* SCOPED to the class the schedule dialog puts on <body> while it is open. Unscoped,
      this hid every body child on every route and printed the rest of the app blank. */
@@ -577,6 +631,29 @@ input[type="number"]::-webkit-outer-spin-button {
      adds `printing` to <body> and portals the sheet into #print-root. Same scoping discipline
      — the class is only present while a print is in flight, so no other route can be blanked. */
   body.printing > *:not(#print-root) {
+    display: none !important;
+  }
+
+  /* The preview is a SCREEN affordance. On paper the wrapper must stop being a fixed,
+     scrolling, tinted overlay and become an ordinary block, or the document is clipped to
+     one viewport-sized page with a grey background painted behind it. */
+  .print-preview {
+    position: static !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    background: none !important;
+  }
+
+  .print-preview .print-sheet {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  /* The toolbar is never part of the document. */
+  .print-preview__chrome {
     display: none !important;
   }
 

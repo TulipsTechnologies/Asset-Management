@@ -182,15 +182,8 @@ const ReturnsPage = () => {
   };
 
   // Print on the render AFTER the sheet mounts; inline would race the document snapshot.
-  useEffect(() => {
-    if (!clearanceFor) return;
-    // setTimeout, NOT requestAnimationFrame: rAF never fires while the document is
-    // hidden, so a user who switches tab straight after clicking would get no print
-    // at all and no error either. A timer fires regardless of visibility.
-    const timer = setTimeout(() => printClearance(), 0);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clearanceFor]);
+  // No auto-print: the sheet opens as a PREVIEW and the operator presses Print once they can
+  // see the document. Printing on the same tick the portal mounted is what produced blanks.
 
   const [activeTab, setActiveTab] = useState<'returns' | 'recovery'>('returns');
 
@@ -1109,7 +1102,10 @@ const ReturnsPage = () => {
       </Modal>
 
       {clearanceFor && (
-        <PrintSheet>
+        <PrintSheet
+          title={`Return document — ${clearanceFor.assetCode}`}
+          onClose={() => setClearanceFor(null)}
+        >
           <ReturnClearanceSheet
             companyName={printIdentity.companyName}
             generatedBy={printIdentity.userName}

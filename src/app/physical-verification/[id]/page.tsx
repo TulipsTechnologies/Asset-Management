@@ -397,15 +397,8 @@ const CampaignDetailPage = () => {
 
   // Print on the render AFTER the sheet mounts — calling it inline races the browser's
   // document snapshot and prints a blank page.
-  useEffect(() => {
-    if (!countSheetGroups) return;
-    // setTimeout, NOT requestAnimationFrame: rAF never fires while the document is
-    // hidden, so a user who switches tab straight after clicking would get no print
-    // at all and no error either. A timer fires regardless of visibility.
-    const timer = setTimeout(() => printSheet(), 0);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [countSheetGroups]);
+  // No auto-print: the sheet opens as a PREVIEW and the operator presses Print once they can
+  // see the document. Printing on the same tick the portal mounted is what produced blanks.
 
   const loadDiscrepancies = useCallback(async () => {
     if (!id) return;
@@ -2157,7 +2150,11 @@ const CampaignDetailPage = () => {
 
       {/* Landscape: ten columns, four of them left blank for a pen. */}
       {countSheetGroups && (
-        <PrintSheet landscape>
+        <PrintSheet
+          landscape
+          title={`Count sheet — ${campaign.name}`}
+          onClose={() => setCountSheetGroups(null)}
+        >
           <CountSheet
             companyName={printIdentity.companyName}
             generatedBy={printIdentity.userName}
