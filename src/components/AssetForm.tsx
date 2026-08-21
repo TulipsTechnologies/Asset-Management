@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/Providers/ToastProvider';
+import BackButton from '@/components/UI/BackButton';
 import Button from '@/components/UI/Button';
 import Input from '@/components/UI/Input';
 import Select from '@/components/UI/Select';
@@ -461,23 +462,21 @@ const AssetForm = ({ asset }: { asset?: IAsset }) => {
   // comfortable width on a large monitor.
   return (
     <div className="mt-2 max-w-[1200px] px-4">
-      <div className="mb-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-secondaryColor">
-            {isEdit ? `Edit Asset — ${asset.assetCode}` : 'Add Asset'}
-          </h1>
-          <p className="mt-0.5 text-xs text-gray-500">
-            {isEdit
-              ? 'Descriptive and purchase details of the asset. Lifecycle, custody and financials are managed by their own workflows.'
-              : 'Registers the asset and assigns its code. Only name, category and condition are needed to start — the rest can be filled in any time.'}
-          </p>
-        </div>
-        <button
-          onClick={() => router.push(backUrl)}
-          className="text-sm text-gray-500 hover:text-primarycolor"
-        >
-          <i className="icon icon-left mr-1 text-xs" /> Back
-        </button>
+      {/* Back sits ABOVE the title on the left, through the shared BackButton, exactly as
+          every other page in the module places it. This screen used to hand-roll its own on
+          the RIGHT of the title row, which put the control in a different place depending on
+          which page you were on — and on a narrow viewport it collided with the long
+          "Edit Asset — PREMIER-FU-FY83/84-C-05446" heading. */}
+      <BackButton className="mb-3" />
+      <div className="mb-4">
+        <h1 className="text-lg font-semibold text-secondaryColor">
+          {isEdit ? `Edit Asset — ${asset.assetCode}` : 'Add Asset'}
+        </h1>
+        <p className="mt-0.5 text-xs text-gray-500">
+          {isEdit
+            ? 'Descriptive and purchase details of the asset. Lifecycle, custody and financials are managed by their own workflows.'
+            : 'Registers the asset and assigns its code. Only name, category and condition are needed to start — the rest can be filled in any time.'}
+        </p>
       </div>
 
       <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
