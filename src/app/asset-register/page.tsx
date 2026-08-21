@@ -19,8 +19,8 @@ const SECTIONS: IHubSection[] = [
         url: '/asset-categories',
       },
       {
-        label: 'Employees',
-        description: 'Custodian register, synced from TulipsHRM for linked companies',
+        label: 'Custodians',
+        description: 'Who currently holds company assets — synced from TulipsHRM',
         iconName: 'users',
         url: '/employees',
       },

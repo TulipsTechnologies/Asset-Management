@@ -30,7 +30,7 @@ export const staticMenus: IStaticMenu[] = [
   { label: 'Assets', iconName: 'icon-briefcase', iconSizeClass: 'text-lg', url: '/assets/:id' },
   { label: 'Assets', iconName: 'icon-briefcase', iconSizeClass: 'text-lg', url: '/assets/:id/edit' },
   { label: 'Asset Categories', iconName: 'icon-modules', iconSizeClass: 'text-lg', url: '/asset-categories' },
-  { label: 'Employees', iconName: 'icon-users', iconSizeClass: 'text-lg', url: '/employees' },
+  { label: 'Custodians', iconName: 'icon-users', iconSizeClass: 'text-lg', url: '/employees' },
 
   // Asset Operations
   { label: 'Asset Operations', iconName: 'icon-stream', iconSizeClass: 'text-lg', url: '/asset-operations' },

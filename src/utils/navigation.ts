@@ -29,7 +29,7 @@ const HUBS: IHub[] = [
     children: [
       { url: '/assets', label: 'Assets' },
       { url: '/asset-categories', label: 'Categories' },
-      { url: '/employees', label: 'Employees' },
+      { url: '/employees', label: 'Custodians' },
     ],
   },
   {

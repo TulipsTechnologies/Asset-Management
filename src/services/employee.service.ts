@@ -20,6 +20,7 @@ export const fetchEmployees = (
         ...sortQuery(filter),
         Search: filter.search,
         IsActive: filter.isActive,
+        HasOpenAssignments: filter.hasOpenAssignments,
       }),
     method: 'GET',
     completeData: true,
