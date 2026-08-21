@@ -67,6 +67,11 @@ const HUBS: IHub[] = [
 ];
 
 /** Top-level destinations: the sidebar reaches them directly, so they have no "back". */
+const ROOT_LABELS: Record<string, string> = {
+  '/dashboard': 'Dashboard',
+  '/reports': 'Reports & Analytics',
+};
+
 const ROOTS = new Set([
   '/dashboard',
   '/reports',
@@ -116,6 +121,32 @@ export const resolveBackTarget = (
   const owner =
     owners.find((hub) => hub.url === lastHubUrl) ?? owners[0] ?? null;
   return owner ? { url: owner.url, label: owner.label } : null;
+};
+
+/**
+ * A readable name for an arbitrary in-app href, for the Back tooltip.
+ *
+ * The recorded journey stores raw hrefs, which may carry a query string and may point at a
+ * dynamic route the menu map has no exact entry for. Deepest match wins so
+ * /configuration/depreciation is named for itself rather than for Settings, and anything
+ * genuinely unknown degrades to "the previous page" rather than showing a raw path.
+ */
+export const labelForPath = (href: string): string => {
+  const path = href.split('?')[0];
+  // Dashboard and Reports are sidebar destinations rather than hub cards, so they appear in
+  // ROOTS and nowhere in HUBS — without these two they were reachable, nameable places that
+  // the tooltip could only call "the previous page".
+  const root = ROOT_LABELS[path];
+  if (root) return root;
+  let best: INavTarget | null = null;
+  for (const hub of HUBS) {
+    if (isWithin(path, hub.url) && (!best || hub.url.length > best.url.length))
+      best = { url: hub.url, label: hub.label };
+    for (const child of hub.children)
+      if (isWithin(path, child.url) && (!best || child.url.length > best.url.length))
+        best = child;
+  }
+  return best?.label ?? 'the previous page';
 };
 
 /** Remembered across a session so a reload does not lose which hub was used. */

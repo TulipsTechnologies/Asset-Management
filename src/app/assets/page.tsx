@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/components/Providers/ToastProvider';
 import Button from '@/components/UI/Button';
+import BackButton from '@/components/UI/BackButton';
 import CustomTable from '@/components/CustomTable/CustomTable';
 import ImportExportOptions from '@/components/ImportExport/ImportExportOptions';
 import {
@@ -668,7 +669,13 @@ const AssetsPage = () => {
       ) : (
         <>
           <div className="flex flex-wrap justify-between items-center gap-x-4 gap-y-2 w-full mb-3">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">{toolbarLeft}</div>
+            {/* Back is inherited from CustomTable, which only renders in the table view — so
+                every other view had no way back, and an operator whose saved view is Card or
+                Kanban never saw one at all. */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <BackButton />
+              {toolbarLeft}
+            </div>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 md:gap-x-8">
               {filterControls}
             </div>

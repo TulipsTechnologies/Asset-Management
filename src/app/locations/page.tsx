@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useToast } from '@/components/Providers/ToastProvider';
 import Button from '@/components/UI/Button';
+import BackButton from '@/components/UI/BackButton';
 import CustomTable from '@/components/CustomTable/CustomTable';
 import ImportExportOptions from '@/components/ImportExport/ImportExportOptions';
 import {
@@ -480,6 +481,9 @@ const LocationsPage = () => {
   if (view === 'tree') {
     return (
       <div className="px-4 mt-2">
+        {/* Tree is the DEFAULT view and takes its own early return, so until now the most
+            common way to arrive at Locations was also the one with no way back. */}
+        <BackButton className="mb-2" />
         <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between">
           <Button onClick={openCreate}>
             <i className="icon icon-plus text-xs"></i>

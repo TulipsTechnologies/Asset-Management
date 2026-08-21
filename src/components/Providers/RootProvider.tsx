@@ -1,9 +1,10 @@
 'use client';
 import { store } from '@/store';
-import { ReactNode } from 'react';
+import { ReactNode, Suspense } from 'react';
 import { Provider } from 'react-redux';
 import dynamic from 'next/dynamic';
 import SiteLayout from '../Layout/RootLayout';
+import NavHistoryRecorder from '../Layout/NavHistoryRecorder';
 
 const ToastProvider = dynamic(
   () => import('./ToastProvider').then((mod) => mod.ToastProvider),
@@ -23,6 +24,10 @@ const RootProvider = ({ children }: { children: ReactNode }) => {
     <Provider store={store}>
       <ToastProvider>
         <AuthProvider>
+          {/* useSearchParams needs a Suspense boundary above it during prerender. */}
+          <Suspense fallback={null}>
+            <NavHistoryRecorder />
+          </Suspense>
           <SiteLayout>{children}</SiteLayout>
         </AuthProvider>
       </ToastProvider>
