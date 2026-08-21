@@ -321,7 +321,7 @@ export default function ScheduleModal({
       <Modal isOpen={!!book} onClose={onClose} size="6xl">
         {/* The dialog is one flex column: header, summary and toolbar hold still while
             only the table scrolls, so the columns never lose their headings. */}
-        <div className="flex max-h-[86vh] flex-col print:hidden">
+        <div className="flex max-h-[86dvh] flex-col print:hidden">
           <div className="shrink-0 border-b border-gray-100 px-6 pb-4 pr-14 pt-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">

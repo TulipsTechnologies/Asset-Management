@@ -1,5 +1,6 @@
 import { FC, ReactNode, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { lockBodyScroll, unlockBodyScroll } from "@tulipstechnologies/common";
 
 interface ModalProps {
   isOpen: boolean;
@@ -35,26 +36,23 @@ const Modal: FC<ModalProps> = ({
       }
     };
 
-    let focusTimer: ReturnType<typeof setTimeout> | undefined;
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-      window.addEventListener("keydown", handleKeyDown);
-      // Move focus into the dialog (WCAG 2.4.3): otherwise keyboard users are left
-      // behind the overlay, tabbing through the page underneath. A short timeout rather
-      // than one animation frame — the portal's children mount a beat after isOpen flips,
-      // and focusing a node that is not yet in the tree silently does nothing.
-      focusTimer = setTimeout(() => {
-        if (!dialogRef.current) return;
-        if (!dialogRef.current.contains(document.activeElement))
-          dialogRef.current.focus();
-      }, 50);
-    } else {
-      document.body.style.overflow = "auto";
-    }
+    if (!isOpen) return;
+
+    lockBodyScroll();
+    window.addEventListener("keydown", handleKeyDown);
+    // Move focus into the dialog (WCAG 2.4.3): otherwise keyboard users are left
+    // behind the overlay, tabbing through the page underneath. A short timeout rather
+    // than one animation frame — the portal's children mount a beat after isOpen flips,
+    // and focusing a node that is not yet in the tree silently does nothing.
+    const focusTimer = setTimeout(() => {
+      if (!dialogRef.current) return;
+      if (!dialogRef.current.contains(document.activeElement))
+        dialogRef.current.focus();
+    }, 50);
 
     return () => {
-      if (focusTimer) clearTimeout(focusTimer);
-      document.body.style.overflow = "auto";
+      clearTimeout(focusTimer);
+      unlockBodyScroll();
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [isOpen, onClose]);
@@ -91,7 +89,7 @@ const Modal: FC<ModalProps> = ({
 
   return createPortal(
     <div
-      className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[9999] max-h-[100vh] overflow-y-auto px-4 sm:px-0"
+      className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[9999] max-h-[100dvh] overflow-y-auto px-4 sm:px-0"
       onClick={onClose}
     >
       <div
@@ -99,7 +97,7 @@ const Modal: FC<ModalProps> = ({
         aria-modal="true"
         tabIndex={-1}
         ref={dialogRef}
-        className={`bg-white text-black rounded-lg shadow-lg relative z-[10000] max-h-[85vh] sm:max-h-[90vh] overflow-y-auto w-full sm:w-[95vw] ${getWidthClass()} min-w-0 sm:min-w-[320px]`}
+        className={`bg-white text-black rounded-lg shadow-lg relative z-[10000] max-h-[85dvh] sm:max-h-[90dvh] overflow-y-auto w-full sm:w-[95vw] ${getWidthClass()} min-w-0 sm:min-w-[320px]`}
         onClick={(e) => e.stopPropagation()}
       >
         {showCloseBtn && (

@@ -694,7 +694,7 @@ const AssetCategoriesPage = () => {
 
       {/* View details — read-only, reachable for every row */}
       <Modal isOpen={viewing !== null} onClose={() => setViewing(null)} size="2xl">
-        <div className="flex max-h-[85vh] flex-col">
+        <div className="flex max-h-[85dvh] flex-col">
           {/* Identity band: what this category IS, and its standing at a glance. */}
           <div className="shrink-0 border-b border-gray-100 px-6 pb-4 pr-14 pt-5">
             <div className="flex flex-wrap items-start justify-between gap-3">

@@ -260,7 +260,7 @@ const ReportsContent = () => {
               />
             </div>
 
-            <div className="mt-4 max-h-[55vh] overflow-y-auto">
+            <div className="mt-4 max-h-[55dvh] overflow-y-auto">
               <RunItemsTable items={detail.items} />
             </div>
           </div>

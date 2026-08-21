@@ -1274,7 +1274,7 @@ export default function DepreciationPage() {
       <Modal isOpen={!!viewingRun} onClose={() => setViewingRun(null)} size="6xl">
         {/* Header, summary and notices hold still; only the lines scroll, so the column
             headings stay with the figures they name. */}
-        <div className="flex max-h-[86vh] flex-col">
+        <div className="flex max-h-[86dvh] flex-col">
           <div className="shrink-0 border-b border-gray-100 px-6 pb-4 pr-14 pt-5">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-lg font-semibold text-secondaryColor">
