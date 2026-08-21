@@ -91,7 +91,13 @@ const LocationAssetCards = ({
               >
                 {asset.assetName}
               </p>
-              <p className="mt-0.5 truncate font-mono text-xs text-gray-400">
+              {/* Green, like every other asset code in the app. This was the only surface
+                  rendering it grey — the explorer's own TABLE view already used
+                  font-mono text-primarycolor, so the two halves of the same report
+                  disagreed with each other as well as with the register. Mono is kept: that
+                  is the explorer's convention for a code, and it is what the table beside
+                  this uses. */}
+              <p className="mt-0.5 truncate font-mono text-xs text-primarycolor">
                 {asset.assetCode}
               </p>
             </div>
